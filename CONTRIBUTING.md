@@ -14,8 +14,7 @@ platforms/<host>/
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
-schemas/                     JSON Schemas the manifests are checked against
-scripts/                     render, validate, override, new-host, fetch-schemas
+scripts/                     render, validate, override, new-host
 ```
 
 ### Marketplace catalogs
@@ -41,7 +40,7 @@ Unknown variables, unknown skill names, missing slots and unused slot files fail
 
 ## Manifest schemas
 
-A JSON file that declares a `"$schema"` (for example Copilot's `plugin.json` and `mcp.json`) is checked against it by `npm run validate`. The schemas are kept in `schemas/<domain>/<path>`, so CI needs no network. When a host declares a new schema, run `npm run fetch-schemas` and commit what it downloads.
+A JSON file that declares a `"$schema"` (for example Copilot's `plugin.json` and `mcp.json`) is checked against it by `npm run validate`. The schema is downloaded from that URL and cached in `.cache/schemas/` (git-ignored), so it's downloaded once per machine; CI downloads it on each run. Schema URLs carry a version (`…/1.0.0/plugin.schema.json`), so the cache doesn't go stale. If the download fails, `npm run validate` fails and names the URL.
 
 ## Adding a host
 
@@ -56,7 +55,7 @@ Run `npm run new-host` and answer the questions:
 
 It creates `platforms/<id>/` (manifest, MCP config, README, the `getting-started` connect slot, `vars.yaml`), the catalog at the top of the repo if any, and adds the host to `release-please-config.json` and `.release-please-manifest.json` at `0.1.0`. Answers can also be piped in, one per line.
 
-The text only you can write, such as install and sign-in steps, is marked `TODO(new-host)`, and `npm run validate` fails until it's filled in. Add anything else the host needs (more manifest fields, rules, commands) to `platforms/<id>/`, then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/` and the catalog together.
+The text only you can write, such as install and sign-in steps, is marked `TODO(new-host)`, and `npm run validate` fails until it's filled in. Add anything else the host needs (more manifest fields, rules, commands) to `platforms/<id>/`, then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the catalog and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
 
 ## Commits and releases
 
