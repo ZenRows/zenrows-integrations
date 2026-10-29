@@ -1,0 +1,4 @@
+- Tools missing entirely: Zenrows is not connected yet. Tell the user how to connect it:
+  - In Copilot CLI: run `/mcp auth zenrows`, then sign in to Zenrows in the browser. `/mcp` shows whether the `zenrows` server is connected.
+  - In VS Code: run **MCP: List Servers** from the Command Palette, select `zenrows` and start it, then allow it to authenticate and sign in to Zenrows in the browser.
+  - In the GitHub Copilot app: sign in to Zenrows in the browser when Copilot first asks to use the `zenrows` server.

@@ -1,0 +1,8 @@
+# Text that differs per host. Shared skills use these as {{name}}; {{version}}
+# comes from .release-please-manifest.json.
+host: Copilot
+host_full: GitHub Copilot
+# What the host calls Zenrows once connected, as in "The <connection> signs in with OAuth".
+connection: Zenrows MCP server
+write_files_example: Copilot CLI or VS Code agent mode
+skill_prefix: ""

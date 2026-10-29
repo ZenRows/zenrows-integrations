@@ -1,0 +1,19 @@
+{
+  "name": "zenrows",
+  "owner": {
+    "name": "Zenrows",
+    "email": "integrations@zenrows.com"
+  },
+  "metadata": {
+    "description": "Zenrows for GitHub Copilot: live web data through the Zenrows MCP server.",
+    "version": "0.1.1"
+  },
+  "plugins": [
+    {
+      "name": "zenrows",
+      "description": "Live web data for GitHub Copilot: fetch pages, extract structured data, run batch jobs and drive hosted browser sessions through the Zenrows MCP server.",
+      "version": "0.1.1",
+      "source": "./dist/copilot"
+    }
+  ]
+}
