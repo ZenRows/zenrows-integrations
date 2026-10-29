@@ -21,6 +21,14 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
+      # JSON Schemas the manifests declare, downloaded by npm run validate. Their
+      # URLs carry a version, so the cache only changes when a manifest declares
+      # a new schema URL.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/schemas
+          key: schemas-${{ hashFiles('platforms/**/*.json', '.github/plugin/*.json') }}
+          restore-keys: schemas-
       # dist/ must match a fresh render: it's generated, never edited by hand.
       - run: npm run render -- --check
       # Frontmatter, skill references, manifests against their JSON Schemas, and overrides.lock.
