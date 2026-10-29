@@ -1,0 +1,183 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  release-pr:
+    name: Open or update the release PR
+    # After the tag job: on the push that merges a release PR, release-please
+    # must see the new release, or it reads the whole history as unreleased.
+    needs: release
+    if: ${{ !cancelled() && needs.release.result != 'failure' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-release-pr
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-release: true
+
+  detect:
+    name: Detect a release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      release: ${{ steps.detect.outputs.release }}
+      packages: ${{ steps.detect.outputs.packages }}
+      sha: ${{ steps.detect.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          manifest=.release-please-manifest.json
+          no_release() { echo "release=false" >>"$GITHUB_OUTPUT"; echo "No release: $1"; exit 0; }
+
+          # This push must merge a release PR that release-please opened and
+          # change the manifest. Branch name alone is not enough: anyone with
+          # write access can name a branch. "tagged" keeps a full re-run working.
+          pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '
+            [.[] | select(.merged_at != null
+                          and (.head.ref | startswith("release-please--branches--main"))
+                          and .user.login == "github-actions[bot]"
+                          and ([.labels[].name] | any(. == "autorelease: pending" or . == "autorelease: tagged")))][0].number // empty')
+          [ -n "$pr" ] || no_release "this push does not merge a release PR"
+          if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- "$manifest"; then no_release "the manifest did not change"; fi
+
+          # Every package (host) whose version changed in this release PR. The
+          # component comes from release-please-config.json, so tags match the
+          # ones release-please creates: <component>-v<version>.
+          packages=$(jq -c -n \
+            --slurpfile now "$manifest" \
+            --slurpfile before <(git show "$BEFORE:$manifest") \
+            --slurpfile config release-please-config.json '
+            [$now[0] | to_entries[] | select($before[0][.key] != .value)
+             | .key as $p | .value as $v | $before[0][$p] as $prev
+             | ($config[0].packages[$p].component // ($p | split("/") | last)) as $c
+             | {package: $p, component: $c, version: $v, tag: "\($c)-v\($v)",
+                previous_tag: (if $prev then "\($c)-v\($prev)" else "" end)}]')
+          [ "$(jq length <<<"$packages")" -gt 0 ] || no_release "no package version changed"
+          echo "Release PR #$pr:"
+          jq -r '.[] | "  \(.component) \(.previous_tag) -> \(.tag)"' <<<"$packages"
+          {
+            echo "release=true"
+            echo "packages=$packages"
+            echo "sha=$GITHUB_SHA"
+          } >>"$GITHUB_OUTPUT"
+
+  release:
+    name: Tag and release
+    needs: detect
+    if: needs.detect.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    # The release environment deploys only from main.
+    environment: release
+    concurrency:
+      group: ${{ github.workflow }}-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      PACKAGES: ${{ needs.detect.outputs.packages }}
+      COMMIT: ${{ needs.detect.outputs.sha }}
+    steps:
+      # A re-run after a partial release finds its own tags and goes on to the notes.
+      - name: Check the tags
+        id: tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for tag in $(jq -r '.[].tag' <<<"$PACKAGES"); do
+            if ! ref=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" 2>/dev/null); then
+              missing=1
+              continue
+            fi
+            sha=$(jq -r .object.sha <<<"$ref")
+            if [ "$(jq -r .object.type <<<"$ref")" = tag ]; then
+              sha=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq .object.sha)
+            fi
+            if [ "$sha" != "$COMMIT" ]; then
+              echo "::error::The tag $tag already exists on another commit ($sha)."
+              exit 1
+            fi
+            echo "::notice::The tag $tag already exists on this commit."
+          done
+          echo "missing=$missing" >>"$GITHUB_OUTPUT"
+
+      # One run creates the tag and GitHub release of every package in the merged release PR.
+      - name: Create the tags and GitHub releases
+        if: steps.tags.outputs.missing == '1'
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
+
+  publish:
+    name: Publish ${{ matrix.component }}
+    needs: [detect, release]
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect.outputs.packages) }}
+    env:
+      COMPONENT: ${{ matrix.component }}
+      VERSION: ${{ matrix.version }}
+      TAG: ${{ matrix.tag }}
+      PREVIOUS_TAG: ${{ matrix.previous_tag }}
+      COMMIT: ${{ needs.detect.outputs.sha }}
+    steps:
+      - name: Set the release title and notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The first release of a host has no previous tag to compare with.
+          previous=()
+          if [ -n "$PREVIOUS_TAG" ] && gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$PREVIOUS_TAG" >/dev/null 2>&1; then
+            previous=(-f "previous_tag_name=$PREVIOUS_TAG")
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f "tag_name=$TAG" "${previous[@]}" --jq .body |
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file -
+
+      # Steps that publish a host somewhere else go here, selected by component,
+      # for example: if: matrix.component == 'cursor' (push dist/cursor to its mirror).
+
+      - name: Write the summary
+        run: |
+          repo="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          {
+            echo "## $COMPONENT $VERSION"
+            echo "- Tag: [$TAG]($repo/tree/$TAG)"
+            echo "- Release: [$TAG]($repo/releases/tag/$TAG)"
+            echo "- Commit: [${COMMIT:0:7}]($repo/commit/$COMMIT)"
+          } >>"$GITHUB_STEP_SUMMARY"
