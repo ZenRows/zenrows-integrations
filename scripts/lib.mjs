@@ -29,12 +29,6 @@ process.on("uncaughtException", (e) => {
 
 export const sha256 = (buf) => createHash("sha256").update(buf).digest("hex");
 
-// Local copy of a JSON Schema declared in "$schema": schemas/<domain>/<path>.
-export function schemaFile(url) {
-  const { hostname, pathname } = new URL(url);
-  return join(root, "schemas", hostname, pathname);
-}
-
 export function hosts() {
   return readdirSync(platformsDir).filter((d) => statSync(join(platformsDir, d)).isDirectory()).sort();
 }

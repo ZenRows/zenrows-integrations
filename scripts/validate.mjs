@@ -1,26 +1,64 @@
 // Checks what each host ships: skill frontmatter, skill references, manifests
 // (against the JSON Schema they declare), the marketplace catalogs at the top of
 // the repo, and that no whole-file override was copied from an older shared file.
-import { existsSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hosts, listFiles, platformsDir, readLock, renderHost, root, schemaFile, sha256, skillNames, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hosts, listFiles, platformsDir, readLock, renderHost, root, sha256, skillNames, vars } from "./lib.mjs";
 
 const errors = [];
 const report = [];
 
-// Schemas are read from schemas/ (npm run fetch-schemas), so CI needs no network.
+// JSON Schemas are downloaded from the URL a file declares in "$schema" and
+// cached in .cache/schemas/ (git-ignored), so a local run downloads each once.
+// Schema URLs are versioned (…/1.0.0/plugin.schema.json), so a cached copy stays valid.
+async function loadSchemas() {
+  const urls = new Set();
+  for (const host of hosts()) {
+    const tops = catalogs()
+      .filter((c) => c.host === host && existsSync(join(root, c.file)))
+      .map(({ file }) => [file, readFileSync(join(root, file))]);
+    for (const [file, buf] of [...renderHost(host), ...tops]) {
+      if (!file.endsWith(".json")) continue;
+      try {
+        const url = JSON.parse(buf.toString("utf8")).$schema;
+        if (url) urls.add(url);
+      } catch {
+        // Invalid JSON is reported below, with the file it's in.
+      }
+    }
+  }
+  const loaded = new Map();
+  for (const url of urls) {
+    const { hostname, pathname } = new URL(url);
+    const cached = join(root, ".cache", "schemas", hostname, pathname);
+    try {
+      if (!existsSync(cached)) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        JSON.parse(text);
+        mkdirSync(dirname(cached), { recursive: true });
+        writeFileSync(cached, text);
+      }
+      loaded.set(url, JSON.parse(readFileSync(cached, "utf8")));
+    } catch (e) {
+      loaded.set(url, new Error(`couldn't download ${url} (${e.cause?.code ?? e.message})`));
+    }
+  }
+  return loaded;
+}
+
+const schemas = await loadSchemas();
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 const validators = new Map();
-function schemaErrors(url) {
-  if (!validators.has(url)) {
-    const file = schemaFile(url);
-    if (!existsSync(file)) return [`declares ${url}, which isn't in schemas/ (run npm run fetch-schemas and commit it)`];
-    validators.set(url, ajv.compile(JSON.parse(readFileSync(file, "utf8"))));
-  }
+function schemaErrors(url, json) {
+  const schema = schemas.get(url);
+  if (schema instanceof Error) return [`can't be checked against its schema: ${schema.message}`];
+  if (!validators.has(url)) validators.set(url, ajv.compile(schema));
   const check = validators.get(url);
-  return (json) => (check(json) ? [] : check.errors.map((e) => `${e.instancePath || "/"} ${e.message}`));
+  return check(json) ? [] : check.errors.map((e) => `${e.instancePath || "/"} ${e.message}`);
 }
 
 // Parses a JSON file and checks it against its "$schema". Returns the JSON, or
@@ -34,8 +72,7 @@ function readJson(host, file, buf) {
     return undefined;
   }
   if (json.$schema) {
-    const check = schemaErrors(json.$schema);
-    for (const problem of Array.isArray(check) ? check : check(json)) errors.push(`${host}: ${file} ${problem}`);
+    for (const problem of schemaErrors(json.$schema, json)) errors.push(`${host}: ${file} ${problem}`);
   }
   return json;
 }

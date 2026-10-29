@@ -1,3 +1,4 @@
 .DS_Store
 .zenrows/
 node_modules/
+.cache/

@@ -10,8 +10,7 @@
     "validate": "node scripts/validate.mjs",
     "override": "node scripts/override.mjs create",
     "override:ack": "node scripts/override.mjs ack",
-    "new-host": "node scripts/new-host.mjs",
-    "fetch-schemas": "node scripts/fetch-schemas.mjs"
+    "new-host": "node scripts/new-host.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",
