@@ -3,14 +3,15 @@
 # fresh render, or when the render's changes aren't staged. It renders nothing
 # itself. Skip once with `git commit --no-verify`; CI and the pre-push hook
 # still check.
+. "$(dirname "$0")/check-render.sh"
 
 # Only commits that touch what the render reads or writes.
 git diff --cached --name-only | grep -qE '^(dist/|skills/|platforms/|shared/|LICENSE$|README\.md$|\.release-please-manifest\.json$)' || exit 0
 
-if ! node scripts/render.mjs --check >/dev/null 2>&1; then
+if ! check_render "Checking the rendered files"; then
   echo "commit stopped: the rendered files don't match the sources." >&2
   echo "" >&2
-  node scripts/render.mjs --check 2>&1 | grep -E '^(missing|out of date|not rendered)' | sed 's/^/  /' >&2
+  render_problems >&2
   echo "" >&2
   echo "dist/ is generated: don't edit it by hand. Run: npm run render" >&2
   echo "then stage the changes (git add dist README.md) and commit again." >&2
