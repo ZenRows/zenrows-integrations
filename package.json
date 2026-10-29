@@ -1,0 +1,20 @@
+{
+  "name": "zenrows-integrations",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "render": "node scripts/render.mjs",
+    "validate": "node scripts/validate.mjs",
+    "override": "node scripts/override.mjs create",
+    "override:ack": "node scripts/override.mjs ack",
+    "new-host": "node scripts/new-host.mjs",
+    "fetch-schemas": "node scripts/fetch-schemas.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "yaml": "2.9.1"
+  }
+}
