@@ -1,0 +1,13 @@
+#!/bin/sh
+# Stops a push when dist/ or the hosts list in README.md don't match a fresh
+# render. It renders nothing itself: run the command it prints, commit, push again.
+# Turned on by `npm install` (the prepare script); skip once with `git push --no-verify`.
+if ! node scripts/render.mjs --check >/dev/null 2>&1; then
+  echo "push stopped: the rendered files are out of date." >&2
+  echo "" >&2
+  node scripts/render.mjs --check 2>&1 | grep -E '^(missing|out of date|not rendered)' | sed 's/^/  /' >&2
+  echo "" >&2
+  echo "Run: npm run render" >&2
+  echo "then commit the changes and push again." >&2
+  exit 1
+fi

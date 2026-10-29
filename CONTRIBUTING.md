@@ -26,7 +26,7 @@ Some hosts install from a subfolder of this repo through a catalog file at the t
 Requires Node 22. Run `npm ci` once.
 
 1. Change `skills/`, `shared/` or `platforms/<host>/`.
-2. Run `npm run render` and commit the changes in `dist/` with your edit. CI fails if `dist/` doesn't match a fresh render.
+2. Run `npm run render` and commit the changes in `dist/` with your edit. If you forget, `git push` stops and tells you to run it (a pre-push hook that `npm ci` turns on), and CI fails too.
 3. Run `npm run validate` (CI runs it too).
 
 ## Text that differs per host
