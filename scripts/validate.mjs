@@ -5,10 +5,52 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hosts, listFiles, platformsDir, readLock, renderHost, root, sha256, skillNames, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, listFiles, platformsDir, readLock, renderHost, root, sha256, skillNames, vars } from "./lib.mjs";
 
 const errors = [];
 const report = [];
+
+// Every name a skill has anywhere: shared names, each host's own skills, and
+// each host's name for them. A reference is only checked if it's one of these.
+const knownSkills = new Set(skillNames());
+for (const host of hosts()) {
+  const values = vars(host);
+  for (const { name } of hostSkills(host, values)) {
+    knownSkills.add(name);
+    knownSkills.add(hostSkillName(values, name));
+  }
+}
+
+// Skill names a text refers to: "use map", every name inside "(use …)", and
+// backticked names. One-word names count, so a plain "use map" is caught on a
+// host that ships map as zenrows-map.
+function skillReferences(text) {
+  const refs = new Set();
+  const add = (s) => {
+    for (const [word] of s.matchAll(/(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?![\w-])/g)) if (knownSkills.has(word)) refs.add(word);
+  };
+  for (const [, word] of text.matchAll(/\buse (?:the )?`?([a-z][a-z0-9-]*)(?![\w-])/g)) add(word);
+  for (const [, inner] of text.matchAll(/\(use ([^()]*)\)/g)) add(inner);
+  for (const [, word] of text.matchAll(/`([a-z][a-z0-9-]*)`/g)) add(word);
+  return refs;
+}
+
+// Shared skills and host skill text must write references as {{skill:name}},
+// so a host that renames a skill gets its own name. Checked on the sources, so
+// a plain name is caught even while no host renames anything.
+const shared = skillNames();
+const sources = [
+  ...shared.map((n) => `skills/${n}/SKILL.md`),
+  ...hosts().flatMap((h) => listFiles(join(platformsDir, h, "skills")).map((f) => `platforms/${h}/skills/${f}`)),
+];
+for (const file of sources) {
+  const text = readFileSync(join(root, file), "utf8").replace(/\{\{\s*skill:[a-z0-9-]+\s*\}\}/g, "");
+  const name = text.match(/^name: *([a-z][a-z0-9-]*) *$/m);
+  if (name && shared.includes(name[1])) errors.push(`${file}: write name: {{skill:${name[1]}}}, not the plain name`);
+  for (const ref of skillReferences(text)) {
+    if (shared.includes(ref)) errors.push(`${file}: refers to the skill "${ref}" by its plain name; write {{skill:${ref}}}`);
+  }
+}
 
 // JSON Schemas are downloaded from the URL a file declares in "$schema" and
 // cached in .cache/schemas/ (git-ignored), so a local run downloads each once.
@@ -80,7 +122,8 @@ function readJson(host, file, buf) {
 for (const host of hosts()) {
   const files = renderHost(host);
   const values = vars(host);
-  const shipped = new Set(skillNames().map((n) => hostSkillName(values, n)));
+  const own = hostSkills(host, values);
+  const shipped = new Set(own.map((s) => hostSkillName(values, s.name)));
 
   for (const [path, buf] of files) {
     const m = path.match(/^skills\/([^/]+)\/SKILL\.md$/);
@@ -95,15 +138,9 @@ for (const host of hosts()) {
     if (!meta.description) errors.push(`${host}: ${path} has no description`);
     if (meta.name !== m[1]) errors.push(`${host}: ${path} is named "${meta.name}", expected "${m[1]}"`);
 
-    // References to other skills: "use scrape-webpage", "the `map` skill" and
-    // the backticked list after "skills:".
-    const refs = new Set();
-    for (const r of text.matchAll(/\buse ([a-z]+(?:-[a-z]+)+)\b/g)) refs.add(r[1]);
-    for (const r of text.matchAll(/`([a-z][a-z0-9-]*)` skill\b/g)) refs.add(r[1]);
-    for (const line of text.split("\n").filter((l) => /\bskills: `/.test(l))) {
-      for (const r of line.matchAll(/`([a-z][a-z0-9-]*)`/g)) refs.add(r[1]);
-    }
-    for (const ref of refs) {
+    // References to other skills ("use map", "(use map or crawl)", "the `map`
+    // skill") must name a skill this host ships, under its name on this host.
+    for (const ref of skillReferences(text)) {
       if (!shipped.has(ref)) errors.push(`${host}: ${path} refers to skill "${ref}", which ${host} doesn't ship`);
     }
   }
@@ -159,6 +196,7 @@ for (const host of hosts()) {
   }
   for (const file of listFiles(join(platformsDir, host, "skills")).filter((f) => f.endsWith("/SKILL.md"))) {
     const shared = `skills/${file}`;
+    if (!existsSync(join(root, shared))) continue; // a skill only this host has, not an override
     if (!(shared in lock)) errors.push(`${host}: platforms/${host}/skills/${file} overrides ${shared} but isn't in overrides.lock (use npm run override)`);
   }
 

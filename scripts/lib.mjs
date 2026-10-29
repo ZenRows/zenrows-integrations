@@ -64,6 +64,25 @@ export function readLock(host) {
   return parseYaml(readFileSync(file, "utf8")) ?? {};
 }
 
+// The skills a host ships: the shared skills minus vars.yaml's skip_skills, plus
+// the host's own skills (platforms/<host>/skills/<name>/SKILL.md with no shared
+// skill of that name). Returns [{ name, own }].
+export function hostSkills(host, values = vars(host)) {
+  const shared = skillNames();
+  const skip = values.skip_skills ?? [];
+  for (const name of skip) {
+    if (!shared.includes(name)) throw new Error(`platforms/${host}/vars.yaml: skip_skills lists "${name}", which isn't in skills/`);
+  }
+  const own = listFiles(join(platformsDir, host, "skills"))
+    .filter((f) => /^[^/]+\/SKILL\.md$/.test(f))
+    .map((f) => f.split("/")[0])
+    .filter((name) => !shared.includes(name));
+  return [
+    ...shared.filter((name) => !skip.includes(name)).map((name) => ({ name, own: false })),
+    ...own.map((name) => ({ name, own: true })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // A skill's name on a host: skill_prefix + the shared name, unless vars.yaml
 // renames it in skill_names (OpenClaw ships scrape-webpage as zenrows-scrape).
 export function hostSkillName(values, name) {
@@ -74,7 +93,10 @@ export function hostSkillName(values, name) {
 function fill(text, values, where) {
   return text.replace(/\{\{\s*([a-z_]+)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
-      if (!skillNames().includes(arg)) throw new Error(`${where}: ${token} names no skill in skills/`);
+      if (!values.skills.includes(arg)) {
+        const why = skillNames().includes(arg) ? "this host skips it (skip_skills)" : "there's no such skill";
+        throw new Error(`${where}: ${token} names a skill this host doesn't ship: ${why}`);
+      }
       return hostSkillName(values, arg);
     }
     if (arg !== undefined || !(name in values) || typeof values[name] === "object") {
@@ -87,13 +109,16 @@ function fill(text, values, where) {
 // Renders one host. Returns Map<path under dist/<host>, Buffer>.
 export function renderHost(host) {
   const values = vars(host);
+  const skills = hostSkills(host, values);
+  values.skills = skills.map((s) => s.name);
   const platform = join(platformsDir, host);
   const out = new Map();
   const usedSlots = new Set();
 
-  for (const name of skillNames()) {
-    const override = join(platform, "skills", name, "SKILL.md");
-    const source = existsSync(override) ? override : join(skillsDir, name, "SKILL.md");
+  for (const { name } of skills) {
+    // The host's own copy: a skill only this host has, or a whole-file override.
+    const own = join(platform, "skills", name, "SKILL.md");
+    const source = existsSync(own) ? own : join(skillsDir, name, "SKILL.md");
     const where = relative(root, source);
     let text = readFileSync(source, "utf8").replace(/\{\{>\s*([a-z0-9_-]+)\s*\}\}/g, (_, slot) => {
       const file = join(platform, "skills", name, `${slot}.md`);
@@ -108,7 +133,7 @@ export function renderHost(host) {
   for (const file of listFiles(join(platform, "skills"))) {
     const path = relative(root, join(platform, "skills", file));
     if (file.endsWith("/SKILL.md")) continue;
-    if (!usedSlots.has(path)) throw new Error(`${path}: no shared skill has this slot`);
+    if (!usedSlots.has(path)) throw new Error(`${path}: no skill this host ships has this slot`);
   }
 
   for (const [from, to] of Object.entries(sharedFiles)) out.set(to, readFileSync(join(root, from)));

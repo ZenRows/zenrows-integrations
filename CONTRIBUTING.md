@@ -34,13 +34,15 @@ Requires Node 22. Run `npm ci` once.
 - **A word or phrase:** use a variable, for example `{{host}}`, and set it in `platforms/<host>/vars.yaml`.
 - **A paragraph or a few lines:** use a slot, for example `{{> connect}}`, and write the host's text in `platforms/<host>/skills/<skill>/connect.md`. Everything outside the slot stays shared, so later fixes still reach the host.
 - **The whole file, as a last resort:** `npm run override -- <host> <skill>` copies the shared skill into `platforms/<host>/` and records which version it was copied from in `overrides.lock`. When the shared skill changes later, `npm run validate` fails until someone updates the copy, or confirms the change doesn't apply, and runs `npm run override:ack -- <host> <skill>`.
+- **A skill only one host has:** put it in `platforms/<host>/skills/<name>/SKILL.md`, with no shared skill of that name. It ships only on that host and needs no `overrides.lock` entry.
+- **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
 - **A reference to another skill:** write `{{skill:batch}}`, never the plain name. It renders as that skill's name on the host: `skill_prefix` plus the shared name, unless `skill_names` in `vars.yaml` renames it (OpenClaw ships `scrape-webpage` as `zenrows-scrape`). The skill's own `name:` in its frontmatter uses it too.
 
-Unknown variables, unknown skill names, missing slots and unused slot files fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship.
+Unknown variables, unknown skill names, missing slots and unused slot files fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
 
 ## Manifest schemas
 
-A JSON file that declares a `"$schema"` (for example Copilot's `plugin.json` and `mcp.json`) is checked against it by `npm run validate`. The schema is downloaded from that URL and cached in `.cache/schemas/` (git-ignored), so it's downloaded once per machine; CI downloads it on each run. Schema URLs carry a version (`…/1.0.0/plugin.schema.json`), so the cache doesn't go stale. If the download fails, `npm run validate` fails and names the URL.
+A JSON file that declares a `"$schema"` (for example Copilot's `plugin.json` and `mcp.json`) is checked against it by `npm run validate`. The schema is downloaded from that URL and cached in `.cache/schemas/` (git-ignored), so it's downloaded once per machine; CI keeps the same cache between runs. Schema URLs carry a version (`…/1.0.0/plugin.schema.json`), so the cache doesn't go stale. If the download fails, `npm run validate` fails and names the URL.
 
 ## Adding a host
 
