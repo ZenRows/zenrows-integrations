@@ -46,18 +46,16 @@ A JSON file that declares a `"$schema"` (for example Copilot's `plugin.json` and
 
 ## Adding a host
 
-Run `npm run new-host` and answer the questions:
+Run `npm run new-host`. It asks for the host id (`platforms/<id>/`, `dist/<id>/`, tags `<id>-v1.2.3`) and the full product name, then creates `platforms/<id>/` from templates:
 
-- the host id (`platforms/<id>/`, `dist/<id>/`, tags `<id>-v1.2.3`);
-- the names the skills use for the host, and what it calls Zenrows once connected ("Zenrows MCP server", "Zenrows connector");
-- where the agent can write files, and any skill folder prefix;
-- the plugin layout: Claude-style (`.claude-plugin/plugin.json` + `.mcp.json`), Cursor-style (`.cursor-plugin/plugin.json` + `mcp.json`), the Agent Plugins standard (`plugin.json` + `mcp.json`, as Copilot and OpenAI use), or your own paths;
-- the marketplace catalog at the top of the repo the host installs from, if it installs from a subfolder of this repo (empty for hosts that use a mirror, a ZIP upload or a registry);
-- a one-line description.
+- `vars.yaml`, with defaults and comments for every setting;
+- a generic `plugin.json` and `mcp.json`;
+- the README;
+- the `getting-started` sign-in slot.
 
-It creates `platforms/<id>/` (manifest, MCP config, README, the `getting-started` connect slot, `vars.yaml`), the catalog at the top of the repo if any, and adds the host to `release-please-config.json` and `.release-please-manifest.json` at `0.1.0`. Answers can also be piped in, one per line.
+It also adds the host to `release-please-config.json` and `.release-please-manifest.json` at `0.1.0`. Answers can also be piped in, one per line.
 
-The text only you can write, such as install and sign-in steps, is marked `TODO(new-host)`, and `npm run validate` fails until it's filled in. Add anything else the host needs (more manifest fields, rules, commands) to `platforms/<id>/`, then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the catalog and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
+What only a person can decide is marked `TODO(new-host)`, and `npm run validate` fails until it's done: the install and sign-in steps, where the agent can write files, and the plugin files. Each host reads its own layout (Claude: `.claude-plugin/plugin.json` and `.mcp.json`; Cursor: `.cursor-plugin/plugin.json`), so move the templates to those paths, add the fields the host needs, update the manifest path in `release-please-config.json`, and add a marketplace catalog at the top of the repo if the host installs from a subfolder. Use an existing `platforms/<host>/` as the example. Then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the release-please files and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
 
 ## Commits and releases
 
