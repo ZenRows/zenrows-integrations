@@ -10,6 +10,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 | Host | Setup guide |
 |---|---|
 | GitHub Copilot | [dist/copilot/README.md](dist/copilot/README.md) |
+| OpenClaw | [dist/openclaw/README.md](dist/openclaw/README.md) |
 <!-- hosts:end -->
 
 ## Skills

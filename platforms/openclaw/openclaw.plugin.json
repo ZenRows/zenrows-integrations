@@ -1,0 +1,20 @@
+{
+  "id": "zenrows",
+  "name": "Zenrows",
+  "version": "{{version}}",
+  "description": "Web data for OpenClaw: scrape, extract and browser automation through the Zenrows MCP server.",
+  "categories": ["web"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "mcpServers": {
+    "zenrows": {
+      "url": "https://mcp.zenrows.com/mcp",
+      "description": "Enable this plugin and connect your Zenrows account in OpenClaw. A Zenrows account is required; usage is billed by Zenrows.",
+      "auth": "oauth",
+      "transport": "streamable-http"
+    }
+  }
+}

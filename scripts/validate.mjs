@@ -10,24 +10,16 @@ import { catalogs, hostSkillName, hostSkills, hosts, listFiles, platformsDir, re
 const errors = [];
 const report = [];
 
-// Every name a skill has anywhere: shared names, each host's own skills, and
-// each host's name for them. A reference is only checked if it's one of these.
-const knownSkills = new Set(skillNames());
-for (const host of hosts()) {
-  const values = vars(host);
-  for (const { name } of hostSkills(host, values)) {
-    knownSkills.add(name);
-    knownSkills.add(hostSkillName(values, name));
-  }
-}
-
 // Skill names a text refers to: "use map", every name inside "(use …)", and
-// backticked names. One-word names count, so a plain "use map" is caught on a
-// host that ships map as zenrows-map.
-function skillReferences(text) {
+// backticked names. Only words in `names` count: the shared names, plus a
+// host's own names when checking that host. One-word names count, so a plain
+// "use map" is caught on a host that ships map as zenrows-map, while OpenClaw's
+// skill "zenrows" doesn't turn every `zenrows` server mention on other hosts
+// into a reference.
+function skillReferences(text, names) {
   const refs = new Set();
   const add = (s) => {
-    for (const [word] of s.matchAll(/(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?![\w-])/g)) if (knownSkills.has(word)) refs.add(word);
+    for (const [word] of s.matchAll(/(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?![\w-])/g)) if (names.has(word)) refs.add(word);
   };
   for (const [, word] of text.matchAll(/\buse (?:the )?`?([a-z][a-z0-9-]*)(?![\w-])/g)) add(word);
   for (const [, inner] of text.matchAll(/\(use ([^()]*)\)/g)) add(inner);
@@ -47,7 +39,7 @@ for (const file of sources) {
   const text = readFileSync(join(root, file), "utf8").replace(/\{\{\s*skill:[a-z0-9-]+\s*\}\}/g, "");
   const name = text.match(/^name: *([a-z][a-z0-9-]*) *$/m);
   if (name && shared.includes(name[1])) errors.push(`${file}: write name: {{skill:${name[1]}}}, not the plain name`);
-  for (const ref of skillReferences(text)) {
+  for (const ref of skillReferences(text, new Set(shared))) {
     if (shared.includes(ref)) errors.push(`${file}: refers to the skill "${ref}" by its plain name; write {{skill:${ref}}}`);
   }
 }
@@ -140,7 +132,7 @@ for (const host of hosts()) {
 
     // References to other skills ("use map", "(use map or crawl)", "the `map`
     // skill") must name a skill this host ships, under its name on this host.
-    for (const ref of skillReferences(text)) {
+    for (const ref of skillReferences(text, new Set([...shared, ...shipped]))) {
       if (!shipped.has(ref)) errors.push(`${host}: ${path} refers to skill "${ref}", which ${host} doesn't ship`);
     }
   }
@@ -212,6 +204,17 @@ for (const host of hosts()) {
     .map((f) => readFileSync(join(platformsDir, host, "skills", f), "utf8").split("\n").filter(Boolean).length)
     .reduce((a, b) => a + b, 0);
   report.push(`${host}: ${Object.keys(lock).length} whole-file overrides, ${owned} skill lines of its own (slots and overrides)`);
+}
+
+// An optional slot ({{>? name}}) renders as nothing on a host without its file,
+// so a misspelt name would never show up. At least one host must fill it.
+for (const skill of skillNames()) {
+  const text = readFileSync(join(root, "skills", skill, "SKILL.md"), "utf8");
+  for (const [, slot] of text.matchAll(/\{\{>\?\s*([a-z0-9_-]+)\s*\}\}/g)) {
+    if (!hosts().some((host) => existsSync(join(platformsDir, host, "skills", skill, `${slot}.md`)))) {
+      errors.push(`skills/${skill}/SKILL.md: optional slot {{>? ${slot}}} has no platforms/<host>/skills/${skill}/${slot}.md on any host`);
+    }
+  }
 }
 
 console.log(report.join("\n"));
