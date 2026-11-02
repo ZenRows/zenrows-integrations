@@ -1,0 +1,3 @@
+- Tools missing entirely: Zenrows is not connected yet. Tell the user how to connect it:
+  - Check that the plugin is installed and enabled, that Cursor was fully restarted, and that Settings, Tools and MCP shows a `zenrows` entry.
+  - Click "Connect" (or "Needs login") next to the `zenrows` server and complete the Zenrows authorization in the browser. If the connection is stuck, run "Cursor: Clear All MCP Tokens" from the command palette (Cmd+Shift+P), restart Cursor and authorize again.
