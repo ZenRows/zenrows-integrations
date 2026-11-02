@@ -120,12 +120,21 @@ export function renderHost(host) {
     const own = join(platform, "skills", name, "SKILL.md");
     const source = existsSync(own) ? own : join(skillsDir, name, "SKILL.md");
     const where = relative(root, source);
-    let text = readFileSync(source, "utf8").replace(/\{\{>\s*([a-z0-9_-]+)\s*\}\}/g, (_, slot) => {
-      const file = join(platform, "skills", name, `${slot}.md`);
-      if (!existsSync(file)) throw new Error(`${where}: slot {{> ${slot}}} has no ${relative(root, file)}`);
-      usedSlots.add(relative(root, file));
-      return readFileSync(file, "utf8").replace(/\n$/, "");
-    });
+    // {{> slot}} needs platforms/<host>/skills/<skill>/<slot>.md. {{>? slot}} is
+    // optional: without the file, its line (and one blank line after it) goes.
+    let text = readFileSync(source, "utf8")
+      .replace(/^[ \t]*\{\{>\?\s*([a-z0-9_-]+)\s*\}\}[ \t]*\n(\n)?/gm, (line, slot) =>
+        existsSync(join(platform, "skills", name, `${slot}.md`)) ? line : "",
+      )
+      .replace(/\{\{>(\?)?\s*([a-z0-9_-]+)\s*\}\}/g, (_, optional, slot) => {
+        const file = join(platform, "skills", name, `${slot}.md`);
+        if (!existsSync(file)) {
+          if (optional) return "";
+          throw new Error(`${where}: slot {{> ${slot}}} has no ${relative(root, file)}`);
+        }
+        usedSlots.add(relative(root, file));
+        return readFileSync(file, "utf8").replace(/\n$/, "");
+      });
     text = fill(text, values, where);
     out.set(`skills/${hostSkillName(values, name)}/SKILL.md`, Buffer.from(text));
   }
