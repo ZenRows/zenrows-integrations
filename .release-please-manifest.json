@@ -1,3 +1,4 @@
 {
-  "dist/copilot": "0.1.1"
+  "dist/copilot": "0.1.1",
+  "dist/openai": "0.1.8"
 }

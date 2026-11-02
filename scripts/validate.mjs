@@ -1,6 +1,7 @@
 // Checks what each host ships: skill frontmatter, skill references, manifests
 // (against the JSON Schema they declare), the marketplace catalogs at the top of
 // the repo, and that no whole-file override was copied from an older shared file.
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -105,6 +106,15 @@ function schemaErrors(url, json) {
 
 // Parses a JSON file and checks it against its "$schema". Returns the JSON, or
 // undefined after recording an error.
+// OpenAI declares OAuth under mcpServers.<name>.extensions["com.openai"], as its
+// docs show, but the Agent Plugins MCP schema doesn't list "extensions" on a
+// server. Check the rest of the file against the schema.
+function withoutServerExtensions(json) {
+  if (!json.mcpServers || typeof json.mcpServers !== "object") return json;
+  const servers = Object.fromEntries(Object.entries(json.mcpServers).map(([name, { extensions, ...server }]) => [name, server]));
+  return { ...json, mcpServers: servers };
+}
+
 function readJson(host, file, buf) {
   let json;
   try {
@@ -114,7 +124,7 @@ function readJson(host, file, buf) {
     return undefined;
   }
   if (json.$schema) {
-    for (const problem of schemaErrors(json.$schema, json)) errors.push(`${host}: ${file} ${problem}`);
+    for (const problem of schemaErrors(json.$schema, withoutServerExtensions(json))) errors.push(`${host}: ${file} ${problem}`);
   }
   return json;
 }
@@ -204,6 +214,22 @@ for (const host of hosts()) {
   for (const file of listFiles(join(platformsDir, host))) {
     const text = readFileSync(join(platformsDir, host, file), "utf8");
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
+  }
+
+  // platforms/<host>/scripts/ is the host's tooling and never ships, so only the
+  // two files the repo runs belong there.
+  for (const file of listFiles(join(platformsDir, host, "scripts"))) {
+    if (!["validate.mjs", "package.sh"].includes(file)) {
+      errors.push(`${host}: platforms/${host}/scripts/${file} isn't shipped (scripts/ holds only validate.mjs and package.sh); move plugin files elsewhere`);
+    }
+  }
+
+  // Checks only one host needs, such as OpenAI's submission limits, live in
+  // platforms/<host>/scripts/validate.mjs and run on the committed dist/<host>.
+  const extra = join(platformsDir, host, "scripts", "validate.mjs");
+  if (existsSync(extra)) {
+    const run = spawnSync(process.execPath, [extra, join(root, "dist", host)], { encoding: "utf8" });
+    if (run.status !== 0) errors.push(`${host}: platforms/${host}/scripts/validate.mjs failed:\n${(run.stderr || run.stdout).trim()}`);
   }
 
   // How much skill text the host owns instead of sharing: its slot files and
