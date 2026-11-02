@@ -1,0 +1,7 @@
+.git/
+.github/
+.claude/
+reports/
+node_modules/
+*.tgz
+RELEASING.md

@@ -1,0 +1,13 @@
+{
+  "name": "zenrows",
+  "version": "{{version}}",
+  "description": "Web data for OpenClaw: scrape, extract and browser automation through the Zenrows MCP server.",
+  "author": {
+    "name": "Zenrows",
+    "email": "integrations@zenrows.com"
+  },
+  "homepage": "https://docs.zenrows.com/integrations/openclaw",
+  "repository": "https://github.com/ZenRows/zenrows-integrations",
+  "license": "MIT",
+  "mcpServers": "./.mcp.json"
+}

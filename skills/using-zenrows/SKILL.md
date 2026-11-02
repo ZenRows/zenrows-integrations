@@ -1,6 +1,7 @@
 ---
 name: {{skill:using-zenrows}}
 description: Overview of the Zenrows tools for live web data. Use when a task needs the current content of a URL, specific fields from a page, many URLs fetched as one job, the pages linked from a start URL, or a multi-step browser session (login, forms, pagination), especially for JavaScript-heavy pages where a plain fetch returns little. Covers which tool to pick, defaults, errors and plan limits. For a single concrete task, the focused skills ({{skill:scrape-webpage}}, {{skill:extract-structured-data}}, {{skill:batch}}, {{skill:crawl}}, {{skill:map}}, {{skill:browser-automation}}, {{skill:capture-api-calls}}) go deeper.
+{{>? frontmatter}}
 ---
 
 # Using Zenrows
@@ -8,6 +9,8 @@ description: Overview of the Zenrows tools for live web data. Use when a task ne
 Zenrows gives {{host}} live web data through the Zenrows MCP server: page fetching, structured extraction, batch jobs over many URLs, crawls from a start URL, and hosted browser sessions. Zenrows is a paid service: every request uses credits on the user's Zenrows plan.
 
 The {{connection}} signs in with OAuth. If the Zenrows tools are missing or return `AUTH003`, use the `{{skill:getting-started}}` skill. Never ask the user to paste an API key into the conversation.
+
+{{>? setup}}
 
 The user's instructions take precedence over this skill. If they conflict, follow the user.
 
