@@ -1,20 +1,22 @@
 # Contributing
 
-Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Edit the sources, never `dist/`.
+Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Code hosts, such as the Activepieces piece, are rendered the same way from their own source and the shared text. Edit the sources, never `dist/`.
 
 ## Layout
 
 ```
 skills/<skill>/SKILL.md      shared skills; {{var}} and {{> slot}} mark what differs per host
-shared/assets/               files every host ships as they are (logo)
+shared/assets/               files every plugin host ships as they are (logo)
+shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
 platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
   scripts/                   the host's own tooling, never shipped: validate.mjs (run by npm run validate on
-                             dist/<host>) and package.sh (run by npm run package -- <host>), when the host needs them
+                             dist/<host>), package.sh (run by npm run package -- <host>) and check.sh (a code
+                             host's build and test, run by its CI workflow), when the host needs them
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
-dist/<host>/                 GENERATED: the plugin the host installs
+dist/<host>/                 GENERATED: the plugin the host installs, or a code host's code
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
 scripts/                     render, validate, override, new-host, package
 ```
@@ -40,7 +42,15 @@ Requires Node 22. Run `npm ci` once.
 - **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
 - **A reference to another skill:** write `{{skill:batch}}`, never the plain name. It renders as that skill's name on the host: `skill_prefix` plus the shared name, unless `skill_names` in `vars.yaml` renames it (OpenClaw ships `scrape-webpage` as `zenrows-scrape`). The skill's own `name:` in its frontmatter uses it too.
 
-Unknown variables, unknown skill names, missing slots and unused slot files fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+Unknown variables, unknown skill names, missing slots, unused slot files and unknown snippets fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+
+## Text shared with code hosts
+
+A fact that a skill and a code host both state (what `AUTH004` means, why Extract refused a page) lives once in `shared/text/<name>.md`, as one line of plain text. A skill inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it (an agent is told to use a skill, a user to check their connection). Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one, or on one nothing uses.
+
+## Code hosts
+
+`kind: code` in `vars.yaml` makes a host whose output is code for another project, such as `platforms/activepieces/` (the piece, as it sits in activepieces' `packages/pieces/community/zenrows`). A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped. It needs no release-please entry until it's released from this repo. Its `scripts/check.sh` builds and tests `dist/<host>/` the way the target project does, and its own workflow runs it.
 
 ## Manifest schemas
 
