@@ -169,9 +169,11 @@ export function catalogs() {
 // whose root is dist/<host>/ plus the host's marketplace catalogs (see
 // catalogs()) at the same paths, listing only this host with source "./" (the
 // mirror's root), and a banner under README.md's title pointing back here.
+// The banner names the release tag, or for a sync with no tag, the commit.
 // Reads the committed files, which render --check and validate keep current.
 // Returns Map<path, Buffer>.
-export function renderMirror(host) {
+export function renderMirror(host, { tag, sha } = {}) {
+  if (!tag && !sha) throw new Error("renderMirror needs the release tag or the source commit");
   const values = vars(host);
   if (!values.mirror) throw new Error(`platforms/${host}/vars.yaml has no mirror: <owner/repo>`);
   const out = new Map();
@@ -186,7 +188,8 @@ export function renderMirror(host) {
   if (out.has("README.md")) {
     const banner =
       `> Generated from [ZenRows/zenrows-integrations](https://github.com/ZenRows/zenrows-integrations/tree/main/dist/${host}), ` +
-      `released as ${host}-v${values.version}. Open issues and pull requests there; changes made here are overwritten.`;
+      `${tag ? `released as ${tag}` : `synced from main at ${sha.slice(0, 7)}`}. ` +
+      `Open issues and pull requests there; changes made here are overwritten.`;
     const readme = out.get("README.md").toString("utf8");
     const title = readme.match(/^# .*\n/);
     const at = title ? title[0].length : 0;

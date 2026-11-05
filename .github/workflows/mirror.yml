@@ -98,7 +98,7 @@ jobs:
           set -euo pipefail
           dir="$RUNNER_TEMP/mirror"
           git clone --quiet "https://github.com/$MIRROR.git" "$dir"
-          npm run -s mirror -- "$HOST" "$dir"
+          npm run -s mirror -- "$HOST" "$dir" ${TAG:+"$TAG"}
           cd "$dir"
           git add -A
           changed=true
