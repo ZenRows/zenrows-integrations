@@ -170,7 +170,7 @@ jobs:
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file -
 
       # Steps that publish a host somewhere else go here, selected by component,
-      # for example: if: matrix.component == 'cursor' (push dist/cursor to its mirror).
+      # for example: if: matrix.component == 'openai'. Mirror repos are the mirror job below.
 
       - name: Write the summary
         run: |
@@ -181,3 +181,20 @@ jobs:
             echo "- Release: [$TAG]($repo/releases/tag/$TAG)"
             echo "- Commit: [${COMMIT:0:7}]($repo/commit/$COMMIT)"
           } >>"$GITHUB_STEP_SUMMARY"
+
+  # Each released host with mirror: in its vars.yaml is pushed to that repo; for
+  # the others this is a no-op.
+  mirror:
+    name: Mirror ${{ matrix.component }}
+    needs: [detect, release]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect.outputs.packages) }}
+    uses: ./.github/workflows/mirror.yml
+    with:
+      host: ${{ matrix.component }}
+      tag: ${{ matrix.tag }}
+    secrets: inherit
