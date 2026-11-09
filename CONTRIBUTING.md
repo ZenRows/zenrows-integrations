@@ -18,7 +18,7 @@ platforms/<host>/
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's code
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
-scripts/                     render, validate, override, new-host, package
+scripts/                     render, validate, override, new-host, package, mirror
 ```
 
 ### Marketplace catalogs
@@ -74,3 +74,12 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
 
 Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release.
+
+### Mirror repos
+
+Some installs name a repo of their own instead of a folder here: `copilot plugin marketplace add ZenRows/copilot-zenrows` reads that repo's root. Such a repo is a mirror: `mirror: ZenRows/copilot-zenrows` in the host's `vars.yaml` makes each release of the host replace the mirror's contents with `dist/<host>/`, plus the host's marketplace catalogs at the same paths, listing only that host with `source` set to `./` (the mirror's root), and a banner in its README pointing here. So the catalog is edited in one place, and `npm run validate` fails if a mirrored host has none. Nobody edits a mirror by hand; only its deploy key can push to it.
+
+- The release workflow runs `.github/workflows/mirror.yml` for each released host. It makes one normal commit (`release copilot-v0.1.2 from ZenRows/zenrows-integrations@<sha>`), never a force-push, and tags the mirror `v<version>`. No commit is made when nothing changed, so a re-run is safe.
+- It pushes with the deploy key in the `MIRROR_KEY_<HOST>` secret of the `release` environment. The key, the mirror's branch protection and its settings are in [iac-bootstrap](https://github.com/ZenRows/iac-bootstrap).
+- To see what the mirror would get: `npm run mirror -- <host> <clone of the mirror> [<release tag>]`, then `git diff` in the clone. To publish by hand (for example after fixing a failed run), run the Mirror workflow from Actions with the host and the release tag; it's a dry run unless you untick it. With no tag it publishes `main`'s `dist/<host>/`, names the commit in the README banner and tags nothing.
+- Manual runs, dry runs included, start from `main`: the job uses the `release` environment, which only deploys from `main`.
