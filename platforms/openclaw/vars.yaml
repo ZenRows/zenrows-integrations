@@ -17,3 +17,6 @@ skill_names:
   browser-automation: zenrows-browser
   extract-structured-data: zenrows-extract
   scrape-webpage: zenrows-scrape
+# Published to this repo too on each release, for installs that name it
+# (ClawHub publishes it at a commit; see RELEASING.md). See CONTRIBUTING.md.
+mirror: ZenRows/openclaw-zenrows
