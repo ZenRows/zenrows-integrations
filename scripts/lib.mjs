@@ -165,6 +165,39 @@ export function catalogs() {
   return [...found.values()];
 }
 
+// A host with mirror: <owner/repo> in vars.yaml is also published to that repo,
+// whose root is dist/<host>/ plus the host's marketplace catalogs (see
+// catalogs()) at the same paths, listing only this host with source "./" (the
+// mirror's root), and a banner under README.md's title pointing back here.
+// The banner names the release tag, or for a sync with no tag, the commit.
+// Reads the committed files, which render --check and validate keep current.
+// Returns Map<path, Buffer>.
+export function renderMirror(host, { tag, sha } = {}) {
+  if (!tag && !sha) throw new Error("renderMirror needs the release tag or the source commit");
+  const values = vars(host);
+  if (!values.mirror) throw new Error(`platforms/${host}/vars.yaml has no mirror: <owner/repo>`);
+  const out = new Map();
+  for (const file of listFiles(join(distDir, host))) out.set(file, readFileSync(join(distDir, host, file)));
+  for (const { file } of catalogs().filter((c) => c.host === host)) {
+    const catalog = JSON.parse(readFileSync(join(root, file), "utf8"));
+    catalog.plugins = (catalog.plugins ?? [])
+      .filter((p) => p.source === `./dist/${host}`)
+      .map((p) => ({ ...p, source: "./" }));
+    out.set(file, Buffer.from(`${JSON.stringify(catalog, null, 2)}\n`));
+  }
+  if (out.has("README.md")) {
+    const banner =
+      `> Generated from [ZenRows/zenrows-integrations](https://github.com/ZenRows/zenrows-integrations/tree/main/dist/${host}), ` +
+      `${tag ? `released as ${tag}` : `synced from main at ${sha.slice(0, 7)}`}. ` +
+      `Open issues and pull requests there; changes made here are overwritten.`;
+    const readme = out.get("README.md").toString("utf8");
+    const title = readme.match(/^# .*\n/);
+    const at = title ? title[0].length : 0;
+    out.set("README.md", Buffer.from(`${readme.slice(0, at)}${title ? "\n" : ""}${banner}\n\n${readme.slice(at).replace(/^\n/, "")}`));
+  }
+  return out;
+}
+
 function renderFile(path, values) {
   if (!textFile.test(path)) return readFileSync(path);
   return Buffer.from(fill(readFileSync(path, "utf8"), values, relative(root, path)));
