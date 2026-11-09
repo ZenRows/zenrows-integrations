@@ -188,6 +188,18 @@ for (const host of hosts()) {
     }
   }
 
+  // Every host says whether its releases are uploaded somewhere by hand, so the
+  // release workflow knows whether to post a reminder.
+  const upload = values.upload;
+  if (upload === undefined) {
+    errors.push(`${host}: vars.yaml has no upload: (false, or to: and url:; see CONTRIBUTING.md)`);
+  } else if (
+    upload !== false &&
+    !(typeof upload?.to === "string" && upload.to.trim() && typeof upload.url === "string" && upload.url.startsWith("https://"))
+  ) {
+    errors.push(`${host}: vars.yaml upload: must be false, or to: <where> and url: <https:// link>`);
+  }
+
   // A whole-file override stops receiving fixes to the shared file it copied.
   const lock = readLock(host);
   for (const [shared, hash] of Object.entries(lock)) {

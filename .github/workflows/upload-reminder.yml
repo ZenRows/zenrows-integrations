@@ -1,0 +1,100 @@
+name: Upload reminder
+
+# Posts to #proj-integrations that a release has to be uploaded by hand, for a
+# host with upload: in platforms/<host>/vars.yaml (for example a marketplace
+# that reviews each version). release.yml calls it for each released host. Run
+# it by hand to send a reminder again; a manual run is a dry run unless you untick it.
+
+on:
+  workflow_call:
+    inputs:
+      host:
+        type: string
+        required: true
+      tag:
+        description: "The release, <host>-v<version>"
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Host, for example openai"
+        type: string
+        required: true
+      tag:
+        description: "The release, for example openai-v0.1.9"
+        type: string
+        required: true
+      dry_run:
+        description: "Show the message without posting it"
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  remind:
+    name: Upload reminder ${{ inputs.host }}
+    runs-on: ubuntu-latest
+    # The release environment deploys only from main and holds the webhook.
+    environment: release
+    permissions:
+      contents: read
+    env:
+      HOST: ${{ inputs.host }}
+      TAG: ${{ inputs.tag }}
+      # workflow_call has no dry_run input, so a release always posts.
+      DRY_RUN: ${{ inputs.dry_run == true }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Post the reminder
+        env:
+          # A Slack incoming webhook for #proj-integrations.
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_INTEGRATIONS }}
+        run: |
+          set -euo pipefail
+          upload=$(node --input-type=module -e '
+            import { vars } from "./scripts/lib.mjs";
+            const v = vars(process.env.HOST);
+            if (`${process.env.HOST}-v${v.version}` !== process.env.TAG) {
+              console.error(`::error::${process.env.TAG} is not a ${process.env.HOST} release: at that tag, ${process.env.HOST} is at ${v.version}.`);
+              process.exit(1);
+            }
+            console.log(JSON.stringify(v.upload ?? false));')
+          if [ "$upload" = false ]; then
+            echo "::notice::$HOST has upload: false in platforms/$HOST/vars.yaml, so there's nothing to upload by hand."
+            exit 0
+          fi
+
+          repo="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          payload=$(jq -n --argjson upload "$upload" --arg host "$HOST" --arg tag "$TAG" --arg repo "$repo" '{
+            text: (":package: *\($tag)* is released and needs an upload to *\($upload.to)*.\n"
+              + "Files: <\($repo)/tree/\($tag)/dist/\($host)|dist/\($host) at \($tag)>"
+              + " · Upload: <\($upload.url)|\($upload.to)>"
+              + " · Release: <\($repo)/releases/tag/\($tag)|\($tag)>")
+          }')
+          {
+            echo "## $HOST upload reminder"
+            jq -r .text <<<"$payload"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: #proj-integrations would get this message."
+            jq . <<<"$payload"
+            exit 0
+          fi
+          if [ -z "$WEBHOOK" ]; then
+            echo "::warning::No SLACK_WEBHOOK_INTEGRATIONS secret in the release environment, so the reminder wasn't posted to Slack. It's in the job summary: upload $TAG to $(jq -r .to <<<"$upload")."
+            exit 0
+          fi
+          curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$WEBHOOK" >/dev/null
+          echo "::notice::Posted the $TAG upload reminder to #proj-integrations."

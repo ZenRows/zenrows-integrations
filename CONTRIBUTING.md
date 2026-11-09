@@ -55,7 +55,7 @@ Run `npm run new-host`. It asks for the host id (`platforms/<id>/`, `dist/<id>/`
 
 It also adds the host to `release-please-config.json` and `.release-please-manifest.json` at `0.1.0`. Answers can also be piped in, one per line.
 
-What only a person can decide is marked `TODO(new-host)`, and `npm run validate` fails until it's done: the install and sign-in steps, where the agent can write files, and the plugin files. Each host reads its own layout (Claude: `.claude-plugin/plugin.json` and `.mcp.json`; Cursor: `.cursor-plugin/plugin.json`), so move the templates to those paths, add the fields the host needs, update the manifest path in `release-please-config.json`, and add a marketplace catalog at the top of the repo if the host installs from a subfolder. Use an existing `platforms/<host>/` as the example. Then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the release-please files and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
+What only a person can decide is marked `TODO(new-host)`, and `npm run validate` fails until it's done: the install and sign-in steps, where the agent can write files, whether releases are uploaded by hand (`upload:`), and the plugin files. Each host reads its own layout (Claude: `.claude-plugin/plugin.json` and `.mcp.json`; Cursor: `.cursor-plugin/plugin.json`), so move the templates to those paths, add the fields the host needs, update the manifest path in `release-please-config.json`, and add a marketplace catalog at the top of the repo if the host installs from a subfolder. Use an existing `platforms/<host>/` as the example. Then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the release-please files and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
 
 ## Commits and releases
 
@@ -71,3 +71,12 @@ Some installs name a repo of their own instead of a folder here: `copilot plugin
 - It pushes with the deploy key in the `MIRROR_KEY_<HOST>` secret of the `release` environment. The key, the mirror's branch protection and its settings are in [iac-bootstrap](https://github.com/ZenRows/iac-bootstrap).
 - To see what the mirror would get: `npm run mirror -- <host> <clone of the mirror> [<release tag>]`, then `git diff` in the clone. To publish by hand (for example after fixing a failed run), run the Mirror workflow from Actions with the host and the release tag; it's a dry run unless you untick it. With no tag it publishes `main`'s `dist/<host>/`, names the commit in the README banner and tags nothing.
 - Manual runs, dry runs included, start from `main`: the job uses the `release` environment, which only deploys from `main`.
+
+### Uploads by hand
+
+Some hosts take each release only as an upload that someone does by hand, for example a marketplace that reviews every version. Every host's `vars.yaml` says which:
+
+- `upload: false`: installs read this repo or the host's mirror, so nothing is uploaded.
+- `upload:` with `to:` (where, for example `Cursor Marketplace`) and `url:` (an `https://` link to the page you upload on): each release of the host posts a reminder to #proj-integrations naming the release, its files in `dist/<host>/` at the tag, and that link.
+
+`npm run validate` fails if a host has no `upload:`. `.github/workflows/upload-reminder.yml` posts through a Slack incoming webhook in the `SLACK_WEBHOOK_INTEGRATIONS` secret of the `release` environment. Without the secret, the run warns and leaves the message in its job summary. To send a reminder again, run the Upload reminder workflow from Actions, on `main`, with the host and the release tag; it's a dry run unless you untick it.
