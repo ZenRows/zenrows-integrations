@@ -60,6 +60,8 @@ jobs:
         env:
           # A Slack incoming webhook for #proj-integrations.
           WEBHOOK: ${{ secrets.SLACK_WEBHOOK_INTEGRATIONS }}
+          # The @ZenGrow user group, which owns the integrations.
+          MENTION: "<!subteam^S098279QJNA>"
         run: |
           set -euo pipefail
           upload=$(node --input-type=module -e '
@@ -77,8 +79,8 @@ jobs:
           fi
 
           repo="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-          payload=$(jq -n --argjson upload "$upload" --arg host "$HOST" --arg tag "$TAG" --arg repo "$repo" '{
-            text: (":package: *\($tag)* is released and needs an upload to *\($upload.to)*.\n"
+          payload=$(jq -n --argjson upload "$upload" --arg mention "$MENTION" --arg host "$HOST" --arg tag "$TAG" --arg repo "$repo" '{
+            text: ("\($mention) :package: *\($tag)* is released and needs an upload to *\($upload.to)*.\n"
               + "Files: <\($repo)/tree/\($tag)/dist/\($host)|dist/\($host) at \($tag)>"
               + " · Upload: <\($upload.url)|\($upload.to)>"
               + " · Release: <\($repo)/releases/tag/\($tag)|\($tag)>")
@@ -93,9 +95,11 @@ jobs:
             jq . <<<"$payload"
             exit 0
           fi
+          # Fail rather than warn: the release is already out, and a red job is
+          # harder to miss than a reminder nobody received.
           if [ -z "$WEBHOOK" ]; then
-            echo "::warning::No SLACK_WEBHOOK_INTEGRATIONS secret in the release environment, so the reminder wasn't posted to Slack. It's in the job summary: upload $TAG to $(jq -r .to <<<"$upload")."
-            exit 0
+            echo "::error::No SLACK_WEBHOOK_INTEGRATIONS secret in the release environment, so the reminder wasn't posted to Slack. It's in the job summary: upload $TAG to $(jq -r .to <<<"$upload")."
+            exit 1
           fi
           curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$WEBHOOK" >/dev/null
           echo "::notice::Posted the $TAG upload reminder to #proj-integrations."
