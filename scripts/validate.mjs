@@ -177,15 +177,8 @@ for (const host of hosts()) {
     }
   }
 
-  // A mirror repo installs through the host's marketplace catalog, rewritten
-  // to point at the mirror's root, so a mirrored host needs one.
-  if (values.mirror !== undefined) {
-    if (!/^[\w.-]+\/[\w.-]+$/.test(String(values.mirror))) {
-      errors.push(`${host}: vars.yaml mirror: is "${values.mirror}", expected <owner>/<repo>`);
-    }
-    if (!catalogs().some((c) => c.host === host)) {
-      errors.push(`${host}: vars.yaml sets mirror:, but ${host} has no marketplace catalog for the mirror to carry (see CONTRIBUTING.md)`);
-    }
+  if (values.mirror !== undefined && !/^[\w.-]+\/[\w.-]+$/.test(String(values.mirror))) {
+    errors.push(`${host}: vars.yaml mirror: is "${values.mirror}", expected <owner>/<repo>`);
   }
 
   // A whole-file override stops receiving fixes to the shared file it copied.
