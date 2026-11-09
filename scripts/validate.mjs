@@ -177,6 +177,10 @@ for (const host of hosts()) {
     }
   }
 
+  if (values.mirror !== undefined && !/^[\w.-]+\/[\w.-]+$/.test(String(values.mirror))) {
+    errors.push(`${host}: vars.yaml mirror: is "${values.mirror}", expected <owner>/<repo>`);
+  }
+
   // A whole-file override stops receiving fixes to the shared file it copied.
   const lock = readLock(host);
   for (const [shared, hash] of Object.entries(lock)) {

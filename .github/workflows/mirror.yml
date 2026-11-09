@@ -1,0 +1,154 @@
+name: Mirror
+
+# Publishes a host to its mirror repo (mirror: in platforms/<host>/vars.yaml):
+# the mirror's root becomes dist/<host>/ plus its marketplace catalog, in one
+# normal commit (never a force-push, so SHAs a marketplace pinned stay valid).
+# release.yml calls it for each released host. Run it by hand to sync from main
+# (no tag) or to re-run a release; a manual run is a dry run unless you untick it.
+
+on:
+  workflow_call:
+    inputs:
+      host:
+        type: string
+        required: true
+      tag:
+        description: "The source release, <host>-v<version>"
+        type: string
+        required: true
+      dry_run:
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Host, for example copilot"
+        type: string
+        required: true
+      tag:
+        description: "Release to publish, for example copilot-v0.1.2. Empty: this branch's dist/, with no tag in the mirror"
+        type: string
+        required: false
+      dry_run:
+        description: "Show the change without pushing"
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  mirror:
+    name: Mirror ${{ inputs.host }}
+    runs-on: ubuntu-latest
+    # The release environment deploys only from main and holds the mirror keys.
+    environment: release
+    concurrency:
+      group: mirror-${{ inputs.host }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      HOST: ${{ inputs.host }}
+      TAG: ${{ inputs.tag }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      - name: Find the mirror
+        id: target
+        run: |
+          set -euo pipefail
+          read -r mirror version < <(node --input-type=module -e '
+            import { vars } from "./scripts/lib.mjs";
+            const v = vars(process.env.HOST);
+            console.log(v.mirror ?? "-", v.version);')
+          if [ "$mirror" = "-" ]; then
+            echo "::notice::$HOST has no mirror: in platforms/$HOST/vars.yaml, so there's nothing to publish."
+            echo "mirror=" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$TAG" ] && [ "$TAG" != "$HOST-v$version" ]; then
+            echo "::error::$TAG isn't a $HOST release: at that tag, $HOST is at $version."
+            exit 1
+          fi
+          {
+            echo "mirror=$mirror"
+            echo "version=$version"
+            echo "sha=$(git rev-parse HEAD)"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Update the mirror
+        if: steps.target.outputs.mirror != ''
+        env:
+          MIRROR: ${{ steps.target.outputs.mirror }}
+          VERSION: ${{ steps.target.outputs.version }}
+          SHA: ${{ steps.target.outputs.sha }}
+          # A deploy key with write access to that one repo, set per host in the
+          # release environment: MIRROR_KEY_COPILOT for copilot.
+          KEY: ${{ secrets[format('MIRROR_KEY_{0}', inputs.host)] }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/mirror"
+          git clone --quiet "https://github.com/$MIRROR.git" "$dir"
+          npm run -s mirror -- "$HOST" "$dir" ${TAG:+"$TAG"}
+          cd "$dir"
+          git add -A
+          changed=true
+          if git diff --cached --quiet; then changed=false; fi
+
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: $MIRROR would get these changes."
+            git diff --cached --stat
+            git diff --cached
+            exit 0
+          fi
+
+          if [ -z "$KEY" ]; then
+            echo "::error::No MIRROR_KEY_${HOST^^} secret in the release environment."
+            exit 1
+          fi
+          # GitHub's SSH host keys, from its API over HTTPS, so the push can't go
+          # to a host that only claims to be github.com.
+          curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[] | "github.com \(.)"' >"$RUNNER_TEMP/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/mirror_key"' EXIT
+          install -m 600 /dev/null "$RUNNER_TEMP/mirror_key"
+          printf '%s\n' "$KEY" >"$RUNNER_TEMP/mirror_key"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/mirror_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
+          git remote set-url --push origin "git@github.com:$MIRROR.git"
+
+          source="ZenRows/zenrows-integrations@$SHA"
+          if [ -n "$TAG" ]; then what="release $TAG"; else what="sync dist/$HOST"; fi
+          if [ "$changed" = true ]; then
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "$what from $source"
+            git push --quiet origin HEAD:main
+            echo "::notice::Pushed $(git rev-parse --short HEAD) to $MIRROR."
+          else
+            echo "::notice::$MIRROR already matches $source; no commit."
+          fi
+
+          # Tag the release in the mirror as v<version>, the way its installs and
+          # listings name versions. An existing tag is left where it is.
+          if [ -n "$TAG" ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null; then
+              echo "::notice::$MIRROR already has v$VERSION; left as it is."
+            else
+              git tag "v$VERSION"
+              git push --quiet origin "v$VERSION"
+            fi
+          fi
+
+          {
+            echo "## $HOST mirror"
+            echo "- Mirror: [$MIRROR](https://github.com/$MIRROR/commits/main)"
+            echo "- Source: [$source](https://github.com/ZenRows/zenrows-integrations/commit/$SHA)"
+            if [ -n "$TAG" ]; then echo "- Tag: v$VERSION"; fi
+          } >>"$GITHUB_STEP_SUMMARY"
