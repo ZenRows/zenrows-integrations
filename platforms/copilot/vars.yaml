@@ -6,3 +6,6 @@ host_full: GitHub Copilot
 connection: Zenrows MCP server
 write_files_example: Copilot CLI or VS Code agent mode
 skill_prefix: ""
+# Published to this repo too on each release, for installs that name it
+# (copilot plugin marketplace add ZenRows/copilot-zenrows). See CONTRIBUTING.md.
+mirror: ZenRows/copilot-zenrows
