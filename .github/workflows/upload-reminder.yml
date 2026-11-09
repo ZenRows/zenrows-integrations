@@ -64,9 +64,10 @@ jobs:
           set -euo pipefail
           upload=$(node --input-type=module -e '
             import { vars } from "./scripts/lib.mjs";
-            const v = vars(process.env.HOST);
-            if (`${process.env.HOST}-v${v.version}` !== process.env.TAG) {
-              console.error(`::error::${process.env.TAG} is not a ${process.env.HOST} release: at that tag, ${process.env.HOST} is at ${v.version}.`);
+            const { HOST, TAG } = process.env;
+            const v = vars(HOST);
+            if (HOST + "-v" + v.version !== TAG) {
+              console.error("::error::" + TAG + " is not a " + HOST + " release: at that tag, " + HOST + " is at " + v.version + ".");
               process.exit(1);
             }
             console.log(JSON.stringify(v.upload ?? false));')
