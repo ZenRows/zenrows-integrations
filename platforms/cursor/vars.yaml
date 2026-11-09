@@ -16,3 +16,6 @@ skill_prefix: ""
 #   scrape-webpage: zenrows-scrape
 # To leave a shared skill out on this host, list it here, for example:
 # skip_skills: [using-zenrows]
+# Published to this repo too on each release, for installs that name it (the
+# Cursor Marketplace reads it). See CONTRIBUTING.md.
+mirror: ZenRows/cursor-zenrows
