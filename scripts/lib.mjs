@@ -20,7 +20,7 @@ const sharedDirs = { "shared/assets": "assets" };
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
 const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/"];
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
-const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
+export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
 // Errors here are for whoever edited a skill or platform file: print the
 // message, not a stack trace.
@@ -55,8 +55,8 @@ function versions() {
 export function vars(host) {
   const v = parseYaml(readFileSync(join(platformsDir, host, "vars.yaml"), "utf8")) ?? {};
   const version = versions()[`dist/${host}`];
-  // A code host keeps its version in its own package.json until it's released
-  // from here, so it needs no release-please entry yet.
+  // A code host may not be released from here (yet), so it needs no
+  // release-please entry; it then has no {{version}}.
   if (!version && !isCodeHost(v)) throw new Error(`.release-please-manifest.json has no "dist/${host}" entry`);
   return version ? { ...v, version } : v;
 }
@@ -72,7 +72,7 @@ export function readLock(host) {
 // the host's own skills (platforms/<host>/skills/<name>/SKILL.md with no shared
 // skill of that name). Returns [{ name, own }].
 export function hostSkills(host, values = vars(host)) {
-  // A code host (kind: code, such as the Activepieces piece) ships no skills.
+  // A code host (kind: code) ships no skills.
   if (isCodeHost(values)) return [];
   const shared = skillNames();
   const skip = values.skip_skills ?? [];
@@ -89,9 +89,10 @@ export function hostSkills(host, values = vars(host)) {
   ].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-// kind: code in vars.yaml marks a host whose output is code (a package or a
-// piece for another project), not a plugin: it ships only its own files, with
-// {{…}} filled in its source, and no shared skills, LICENSE or assets.
+// kind: code in vars.yaml marks a host whose output isn't a plugin but files for
+// somewhere else (code for another project, a listing a marketplace reads): it
+// ships only its own files, with {{…}} filled in, and no shared skills, LICENSE
+// or assets.
 export function isCodeHost(values) {
   const kind = values.kind ?? "plugin";
   if (!["plugin", "code"].includes(kind)) throw new Error(`kind: ${kind} in vars.yaml; use plugin or code`);

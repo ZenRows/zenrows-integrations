@@ -1,6 +1,6 @@
 # Contributing
 
-Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Code hosts, such as the Activepieces piece, are rendered the same way from their own source and the shared text. Edit the sources, never `dist/`.
+Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Code hosts (a piece for another project, a marketplace listing) are rendered the same way from their own source and the shared text. Edit the sources, never `dist/`.
 
 ## Layout
 
@@ -16,7 +16,7 @@ platforms/<host>/
                              dist/<host>), package.sh (run by npm run package -- <host>) and check.sh (a code
                              host's build and test, run by its CI workflow), when the host needs them
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
-dist/<host>/                 GENERATED: the plugin the host installs, or a code host's code
+dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
 scripts/                     render, validate, override, new-host, package, mirror
 ```
@@ -44,13 +44,13 @@ Requires Node 22. Run `npm ci` once.
 
 Unknown variables, unknown skill names, missing slots, unused slot files and unknown snippets fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
 
-## Text shared with code hosts
+## Shared text
 
-A fact that a skill and a code host both state (what `AUTH004` means, why Extract refused a page) lives once in `shared/text/<name>.md`, as one line of plain text. A skill inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it (an agent is told to use a skill, a user to check their connection). Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one, or on one nothing uses.
+A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one, or on one nothing uses.
 
 ## Code hosts
 
-`kind: code` in `vars.yaml` makes a host whose output is code for another project, such as `platforms/activepieces/` (the piece, as it sits in activepieces' `packages/pieces/community/zenrows`). A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped. It needs no release-please entry until it's released from this repo. Its `scripts/check.sh` builds and tests `dist/<host>/` the way the target project does, and its own workflow runs it.
+`kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped. It needs no release-please entry until it's released from this repo. If it's code, its `scripts/check.sh` can build and test `dist/<host>/` the way the target project does, run by its own workflow (`platforms/activepieces/` does).
 
 ## Manifest schemas
 

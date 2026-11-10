@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
 const report = [];
@@ -260,7 +260,7 @@ const snippetSources = [
 ];
 const used = new Set();
 for (const file of snippetSources) {
-  if (!/\.(md|mdc|json|ya?ml|txt|toml|ts)$/.test(file)) continue;
+  if (!textFile.test(file)) continue;
   for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{\s*(<\s*|text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
 }
 for (const file of listFiles(sharedTextDir)) {
