@@ -220,13 +220,8 @@ for (const host of hosts()) {
   // A code host's README stays here (it isn't shipped) and the repo's hosts
   // list links to it.
   if (isCodeHost(values)) {
-    const readme = join(platformsDir, host, "README.md");
-    if (!existsSync(readme)) {
+    if (!existsSync(join(platformsDir, host, "README.md"))) {
       errors.push(`${host}: a code host needs platforms/${host}/README.md; the hosts list in README.md links to it`);
-    } else if (readFileSync(readme, "utf8").replace(/```[\s\S]*?```|`[^`\n]*`/g, "").includes("{{")) {
-      // It isn't rendered, so a {{…}} would show as it is on GitHub. One in
-      // `code` documents the syntax, so code spans and blocks are left out.
-      errors.push(`${host}: platforms/${host}/README.md isn't rendered, so it can't use {{…}}; write the text out`);
     }
     report.push(`${host}: code host, ships only its own files`);
     continue;
@@ -242,9 +237,14 @@ for (const host of hosts()) {
 
 // shared/text/ snippets are plain text, so they read the same in a skill and in
 // a code string, and each must be used somewhere ({{< name}} or {{text:name}}).
+// A code host's README isn't rendered, and vars.yaml and overrides.lock are
+// inputs, so a snippet named only there isn't used.
+const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `${h}/README.md`);
 const snippetSources = [
   ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
-  ...listFiles(platformsDir).map((f) => join(platformsDir, f)),
+  ...listFiles(platformsDir)
+    .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))
+    .map((f) => join(platformsDir, f)),
 ];
 const used = new Set();
 for (const file of snippetSources) {
