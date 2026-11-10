@@ -15,7 +15,7 @@ platforms/<host>/
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
-scripts/                     render, validate, override, new-host, mirror
+scripts/                     render, validate, override, new-host, mirror, test
 ```
 
 ### Marketplace catalogs
@@ -39,15 +39,19 @@ Requires Node 22. Run `npm ci` once.
 - **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
 - **A reference to another skill:** write `{{skill:batch}}`, never the plain name. It renders as that skill's name on the host: `skill_prefix` plus the shared name, unless `skill_names` in `vars.yaml` renames it (OpenClaw ships `scrape-webpage` as `zenrows-scrape`). The skill's own `name:` in its frontmatter uses it too.
 
-Unknown variables, unknown skill names, missing slots, unused slot files and unknown snippets fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+Unknown variables, unknown skill names, missing slots, unused slot files, unknown snippets and any `{{…}}` left in a rendered file fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
 
 ## Shared text
 
-A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one, or on one nothing uses.
+A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one (backticks, `*`, a link or a heading), or on one nothing uses.
 
 ## Code hosts
 
-`kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped. It needs no release-please entry until it's released from this repo.
+`kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered, so it writes its text out instead of using `{{…}}`; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo.
+
+## Tests
+
+`npm test` (CI runs it too) checks that render and validate catch the mistakes they're meant to: each case in `scripts/test.mjs` makes one change in a temporary copy of the repo (a throwaway code host, a snippet, …) and expects a given error, or a pass. When you add a rule, add a case that breaks it.
 
 ## Manifest schemas
 
