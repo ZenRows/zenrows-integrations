@@ -12,7 +12,6 @@
     "override": "node scripts/override.mjs create",
     "override:ack": "node scripts/override.mjs ack",
     "new-host": "node scripts/new-host.mjs",
-    "package": "node scripts/package.mjs",
     "mirror": "node scripts/mirror.mjs"
   },
   "devDependencies": {

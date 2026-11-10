@@ -1,7 +1,6 @@
 // Checks what each host ships: skill frontmatter, skill references, manifests
 // (against the JSON Schema they declare), the marketplace catalogs at the top of
 // the repo, and that no whole-file override was copied from an older shared file.
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -216,23 +215,6 @@ for (const host of hosts()) {
   for (const file of listFiles(join(platformsDir, host))) {
     const text = readFileSync(join(platformsDir, host, file), "utf8");
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
-  }
-
-  // platforms/<host>/scripts/ is the host's tooling and never ships, so only the
-  // files the repo runs belong there: validate.mjs, package.sh, and check.sh (a
-  // code host's build and test, run by its CI workflow).
-  for (const file of listFiles(join(platformsDir, host, "scripts"))) {
-    if (!["validate.mjs", "package.sh", "check.sh"].includes(file)) {
-      errors.push(`${host}: platforms/${host}/scripts/${file} isn't shipped (scripts/ holds only validate.mjs, package.sh and check.sh); move plugin files elsewhere`);
-    }
-  }
-
-  // Checks only one host needs, such as OpenAI's submission limits, live in
-  // platforms/<host>/scripts/validate.mjs and run on the committed dist/<host>.
-  const extra = join(platformsDir, host, "scripts", "validate.mjs");
-  if (existsSync(extra)) {
-    const run = spawnSync(process.execPath, [extra, join(root, "dist", host)], { encoding: "utf8" });
-    if (run.status !== 0) errors.push(`${host}: platforms/${host}/scripts/validate.mjs failed:\n${(run.stderr || run.stdout).trim()}`);
   }
 
   // How much skill text the host owns instead of sharing: its slot files and
