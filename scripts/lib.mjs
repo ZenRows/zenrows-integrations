@@ -18,6 +18,11 @@ const sharedDirs = { "shared/assets": "assets" };
 // In platforms/<host>/, these are inputs to the render, not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
 const reserved = ["vars.yaml", "overrides.lock", "skills/"];
+// What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{< x}},
+// {{> x}}, {{text:x}}) after the render, for example in a file type it doesn't
+// fill or with a stray space. Other {{…}} (n8n or Make expressions, JSX's
+// style={{…}}) isn't ours and ships as written.
+export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_-]+|[a-z_]+(?::[a-z0-9-]+)?)\s*\}\}/;
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
 export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
@@ -53,6 +58,10 @@ function versions() {
 
 export function vars(host) {
   const v = parseYaml(readFileSync(join(platformsDir, host, "vars.yaml"), "utf8")) ?? {};
+  if (typeof v !== "object" || Array.isArray(v)) throw new Error(`platforms/${host}/vars.yaml must be a list of name: value lines`);
+  if ("kind" in v && v.kind !== "plugin" && v.kind !== "code") {
+    throw new Error(`platforms/${host}/vars.yaml: kind is ${JSON.stringify(v.kind)}; use plugin or code`);
+  }
   const version = versions()[`dist/${host}`];
   // A code host may not be released from here (yet), so it needs no
   // release-please entry; it then has no {{version}}.
@@ -98,9 +107,8 @@ export function hostSkills(host, values = vars(host)) {
 // ships only its own files, with {{…}} filled in, and no shared skills, LICENSE
 // or assets.
 export function isCodeHost(values) {
-  const kind = values.kind ?? "plugin";
-  if (!["plugin", "code"].includes(kind)) throw new Error(`kind: ${kind} in vars.yaml; use plugin or code`);
-  return kind === "code";
+  // vars() has already rejected any other kind, naming the file.
+  return values.kind === "code";
 }
 
 // A skill's name on a host: skill_prefix + the shared name, unless vars.yaml
@@ -114,7 +122,12 @@ export function hostSkillName(values, name) {
 export function sharedText(name, where) {
   const file = join(sharedTextDir, `${name}.md`);
   if (!existsSync(file)) throw new Error(`${where}: there's no shared/text/${name}.md`);
-  return readFileSync(file, "utf8").replace(/\n$/, "");
+  // Trimmed, so a trailing blank line or a CRLF ending doesn't end up in a string.
+  const text = readFileSync(file, "utf8").trim();
+  if (text.includes("{{")) {
+    throw new Error(`shared/text/${name}.md uses {{…}}; a snippet is a plain fact, and the text around it adds what differs per host`);
+  }
+  return text;
 }
 
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
@@ -183,12 +196,13 @@ export function renderHost(host) {
     out.set(file, renderFile(join(platform, file), values));
   }
 
-  // A {{…}} the render didn't fill (a mistyped token, or a file type outside
+  // A token the render didn't fill (a mistyped one, or in a file type outside
   // textFile) would otherwise ship as it is. Binary files (not valid UTF-8) are skipped.
   for (const [path, buf] of out) {
     const text = buf.toString("utf8");
-    if (Buffer.from(text, "utf8").equals(buf) && text.includes("{{")) {
-      throw new Error(`${host}: ${path} still has an unrendered {{…}}`);
+    const token = Buffer.from(text, "utf8").equals(buf) && text.match(leftoverToken);
+    if (token) {
+      throw new Error(`${host}: ${path} still has an unrendered ${token[0]}`);
     }
   }
   return out;
