@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hostSkills, hosts, listFiles, platformsDir, readLock, renderHost, root, sha256, skillNames, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
 const report = [];
@@ -167,7 +167,7 @@ for (const host of hosts()) {
       if (!json[key]) errors.push(`${host}: ${file} has no "${key}"`);
     }
   }
-  if (!manifests.length) errors.push(`${host}: no plugin.json in platforms/${host}/`);
+  if (!manifests.length && !isCodeHost(values)) errors.push(`${host}: no plugin.json in platforms/${host}/`);
 
   // Marketplace catalogs at the top of the repo must point at this host's
   // dist/ folder, with this host's version.
@@ -249,6 +249,25 @@ for (const host of hosts()) {
     .map((f) => readFileSync(join(platformsDir, host, "skills", f), "utf8").split("\n").filter(Boolean).length)
     .reduce((a, b) => a + b, 0);
   report.push(`${host}: ${Object.keys(lock).length} whole-file overrides, ${owned} skill lines of its own (slots and overrides)`);
+}
+
+// shared/text/ snippets are plain text, so they read the same in a skill and in
+// a code string, and each must be used somewhere ({{< name}} or {{text:name}}).
+const snippetSources = [
+  ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
+  ...listFiles(platformsDir).map((f) => join(platformsDir, f)),
+];
+const used = new Set();
+for (const file of snippetSources) {
+  if (!textFile.test(file)) continue;
+  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{\s*(<\s*|text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
+}
+for (const file of listFiles(sharedTextDir)) {
+  const name = file.replace(/\.md$/, "");
+  const text = readFileSync(join(sharedTextDir, file), "utf8");
+  if (!used.has(name)) errors.push(`shared/text/${file} isn't used by any skill or host`);
+  if (/[`*_[\]#]/.test(text)) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
+  if (text.trim().includes("\n")) errors.push(`shared/text/${file} has more than one line; keep one fact per snippet`);
 }
 
 console.log(report.join("\n"));
