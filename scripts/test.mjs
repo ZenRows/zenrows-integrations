@@ -2,7 +2,7 @@
 // the repo to a temporary folder, makes one change (a throwaway code host, a
 // snippet, …), runs npm run render and npm run validate there, and checks the
 // first failure, or that both pass. Add a case whenever a new rule is added.
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,7 +10,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { root } from "./lib.mjs";
 
-const copied = ["scripts", "skills", "shared", "platforms", "dist", "README.md", "LICENSE", "package.json", ".release-please-manifest.json", "release-please-config.json", ".github"];
+// Every tracked file, so catalogs at the top of the repo (.claude-plugin/, …) come too.
+const copied = execFileSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
 
 // A code host that passes as it is; cases add or remove files from it.
 const piece = {
@@ -24,7 +25,10 @@ const piece = {
 function run(files) {
   const dir = mkdtempSync(join(tmpdir(), "zenrows-integrations-test-"));
   try {
-    for (const path of copied) cpSync(join(root, path), join(dir, path), { recursive: true });
+    for (const path of copied) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true });
+      cpSync(join(root, path), join(dir, path));
+    }
     symlinkSync(join(root, "node_modules"), join(dir, "node_modules"));
     mkdirSync(join(root, ".cache"), { recursive: true });
     symlinkSync(join(root, ".cache"), join(dir, ".cache"));
@@ -71,6 +75,7 @@ test("an unknown variable fails", fails({ ...piece, "platforms/piece/src/index.t
 
 test("a code host with no README fails", fails({ ...piece, "platforms/piece/README.md": null }, "a code host needs platforms/piece/README.md"));
 test("a code host README with a {{…}} fails", fails({ ...piece, "platforms/piece/README.md": "# {{host_full}}\n" }, "README.md isn't rendered"));
+test("a code host README that documents {{…}} in code passes", passes({ ...piece, "platforms/piece/README.md": "# Piece\n\nFacts come in through `{{text:name}}`.\n\n```\n{{< name}}\n```\n" }));
 test("a code host with a skills/ folder fails", fails({ ...piece, "platforms/piece/skills/scrape/SKILL.md": "x\n" }, "a code host (kind: code) ships no skills"));
 test("a skill reference in a code host fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const s = \"{{skill:batch}}\";\n" }, "a code host (kind: code) ships no skills"));
 test("an unknown kind fails", fails({ ...piece, "platforms/piece/vars.yaml": "host_full: Piece\nkind: Code\n" }, "kind: Code in vars.yaml"));

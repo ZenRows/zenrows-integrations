@@ -223,8 +223,9 @@ for (const host of hosts()) {
     const readme = join(platformsDir, host, "README.md");
     if (!existsSync(readme)) {
       errors.push(`${host}: a code host needs platforms/${host}/README.md; the hosts list in README.md links to it`);
-    } else if (readFileSync(readme, "utf8").includes("{{")) {
-      // It isn't rendered, so a {{…}} would show as it is on GitHub.
+    } else if (readFileSync(readme, "utf8").replace(/```[\s\S]*?```|`[^`\n]*`/g, "").includes("{{")) {
+      // It isn't rendered, so a {{…}} would show as it is on GitHub. One in
+      // `code` documents the syntax, so code spans and blocks are left out.
       errors.push(`${host}: platforms/${host}/README.md isn't rendered, so it can't use {{…}}; write the text out`);
     }
     report.push(`${host}: code host, ships only its own files`);
