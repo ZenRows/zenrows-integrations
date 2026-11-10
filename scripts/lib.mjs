@@ -71,8 +71,13 @@ export function readLock(host) {
 // the host's own skills (platforms/<host>/skills/<name>/SKILL.md with no shared
 // skill of that name). Returns [{ name, own }].
 export function hostSkills(host, values = vars(host)) {
-  // A code host (kind: code) ships no skills.
-  if (isCodeHost(values)) return [];
+  // A code host (kind: code) ships no skills, so a skills/ folder there would be ignored.
+  if (isCodeHost(values)) {
+    if (listFiles(join(platformsDir, host, "skills")).length) {
+      throw new Error(`platforms/${host}/skills/: a code host (kind: code) ships no skills; move these files out of skills/`);
+    }
+    return [];
+  }
   const shared = skillNames();
   const skip = values.skip_skills ?? [];
   for (const name of skip) {
@@ -120,7 +125,11 @@ function fill(text, values, where) {
   return text.replace(/\{\{\s*([a-z_]+)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
       if (!values.skills.includes(arg)) {
-        const why = skillNames().includes(arg) ? "this host skips it (skip_skills)" : "there's no such skill";
+        const why = !skillNames().includes(arg)
+          ? "there's no such skill"
+          : isCodeHost(values)
+            ? "a code host (kind: code) ships no skills"
+            : "this host skips it (skip_skills)";
         throw new Error(`${where}: ${token} names a skill this host doesn't ship: ${why}`);
       }
       return hostSkillName(values, arg);
@@ -172,6 +181,15 @@ export function renderHost(host) {
     // A code host's README documents the integration here; it isn't part of the code.
     if (isCodeHost(values) && file === "README.md") continue;
     out.set(file, renderFile(join(platform, file), values));
+  }
+
+  // A {{…}} the render didn't fill (a mistyped token, or a file type outside
+  // textFile) would otherwise ship as it is. Binary files (not valid UTF-8) are skipped.
+  for (const [path, buf] of out) {
+    const text = buf.toString("utf8");
+    if (Buffer.from(text, "utf8").equals(buf) && text.includes("{{")) {
+      throw new Error(`${host}: ${path} still has an unrendered {{…}}`);
+    }
   }
   return out;
 }

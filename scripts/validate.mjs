@@ -217,6 +217,20 @@ for (const host of hosts()) {
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
   }
 
+  // A code host's README stays here (it isn't shipped) and the repo's hosts
+  // list links to it.
+  if (isCodeHost(values)) {
+    const readme = join(platformsDir, host, "README.md");
+    if (!existsSync(readme)) {
+      errors.push(`${host}: a code host needs platforms/${host}/README.md; the hosts list in README.md links to it`);
+    } else if (readFileSync(readme, "utf8").includes("{{")) {
+      // It isn't rendered, so a {{…}} would show as it is on GitHub.
+      errors.push(`${host}: platforms/${host}/README.md isn't rendered, so it can't use {{…}}; write the text out`);
+    }
+    report.push(`${host}: code host, ships only its own files`);
+    continue;
+  }
+
   // How much skill text the host owns instead of sharing: its slot files and
   // whole-file overrides. Information only; a growing number is worth a look.
   const owned = listFiles(join(platformsDir, host, "skills"))
@@ -234,13 +248,15 @@ const snippetSources = [
 const used = new Set();
 for (const file of snippetSources) {
   if (!textFile.test(file)) continue;
-  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{\s*(<\s*|text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
+  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
 }
 for (const file of listFiles(sharedTextDir)) {
   const name = file.replace(/\.md$/, "");
   const text = readFileSync(join(sharedTextDir, file), "utf8");
   if (!used.has(name)) errors.push(`shared/text/${file} isn't used by any skill or host`);
-  if (/[`*_[\]#]/.test(text)) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
+  // Backticks, *, links and headings would show up as is in a code string.
+  // _ and [ ] don't count: parameter names (js_render) and [{...}] use them.
+  if (/[`*]/.test(text) || /\]\(/.test(text) || /^#/.test(text.trim())) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
   if (text.trim().includes("\n")) errors.push(`shared/text/${file} has more than one line; keep one fact per snippet`);
 }
 
