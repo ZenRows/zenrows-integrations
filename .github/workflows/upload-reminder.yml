@@ -15,6 +15,9 @@ on:
         description: "The release, <host>-v<version>"
         type: string
         required: true
+      dry_run:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       host:
@@ -43,8 +46,7 @@ jobs:
     env:
       HOST: ${{ inputs.host }}
       TAG: ${{ inputs.tag }}
-      # workflow_call has no dry_run input, so a release always posts.
-      DRY_RUN: ${{ inputs.dry_run == true }}
+      DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
