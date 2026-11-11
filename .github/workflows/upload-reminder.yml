@@ -71,12 +71,13 @@ jobs:
             const { HOST, TAG } = process.env;
             const v = vars(HOST);
             if (HOST + "-v" + v.version !== TAG) {
-              console.error("::error::" + TAG + " is not a " + HOST + " release: at that tag, " + HOST + " is at " + v.version + ".");
+              // \x27 is an apostrophe: a literal one would end this shell-quoted script.
+              console.error("::error::" + TAG + " isn\x27t a " + HOST + " release: at that tag, " + HOST + " is at " + v.version + ".");
               process.exit(1);
             }
             console.log(JSON.stringify(v.upload ?? false));')
           if [ "$upload" = false ]; then
-            echo "::notice::$HOST has upload: false in platforms/$HOST/vars.yaml, so there's nothing to upload by hand."
+            echo "::notice::$HOST has no upload to do by hand (upload: in platforms/$HOST/vars.yaml is false or missing)."
             exit 0
           fi
 
