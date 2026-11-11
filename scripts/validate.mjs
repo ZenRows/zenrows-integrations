@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hostSkills, hosts, listFiles, platformsDir, readLock, renderHost, root, sha256, skillNames, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
 const report = [];
@@ -157,7 +157,7 @@ for (const host of hosts()) {
       if (!json[key]) errors.push(`${host}: ${file} has no "${key}"`);
     }
   }
-  if (!manifests.length) errors.push(`${host}: no plugin.json in platforms/${host}/`);
+  if (!manifests.length && !isCodeHost(values)) errors.push(`${host}: no plugin.json in platforms/${host}/`);
 
   // Marketplace catalogs at the top of the repo must point at this host's
   // dist/ folder, with this host's version.
@@ -217,12 +217,48 @@ for (const host of hosts()) {
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
   }
 
+  // A code host's README stays here (it isn't shipped) and the repo's hosts
+  // list links to it.
+  if (isCodeHost(values)) {
+    if (!existsSync(join(platformsDir, host, "README.md"))) {
+      errors.push(`${host}: a code host needs platforms/${host}/README.md; the hosts list in README.md links to it`);
+    }
+    report.push(`${host}: code host, ships only its own files`);
+    continue;
+  }
+
   // How much skill text the host owns instead of sharing: its slot files and
   // whole-file overrides. Information only; a growing number is worth a look.
   const owned = listFiles(join(platformsDir, host, "skills"))
     .map((f) => readFileSync(join(platformsDir, host, "skills", f), "utf8").split("\n").filter(Boolean).length)
     .reduce((a, b) => a + b, 0);
   report.push(`${host}: ${Object.keys(lock).length} whole-file overrides, ${owned} skill lines of its own (slots and overrides)`);
+}
+
+// shared/text/ snippets are plain text, so they read the same in a skill and in
+// a code string, and each must be used somewhere ({{< name}} or {{text:name}}).
+// A code host's README isn't rendered, and vars.yaml and overrides.lock are
+// inputs, so a snippet named only there isn't used.
+const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `${h}/README.md`);
+const snippetSources = [
+  ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
+  ...listFiles(platformsDir)
+    .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))
+    .map((f) => join(platformsDir, f)),
+];
+const used = new Set();
+for (const file of snippetSources) {
+  if (!textFile.test(file)) continue;
+  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
+}
+for (const file of listFiles(sharedTextDir)) {
+  const name = file.replace(/\.md$/, "");
+  const text = readFileSync(join(sharedTextDir, file), "utf8");
+  if (!used.has(name)) errors.push(`shared/text/${file} isn't used by any skill or host`);
+  // Backticks, *, links and headings would show up as is in a code string.
+  // _ and [ ] don't count: parameter names (js_render) and [{...}] use them.
+  if (/[`*]/.test(text) || /\]\(/.test(text) || /^#/.test(text.trim())) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
+  if (text.trim().includes("\n")) errors.push(`shared/text/${file} has more than one line; keep one fact per snippet`);
 }
 
 console.log(report.join("\n"));
