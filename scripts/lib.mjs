@@ -20,9 +20,10 @@ const sharedDirs = { "shared/assets": "assets" };
 const reserved = ["vars.yaml", "overrides.lock", "skills/"];
 // What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{< x}},
 // {{> x}}, {{text:x}}) after the render, for example in a file type it doesn't
-// fill or with a stray space. Other {{…}} (n8n or Make expressions, JSX's
-// style={{…}}) isn't ours and ships as written.
-export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_-]+|[a-z_]+(?::[a-z0-9-]+)?)\s*\}\}/;
+// fill, or with a stray space or capital letter the fill regexes don't take.
+// Other {{…}} (n8n or Make expressions, JSX's style={{…}}) isn't ours and ships
+// as written.
+export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_-]+|[a-z_]+(?:\s*:\s*[a-z0-9-]+)?)\s*\}\}/i;
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
 export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
