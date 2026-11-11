@@ -74,11 +74,19 @@ test("a {{…}} in a file type the render doesn't fill fails", () => {
   fails({ ...piece, "platforms/piece/src/view.tsx": "export const a = \"{{host_full}}\";\n" }, "src/view.tsx still has an unrendered {{host_full}}")();
   fails({ ...piece, "platforms/piece/setup.py": "name = \"{{host_full}}\"\n" }, "setup.py still has an unrendered {{host_full}}")();
 });
-test("a mistyped snippet token fails", fails({
-  ...piece,
-  "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
-  "platforms/piece/src/index.ts": "export const cost = {{ < cost}};\n",
-}, "src/index.ts still has an unrendered {{ < cost}}"));
+test("a mistyped snippet token fails", () => {
+  for (const token of ["{{ < cost}}", "{{text: cost}}", "{{< COST}}", "{{Text:cost}}"]) {
+    fails({
+      ...piece,
+      "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
+      "platforms/piece/src/index.ts": `export const cost = ${token};\n`,
+    }, `src/index.ts still has an unrendered ${token}`)();
+  }
+});
+test("a mistyped skill or variable token fails", () => {
+  fails({ ...piece, "platforms/piece/src/index.ts": "export const s = \"{{skill: batch}}\";\n" }, "still has an unrendered {{skill: batch}}")();
+  fails({ ...piece, "platforms/piece/src/index.ts": "export const a = \"{{Host_full}}\";\n" }, "still has an unrendered {{Host_full}}")();
+});
 test("an unknown variable fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const a = \"{{hots_full}}\";\n" }, "unknown variable {{hots_full}}"));
 
 test("a code host with no README fails", fails({ ...piece, "platforms/piece/README.md": null }, "a code host needs platforms/piece/README.md"));
