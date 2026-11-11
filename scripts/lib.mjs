@@ -18,12 +18,13 @@ const sharedDirs = { "shared/assets": "assets" };
 // In platforms/<host>/, these are inputs to the render, not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
 const reserved = ["vars.yaml", "overrides.lock", "skills/"];
-// What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{< x}},
-// {{> x}}, {{text:x}}) after the render, for example in a file type it doesn't
-// fill, or with a stray space or capital letter the fill regexes don't take.
-// Other {{…}} (n8n or Make expressions, JSX's style={{…}}) isn't ours and ships
-// as written.
-export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_-]+|[a-z_]+(?:\s*:\s*[a-z0-9-]+)?)\s*\}\}/i;
+// What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{text:x}},
+// {{< x}}, {{> x}}) after the render, for example in a file type it doesn't
+// fill, or with a stray space, capital letter, _ or . the fill regexes don't
+// take. A colon is ours only after skill or text, so JSX's style={{ flex: 1 }}
+// isn't matched; nor is other tools' {{…}} (Make's {{a.b}}, n8n's {{ $json.x }}),
+// which ships as written. scripts/test.mjs lists both sides.
+export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_.-]+|(?:skill|text)\s*:\s*[a-z0-9_.-]+|[a-z_][a-z0-9_-]*)\s*\}\}/i;
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
 export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
@@ -136,7 +137,7 @@ export function sharedText(name, where) {
 // as a quoted string literal (JSON), for code.
 function fill(text, values, where) {
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));
-  return text.replace(/\{\{\s*([a-z_]+)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
+  return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
       if (!values.skills.includes(arg)) {
         const why = !skillNames().includes(arg)

@@ -70,22 +70,32 @@ const fails = (files, message) => () => {
 test("the repo as it is passes", passes({}));
 test("a code host passes", passes(piece));
 
-test("a {{…}} in a file type the render doesn't fill fails", () => {
-  fails({ ...piece, "platforms/piece/src/view.tsx": "export const a = \"{{host_full}}\";\n" }, "src/view.tsx still has an unrendered {{host_full}}")();
-  fails({ ...piece, "platforms/piece/setup.py": "name = \"{{host_full}}\"\n" }, "setup.py still has an unrendered {{host_full}}")();
-});
-test("a mistyped snippet token fails", () => {
-  for (const token of ["{{ < cost}}", "{{text: cost}}", "{{< COST}}", "{{Text:cost}}"]) {
-    fails({
-      ...piece,
-      "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
-      "platforms/piece/src/index.ts": `export const cost = ${token};\n`,
-    }, `src/index.ts still has an unrendered ${token}`)();
+// The guard on rendered files, both sides: every form of this tool's tokens
+// must be caught (here in a .tsx, which the render doesn't fill, so each one
+// is a leftover), and other tools' {{…}} must ship as written. Known limit: a
+// mistyped keyword ({{txet:cost}}) looks like another tool's {{a:b}} and ships.
+const ours = [
+  "{{host_full}}", "{{ host_full }}", "{{Host_full}}", "{{host-full}}", "{{api_v2}}",
+  "{{skill:batch}}", "{{skill: batch}}", "{{Skill:batch}}", "{{skill:scrape_webpage}}",
+  "{{text:cost}}", "{{text: cost}}", "{{text:cost.md}}", "{{text:cost_credits}}",
+  "{{< cost}}", "{{ < cost}}", "{{<cost}}", "{{< COST}}", "{{< cost.md}}",
+  "{{> connect}}", "{{>? connect}}", "{{> connect.md}}",
+];
+test("every form of this tool's tokens is caught", () => {
+  for (const token of ours) {
+    fails({ ...piece, "platforms/piece/src/view.tsx": `export const a = ${token};\n` }, `src/view.tsx still has an unrendered ${token}`)();
   }
 });
-test("a mistyped skill or variable token fails", () => {
-  fails({ ...piece, "platforms/piece/src/index.ts": "export const s = \"{{skill: batch}}\";\n" }, "still has an unrendered {{skill: batch}}")();
-  fails({ ...piece, "platforms/piece/src/index.ts": "export const a = \"{{Host_full}}\";\n" }, "still has an unrendered {{Host_full}}")();
+test("a {{…}} in a file type the render doesn't fill fails", fails({ ...piece, "platforms/piece/setup.py": "name = \"{{host_full}}\"\n" }, "setup.py still has an unrendered {{host_full}}"));
+test("a mistyped snippet token fails on the way through the render", fails({
+  ...piece,
+  "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
+  "platforms/piece/src/index.ts": "export const cost = {{ < cost}};\n",
+}, "src/index.ts still has an unrendered {{ < cost}}"));
+test("a variable with a digit in its name is filled", () => {
+  const r = run({ ...piece, "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\napi_v2: two\n", "platforms/piece/src/index.ts": "export const v = \"{{api_v2}}\";\n" });
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), "export const v = \"two\";\n");
 });
 test("an unknown variable fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const a = \"{{hots_full}}\";\n" }, "unknown variable {{hots_full}}"));
 
@@ -111,16 +121,16 @@ test("an unknown kind fails", () => {
 test("a vars.yaml that isn't name: value lines fails", fails({ ...piece, "platforms/piece/vars.yaml": "- host_full: Piece\n" }, "platforms/piece/vars.yaml must be a list of name: value lines"));
 
 // {{…}} that isn't one of this tool's tokens ships as written.
+const theirs = {
+  // JSX, with a string, a number and a variable value, spaced or not.
+  "platforms/piece/src/view.tsx": "export const v = <p style={{ color: \"red\" }} />;\nexport const w = <p style={{ width: 100 }} />;\nexport const x = <p style={{ color: accent }} />;\nexport const y = <p style={{flex:1}} />;\n",
+  // Make, Zapier, n8n and a Handlebars block, plus an empty pair.
+  "platforms/piece/communication.json": "{ \"make\": \"{{parameters.url}} {{1.name}}\", \"zapier\": \"{{bundle.inputData.url}}\", \"n8n\": \"{{ $json.url }}\", \"hbs\": \"{{#if x}}{{/if}}\", \"empty\": \"{{}}\" }\n",
+};
 test("other tools' {{…}} ship as written", () => {
-  const files = {
-    ...piece,
-    "platforms/piece/src/view.tsx": "export const v = <p style={{ color: \"red\" }} />;\n",
-    "platforms/piece/communication.json": "{ \"url\": \"{{parameters.url}}\", \"n8n\": \"{{ $json.url }}\" }\n",
-  };
-  const r = run(files);
+  const r = run({ ...piece, ...theirs });
   assert.ok(r.ok, r.out);
-  assert.equal(r.dist("dist/piece/src/view.tsx"), files["platforms/piece/src/view.tsx"]);
-  assert.equal(r.dist("dist/piece/communication.json"), files["platforms/piece/communication.json"]);
+  for (const [path, text] of Object.entries(theirs)) assert.equal(r.dist(path.replace(/^platforms\//, "dist/")), text);
 });
 
 // Snippets: plain text, one line, used somewhere.
