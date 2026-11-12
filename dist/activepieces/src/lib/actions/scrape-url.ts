@@ -2,7 +2,17 @@ import { randomUUID } from 'crypto';
 import { createAction, OutputSchema, Property } from '@activepieces/pieces-framework';
 import { zenrowsAuth } from '../auth';
 import { zenrowsClient } from '../common/client';
-import { ScrapeOutputFormat, zenrowsParams } from '../common/params';
+
+type OutputFormat = 'markdown' | 'html' | 'plaintext' | 'screenshot';
+
+// What each format adds to the request. A screenshot needs a real browser, so
+// it sets js_render itself instead of leaving the choice to Adaptive Stealth Mode.
+const FORMAT_PARAMS: Record<OutputFormat, Record<string, string>> = {
+  markdown: { response_type: 'markdown' },
+  html: {},
+  plaintext: { response_type: 'plaintext' },
+  screenshot: { js_render: 'true', screenshot_fullpage: 'true', screenshot_format: 'png' },
+};
 
 export const scrapeUrlAction = createAction({
   auth: zenrowsAuth,
@@ -24,7 +34,7 @@ export const scrapeUrlAction = createAction({
       description: 'The full address of the page to scrape, e.g. https://www.scrapingcourse.com/ecommerce/',
       required: true,
     }),
-    output_format: Property.StaticDropdown<ScrapeOutputFormat>({
+    output_format: Property.StaticDropdown<OutputFormat>({
       displayName: 'Output Format',
       description: 'Markdown is the easiest format to read or pass to an AI step. Screenshots always use JS rendering.',
       required: true,
@@ -42,44 +52,14 @@ export const scrapeUrlAction = createAction({
     adaptive: Property.Checkbox({
       displayName: 'Adaptive Stealth Mode',
       description:
-        'Recommended. ZenRows starts with the cheapest setup and adds JS rendering or premium proxies only when the page needs them; you pay only for what succeeds. Turn off to choose JS Rendering and Premium Proxy yourself.',
+        'Recommended. ZenRows starts with the cheapest setup and adds JS rendering or premium proxies only when the page needs them; you pay only for what succeeds. Turn off for a basic request, or use the Custom API Call action to set each option yourself.',
       required: false,
       defaultValue: true,
-    }),
-    js_render: Property.Checkbox({
-      displayName: 'JS Rendering',
-      description:
-        'Load the page in a real browser so content added by JavaScript is included. Only used when Adaptive Stealth Mode is off.',
-      required: false,
-      defaultValue: false,
-    }),
-    premium_proxy: Property.Checkbox({
-      displayName: 'Premium Proxy',
-      description:
-        'Route the request through residential IPs, needed by most protected sites. Only used when Adaptive Stealth Mode is off.',
-      required: false,
-      defaultValue: false,
-    }),
-    proxy_country: Property.ShortText({
-      displayName: 'Proxy Country',
-      description:
-        'Two-letter country code to scrape from, e.g. us, gb or de. Needs Premium Proxy when Adaptive Stealth Mode is off.',
-      required: false,
-    }),
-    wait_for: Property.ShortText({
-      displayName: 'Wait For Selector',
-      description: 'A CSS selector to wait for before returning the page, e.g. .product-list. Needs JS rendering.',
-      required: false,
-    }),
-    wait: Property.Number({
-      displayName: 'Wait (ms)',
-      description: 'Extra milliseconds to wait after the page loads. Needs JS rendering.',
-      required: false,
     }),
     js_instructions: Property.LongText({
       displayName: 'JavaScript Instructions',
       description:
-        'Actions to run on the page before it is returned, as a JSON array, e.g. [{"click": ".load-more"}, {"wait": 1000}]. Needs JS rendering. See https://docs.zenrows.com for the full list.',
+        'Actions to run on the page before it is returned, as a JSON array, e.g. [{"click": ".load-more"}, {"wait": 1000}]. See https://docs.zenrows.com for the full list.',
       required: false,
     }),
     custom_headers: Property.Object({
@@ -87,36 +67,24 @@ export const scrapeUrlAction = createAction({
       description: 'Headers to send to the target site, such as Cookie or Referer.',
       required: false,
     }),
-    session_id: Property.Number({
-      displayName: 'Session ID',
-      description: 'Any number you choose. Requests with the same Session ID use the same IP for up to 10 minutes.',
-      required: false,
-    }),
   },
   async run(context) {
     const { propsValue } = context;
     const outputFormat = propsValue.output_format ?? 'markdown';
-    const forwardedHeaders = zenrowsParams.toStringRecord({ value: propsValue.custom_headers });
-    const forwardHeaders = Object.keys(forwardedHeaders).length > 0;
     const isScreenshot = outputFormat === 'screenshot';
-
-    const params = zenrowsParams.buildScrapeParams({
-      url: propsValue.url,
-      outputFormat,
-      adaptive: propsValue.adaptive ?? true,
-      jsRender: propsValue.js_render,
-      premiumProxy: propsValue.premium_proxy,
-      proxyCountry: propsValue.proxy_country,
-      waitFor: propsValue.wait_for,
-      wait: propsValue.wait,
-      jsInstructions: propsValue.js_instructions,
-      forwardHeaders,
-      sessionId: propsValue.session_id,
-    });
+    const forwardedHeaders = stringValues(propsValue.custom_headers);
+    const forwardHeaders = Object.keys(forwardedHeaders).length > 0;
+    const jsInstructions = propsValue.js_instructions?.trim();
 
     const response = await zenrowsClient.fetchPage({
       apiKey: context.auth.secret_text,
-      params,
+      params: {
+        url: propsValue.url,
+        ...(propsValue.adaptive !== false && !isScreenshot ? { mode: 'auto' } : {}),
+        ...FORMAT_PARAMS[outputFormat],
+        ...(jsInstructions ? { js_instructions: jsInstructions } : {}),
+        ...(forwardHeaders ? { custom_headers: 'true' } : {}),
+      },
       forwardedHeaders: forwardHeaders ? forwardedHeaders : undefined,
       binary: isScreenshot,
     });
@@ -141,6 +109,15 @@ export const scrapeUrlAction = createAction({
     };
   },
 });
+
+// The headers the form holds as text, trimmed; other values are left out.
+function stringValues(value: Record<string, unknown> | null | undefined): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(value ?? {}).flatMap(([key, entry]) =>
+      typeof entry === 'string' && entry.trim() && key.trim() ? [[key.trim(), entry.trim()]] : []
+    )
+  );
+}
 
 function scrapeOutputSchema(): OutputSchema {
   return {

@@ -60,6 +60,9 @@ async function fetchPage({
   }
 }
 
+// The API answers every failure with a code and a reason
+// (https://docs.zenrows.com/api-error-codes); the message keeps both, and adds
+// what to do next for the codes where Activepieces changes the answer.
 function toZenrowsError({ error }: { error: unknown }): unknown {
   if (!(error instanceof HttpError)) {
     return error;
@@ -69,29 +72,11 @@ function toZenrowsError({ error }: { error: unknown }): unknown {
   if (!problem) {
     return error;
   }
-  const hint = isExtractRefusal({ code: problem.code })
-    ? REQS007_HINTS[problem.extractCase ?? ''] ?? ERROR_HINTS['REQS007']
-    : ERROR_HINTS[problem.code];
-  return new Error(
-    `ZenRows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`
-  );
+  const hint = ERROR_HINTS[problem.code];
+  return new Error(`ZenRows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
 }
 
-function readHeader({
-  headers,
-  name,
-}: {
-  headers: HttpHeaders | undefined;
-  name: string;
-}): string | null {
-  const value = headers?.[name.toLowerCase()];
-  if (Array.isArray(value)) {
-    return value[0] ?? null;
-  }
-  return value ?? null;
-}
-
-function parseProblem({ body }: { body: unknown }): ZenrowsProblem | null {
+function parseProblem({ body }: { body: unknown }): { code: string; reason: string } | null {
   if (typeof body === 'string') {
     try {
       return parseProblem({ body: JSON.parse(body) });
@@ -99,43 +84,25 @@ function parseProblem({ body }: { body: unknown }): ZenrowsProblem | null {
       return null;
     }
   }
-  if (!isRecord(body) || typeof body['code'] !== 'string') {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return null;
   }
-  const detail = body['detail'];
-  const title = body['title'];
+  const { code, detail, title } = body as Record<string, unknown>;
+  if (typeof code !== 'string') {
+    return null;
+  }
   return {
-    code: body['code'],
-    reason:
-      typeof detail === 'string'
-        ? detail
-        : typeof title === 'string'
-          ? title
-          : 'Request failed',
-    extractCase: readExtractCase({ body }),
+    code,
+    reason: typeof detail === 'string' ? detail : typeof title === 'string' ? title : 'Request failed',
   };
 }
 
-// REQS007 (or the older AUTH010) says why Extract refused a page in its
-// "reason" field. Until every API release sends it, the title tells the cases
-// apart: https://docs.zenrows.com/api-error-codes#REQS007
-function readExtractCase({ body }: { body: Record<string, unknown> }): string | undefined {
-  if (typeof body['reason'] === 'string') {
-    return body['reason'];
+function readHeader({ headers, name }: { headers: HttpHeaders | undefined; name: string }): string | null {
+  const value = headers?.[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
   }
-  const title = body['title'];
-  if (typeof title !== 'string') {
-    return undefined;
-  }
-  return REQS007_TITLES.find(([prefix]) => title.startsWith(prefix))?.[1];
-}
-
-function isExtractRefusal({ code }: { code: string }): boolean {
-  return code === 'REQS007' || code === 'AUTH010';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return value ?? null;
 }
 
 const FETCH_TIMEOUT_MS = 180000;
@@ -156,43 +123,13 @@ const ERROR_HINTS: Record<string, string> = {
   AUTH003: AUTH_HINT,
   AUTH004: sentence("the account's credit allowance is spent", 'Top up or upgrade at https://app.zenrows.com.'),
   AUTH014: sentence("this API key reached its credit cap", 'Raise the cap in the ZenRows dashboard.'),
-  REQS002:
-    'This page needs JS rendering and/or premium proxies. Turn on Adaptive Stealth Mode, or enable them manually.',
-  REQS007:
-    'Extract refused this page, and nothing was charged. Use the CSS selectors method, or see https://docs.zenrows.com/api-error-codes#REQS007.',
-  AUTH006: sentence("too many requests are running at once", 'Reduce parallel runs and retry.'),
-  AUTH008: 'Rate limit reached. Wait a moment and retry.',
-  RESP009: 'ZenRows is temporarily at capacity. Retry in a few seconds.',
+  REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
 };
 
 export const ZENROWS_API_BASE_URL = 'https://api.zenrows.com/v1';
 
-const REQS007_TITLES: [string, string][] = [
-  ['Extract is not prepared for the requested domain', 'domain_not_prepared'],
-  ['Extract did not recognise this page on', 'page_not_recognised'],
-  ['Extract is not enabled for the requested domain', 'domain_not_enabled'],
-];
-
-const REQS007_HINTS: Record<string, string> = {
-  domain_not_prepared:
-    'ZenRows has not prepared this domain for automatic extraction yet. Prepare it with the Custom API Call action: POST /extract/prepared-domains with the domain and 1 to 5 example URLs. It takes a few minutes and costs no credits. Meanwhile, use the CSS selectors method.',
-  page_not_recognised: sentence(
-    "the domain is prepared, but this page has nothing Extract extracts (a home or search page, for example)",
-    'Try a product, article or listing page, or the CSS selectors method. Preparing the domain again does not change it.'
-  ),
-  domain_not_enabled:
-    'Automatic extraction is not enabled for this site, and preparing it does not help. Use the CSS selectors method, or contact ZenRows support.',
-};
-
 export const zenrowsClient = {
   request,
   fetchPage,
-  toZenrowsError,
   readHeader,
-};
-
-type ZenrowsProblem = {
-  code: string;
-  reason: string;
-  extractCase?: string;
 };

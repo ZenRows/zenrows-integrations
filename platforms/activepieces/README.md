@@ -6,7 +6,7 @@ This is a code host (`kind: code` in `vars.yaml`). `npm run render` writes `dist
 
 ## Shared wording
 
-Facts that the Zenrows skills state too come from `shared/text/` through `{{text:name}}`, which renders as a quoted string. Today that's the meaning of `AUTH004`, `AUTH014`, `AUTH006` and REQS007's `page_not_recognised`, in `src/lib/common/client.ts`. A wording fix in `shared/text/` reaches the skills and the piece in the same render.
+Facts that the Zenrows skills state too come from `shared/text/` through `{{text:name}}`, which renders as a quoted string. Today that's the meaning of `AUTH004` and `AUTH014`, in `src/lib/common/client.ts`. The piece keeps its forms short and passes the rest through: the API validates option combinations and explains every error, so the piece doesn't repeat that. A wording fix in `shared/text/` reaches the skills and the piece in the same render.
 
 ## Check it
 

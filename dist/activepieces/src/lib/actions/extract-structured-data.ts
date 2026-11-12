@@ -1,7 +1,6 @@
 import { createAction, Property } from '@activepieces/pieces-framework';
 import { zenrowsAuth } from '../auth';
 import { zenrowsClient } from '../common/client';
-import { ExtractMethod, zenrowsParams } from '../common/params';
 
 export const extractStructuredDataAction = createAction({
   auth: zenrowsAuth,
@@ -21,7 +20,7 @@ export const extractStructuredDataAction = createAction({
       description: 'The full address of the page to extract data from.',
       required: true,
     }),
-    method: Property.StaticDropdown<ExtractMethod>({
+    method: Property.StaticDropdown<'css' | 'auto'>({
       displayName: 'Extraction Method',
       description:
         'CSS Selectors works on any site. Automatic needs no setup but only works on sites ZenRows supports for automatic extraction.',
@@ -57,16 +56,16 @@ export const extractStructuredDataAction = createAction({
   },
   async run(context) {
     const { propsValue } = context;
-    const params = zenrowsParams.buildExtractParams({
-      url: propsValue.url,
-      method: propsValue.method ?? 'css',
-      selectors: propsValue.selectors,
-      fields: propsValue.fields,
-      adaptive: propsValue.adaptive ?? true,
-    });
+    const fields = (propsValue.fields ?? []).filter((f): f is string => typeof f === 'string' && f.trim() !== '');
     const response = await zenrowsClient.fetchPage({
       apiKey: context.auth.secret_text,
-      params,
+      params: {
+        url: propsValue.url,
+        ...(propsValue.adaptive !== false ? { mode: 'auto' } : {}),
+        ...(propsValue.method === 'auto'
+          ? { extract: 'auto', ...(fields.length ? { extract_fields: fields.join(',') } : {}) }
+          : { css_extractor: JSON.stringify(propsValue.selectors ?? {}) }),
+      },
     });
     return response.body;
   },
