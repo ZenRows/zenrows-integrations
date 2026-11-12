@@ -35,16 +35,18 @@ async function request<TResponse extends HttpMessageBody>({
   }
 }
 
+// responseType: 'text' keeps a page as it is (a JSON page would otherwise come
+// back parsed), 'json' is for Extract's output, 'arraybuffer' for a screenshot.
 async function fetchPage({
   apiKey,
   params,
   forwardedHeaders,
-  binary,
+  responseType,
 }: {
   apiKey: string;
   params: Record<string, string>;
   forwardedHeaders?: Record<string, string>;
-  binary?: boolean;
+  responseType: 'text' | 'json' | 'arraybuffer';
 }): Promise<HttpResponse> {
   try {
     return await httpClient.sendRequest({
@@ -53,7 +55,7 @@ async function fetchPage({
       queryParams: { apikey: apiKey, ...params },
       headers: forwardedHeaders ?? CLIENT_HEADERS,
       timeout: FETCH_TIMEOUT_MS,
-      responseType: binary ? 'arraybuffer' : undefined,
+      responseType,
     });
   } catch (error) {
     throw toZenrowsError({ error });

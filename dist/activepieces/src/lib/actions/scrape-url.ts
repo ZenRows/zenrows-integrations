@@ -86,7 +86,7 @@ export const scrapeUrlAction = createAction({
         ...(forwardHeaders ? { custom_headers: 'true' } : {}),
       },
       forwardedHeaders: forwardHeaders ? forwardedHeaders : undefined,
-      binary: isScreenshot,
+      responseType: isScreenshot ? 'arraybuffer' : 'text',
     });
 
     const screenshotUrl = isScreenshot

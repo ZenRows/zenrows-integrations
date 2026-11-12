@@ -66,7 +66,10 @@ export const extractStructuredDataAction = createAction({
           ? { extract: 'auto', ...(fields.length ? { extract_fields: fields.join(',') } : {}) }
           : { css_extractor: JSON.stringify(propsValue.selectors ?? {}) }),
       },
+      responseType: 'json',
     });
-    return response.body;
+    // Automatic extraction answers { html, parsed }; the flow wants the data,
+    // not the page it came from (https://docs.zenrows.com/extract/setup#response).
+    return propsValue.method === 'auto' ? response.body.parsed ?? response.body : response.body;
   },
 });
