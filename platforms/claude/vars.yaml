@@ -9,13 +9,10 @@ host_full: "Claude"
 connection: "Zenrows connector"
 # Where the agent can write files, as in "if you can write files (for example in <this>)".
 write_files_example: "Claude Code"
-# Prefix for skill folder names (OpenClaw uses zenrows-).
+# Prefix for skill folder names.
 skill_prefix: ""
-# To give a skill a different name on this host, list it here, for example:
-# skill_names:
-#   scrape-webpage: zenrows-scrape
-# To leave a shared skill out on this host, list it here, for example:
-# skip_skills: [using-zenrows]
 # Published to this repo too on each release, for installs that name it
 # (/plugin install zenrows --marketplace ZenRows/claude-zenrows). See CONTRIBUTING.md.
 mirror: ZenRows/claude-zenrows
+# Installs read this repo or claude-zenrows, so no release is uploaded by hand.
+upload: false
