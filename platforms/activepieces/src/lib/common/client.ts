@@ -144,7 +144,7 @@ const CLIENT_HEADERS = { 'X-ZenRows-Client': 'activepieces' };
 
 const AUTH_HINT = 'Check the API key in your ZenRows connection.';
 
-// The facts in {{text:…}} come from zenrows-integrations' shared/text/, the same
+// The facts below come from zenrows-integrations' shared/text/, the same
 // wording the Zenrows skills use; each hint adds what to do in Activepieces.
 function sentence(fact: string, next: string): string {
   return `${fact.charAt(0).toUpperCase()}${fact.slice(1)}. ${next}`;
