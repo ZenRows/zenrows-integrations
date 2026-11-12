@@ -20,3 +20,7 @@ skill_names:
 # Published to this repo too on each release, for installs that name it
 # (ClawHub publishes it at a commit; see RELEASING.md). See CONTRIBUTING.md.
 mirror: ZenRows/openclaw-zenrows
+# Each release is published to ClawHub by hand from the mirror (see RELEASING.md).
+upload:
+  to: ClawHub
+  url: https://clawhub.ai/zenrows/plugins/openclaw-zenrows
