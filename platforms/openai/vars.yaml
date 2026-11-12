@@ -16,3 +16,7 @@ skill_prefix: ""
 #   scrape-webpage: zenrows-scrape
 # To leave a shared skill out on this host, list it here, for example:
 # skip_skills: [using-zenrows]
+# Each release is uploaded by hand to the OpenAI plugin directory, which reviews it.
+upload:
+  to: the OpenAI plugin directory
+  url: https://developers.openai.com/plugins/deploy/submission
