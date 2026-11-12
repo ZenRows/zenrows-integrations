@@ -1,20 +1,21 @@
 # Contributing
 
-Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Edit the sources, never `dist/`.
+Each host's plugin in `dist/<host>/` is rendered from shared skills plus that host's own files. Code hosts (a piece for another project, a marketplace listing) are rendered the same way from their own source and the shared text. Edit the sources, never `dist/`.
 
 ## Layout
 
 ```
 skills/<skill>/SKILL.md      shared skills; {{var}} and {{> slot}} mark what differs per host
-shared/assets/               files every host ships as they are (logo)
+shared/assets/               files every plugin host ships as they are (logo)
+shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
 platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
-dist/<host>/                 GENERATED: the plugin the host installs
+dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
-scripts/                     render, validate, override, new-host, mirror
+scripts/                     render, validate, override, new-host, mirror, test
 ```
 
 ### Marketplace catalogs
@@ -38,7 +39,19 @@ Requires Node 22. Run `npm ci` once.
 - **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
 - **A reference to another skill:** write `{{skill:batch}}`, never the plain name. It renders as that skill's name on the host: `skill_prefix` plus the shared name, unless `skill_names` in `vars.yaml` renames it (OpenClaw ships `scrape-webpage` as `zenrows-scrape`). The skill's own `name:` in its frontmatter uses it too.
 
-Unknown variables, unknown skill names, missing slots and unused slot files fail the render, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+Unknown variables, unknown skill names, missing slots, unused slot files, unknown snippets and any of these tokens left in a rendered file (a typo, or a file type the render doesn't fill) fail the render. Other `{{…}}`, such as an n8n or Make expression or JSX's `style={{…}}`, isn't one of these tokens and ships as written, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+
+## Shared text
+
+A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text with no `{{…}}`. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one (backticks, `*`, a link or a heading), or on one nothing uses.
+
+## Code hosts
+
+`kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo.
+
+## Tests
+
+`npm test` (CI runs it too) checks that render and validate catch the mistakes they're meant to: each case in `scripts/test.mjs` makes one change in a temporary copy of the repo (a throwaway code host, a snippet, …) and expects a given error, or a pass. When you add a rule, add a case that breaks it.
 
 ## Manifest schemas
 
@@ -55,7 +68,7 @@ Run `npm run new-host`. It asks for the host id (`platforms/<id>/`, `dist/<id>/`
 
 It also adds the host to `release-please-config.json` and `.release-please-manifest.json` at `0.1.0`. Answers can also be piped in, one per line.
 
-What only a person can decide is marked `TODO(new-host)`, and `npm run validate` fails until it's done: the install and sign-in steps, where the agent can write files, and the plugin files. Each host reads its own layout (Claude: `.claude-plugin/plugin.json` and `.mcp.json`; Cursor: `.cursor-plugin/plugin.json`), so move the templates to those paths, add the fields the host needs, update the manifest path in `release-please-config.json`, and add a marketplace catalog at the top of the repo if the host installs from a subfolder. Use an existing `platforms/<host>/` as the example. Then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the release-please files and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
+What only a person can decide is marked `TODO(new-host)`, and `npm run validate` fails until it's done: the install and sign-in steps, where the agent can write files, whether releases are uploaded by hand (`upload:`), and the plugin files. Each host reads its own layout (Claude: `.claude-plugin/plugin.json` and `.mcp.json`; Cursor: `.cursor-plugin/plugin.json`), so move the templates to those paths, add the fields the host needs, update the manifest path in `release-please-config.json`, and add a marketplace catalog at the top of the repo if the host installs from a subfolder. Use an existing `platforms/<host>/` as the example. Then run `npm run render` and commit `platforms/<id>/`, `dist/<id>/`, the release-please files and `README.md` together. The render adds the host to the "Supported hosts" list in `README.md`, so don't add it by hand.
 
 ## Commits and releases
 
@@ -71,3 +84,12 @@ Some installs name a repo of their own instead of a folder here: `copilot plugin
 - It pushes with the deploy key in the `MIRROR_KEY_<HOST>` secret of the `release` environment. The key, the mirror's branch protection and its settings are in [iac-bootstrap](https://github.com/ZenRows/iac-bootstrap).
 - To see what the mirror would get: `npm run mirror -- <host> <clone of the mirror> [<release tag>]`, then `git diff` in the clone. To publish by hand (for example after fixing a failed run), run the Mirror workflow from Actions with the host and the release tag; it's a dry run unless you untick it. With no tag it publishes `main`'s `dist/<host>/`, names the commit in the README banner and tags nothing.
 - Manual runs, dry runs included, start from `main`: the job uses the `release` environment, which only deploys from `main`.
+
+### Uploads by hand
+
+Some hosts take each release only as an upload that someone does by hand, for example a marketplace that reviews every version. Every host's `vars.yaml` says which:
+
+- `upload: false`: installs read this repo or the host's mirror, so nothing is uploaded.
+- `upload:` with `to:` (where, for example `Cursor Marketplace`) and `url:` (an `https://` link to the page you upload on): each release of the host posts a reminder to #proj-integrations naming the release, its files in `dist/<host>/` at the tag, and that link.
+
+`npm run validate` fails if a released host has no `upload:`. A host with no release-please entry (a code host not released from here) never posts a reminder, so it leaves `upload:` out, or writes `false`. `.github/workflows/upload-reminder.yml` posts through a Slack incoming webhook in the `SLACK_WEBHOOK_INTEGRATIONS` secret of the `release` environment and tags @ZenGrow. Without the secret, the job fails, so a missed reminder shows as a red run; the message is still in its job summary. To send a reminder again, run the Upload reminder workflow from Actions, on `main`, with the host and the release tag; it's a dry run unless you untick it.

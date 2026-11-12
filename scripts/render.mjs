@@ -4,7 +4,7 @@
 // render.
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { distDir, hosts, listFiles, renderHost, root, vars } from "./lib.mjs";
+import { distDir, hosts, isCodeHost, listFiles, renderHost, root, vars } from "./lib.mjs";
 
 const check = process.argv.includes("--check");
 const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
@@ -26,7 +26,10 @@ function hostsList() {
   const rows = hosts()
     .map((host) => [vars(host).host_full ?? host, host])
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, host]) => `| ${name} | [dist/${host}/README.md](dist/${host}/README.md) |`);
+    .map(([name, host]) => {
+      const guide = isCodeHost(vars(host)) ? `platforms/${host}/README.md` : `dist/${host}/README.md`;
+      return `| ${name} | [${guide}](${guide}) |`;
+    });
   const table = ["| Host | Setup guide |", "|---|---|", ...rows].join("\n");
   const head = readme.slice(0, readme.indexOf("\n", start) + 1);
   return Buffer.from(`${head}${table}\n${readme.slice(end)}`);

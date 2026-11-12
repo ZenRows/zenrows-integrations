@@ -33,6 +33,8 @@ jobs:
       - run: npm run render -- --check
       # Frontmatter, skill references, manifests against their JSON Schemas, and overrides.lock.
       - run: npm run validate
+      # The mistakes render and validate must catch (scripts/test.mjs).
+      - run: npm test
 
   workflows:
     name: Lint workflows

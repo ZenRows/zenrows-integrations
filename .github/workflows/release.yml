@@ -170,7 +170,8 @@ jobs:
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --notes-file -
 
       # Steps that publish a host somewhere else go here, selected by component,
-      # for example: if: matrix.component == 'openai'. Mirror repos are the mirror job below.
+      # for example: if: matrix.component == 'openai'. Mirror repos are the mirror
+      # job below; uploads done by hand get a Slack reminder from upload-reminder.
 
       - name: Write the summary
         run: |
@@ -194,6 +195,23 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.detect.outputs.packages) }}
     uses: ./.github/workflows/mirror.yml
+    with:
+      host: ${{ matrix.component }}
+      tag: ${{ matrix.tag }}
+    secrets: inherit
+
+  # Each released host with upload: in its vars.yaml gets a reminder in
+  # #proj-integrations to upload it by hand; for the others this is a no-op.
+  upload-reminder:
+    name: Upload reminder ${{ matrix.component }}
+    needs: [detect, release]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.detect.outputs.packages) }}
+    uses: ./.github/workflows/upload-reminder.yml
     with:
       host: ${{ matrix.component }}
       tag: ${{ matrix.tag }}
