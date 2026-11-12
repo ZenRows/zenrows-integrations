@@ -19,6 +19,13 @@ const sharedDirs = { "shared/assets": "assets" };
 // (scripts/validate.mjs, scripts/package.sh), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
 const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/"];
+// What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{text:x}},
+// {{< x}}, {{> x}}) after the render, for example in a file type it doesn't
+// fill, or with a stray space, capital letter, _ or . the fill regexes don't
+// take. A colon is ours only after skill or text, so JSX's style={{ flex: 1 }}
+// isn't matched; nor is other tools' {{…}} (Make's {{a.b}}, n8n's {{ $json.x }}),
+// which ships as written. scripts/test.mjs lists both sides.
+export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_.-]+|(?:skill|text)\s*:\s*[a-z0-9_.-]+|[a-z_][a-z0-9_-]*)\s*\}\}/i;
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
 export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
@@ -54,6 +61,10 @@ function versions() {
 
 export function vars(host) {
   const v = parseYaml(readFileSync(join(platformsDir, host, "vars.yaml"), "utf8")) ?? {};
+  if (typeof v !== "object" || Array.isArray(v)) throw new Error(`platforms/${host}/vars.yaml must be a list of name: value lines`);
+  if ("kind" in v && v.kind !== "plugin" && v.kind !== "code") {
+    throw new Error(`platforms/${host}/vars.yaml: kind is ${JSON.stringify(v.kind)}; use plugin or code`);
+  }
   const version = versions()[`dist/${host}`];
   // A code host may not be released from here (yet), so it needs no
   // release-please entry; it then has no {{version}}.
@@ -72,8 +83,13 @@ export function readLock(host) {
 // the host's own skills (platforms/<host>/skills/<name>/SKILL.md with no shared
 // skill of that name). Returns [{ name, own }].
 export function hostSkills(host, values = vars(host)) {
-  // A code host (kind: code) ships no skills.
-  if (isCodeHost(values)) return [];
+  // A code host (kind: code) ships no skills, so a skills/ folder there would be ignored.
+  if (isCodeHost(values)) {
+    if (listFiles(join(platformsDir, host, "skills")).length) {
+      throw new Error(`platforms/${host}/skills/: a code host (kind: code) ships no skills; move these files out of skills/`);
+    }
+    return [];
+  }
   const shared = skillNames();
   const skip = values.skip_skills ?? [];
   for (const name of skip) {
@@ -94,9 +110,8 @@ export function hostSkills(host, values = vars(host)) {
 // ships only its own files, with {{…}} filled in, and no shared skills, LICENSE
 // or assets.
 export function isCodeHost(values) {
-  const kind = values.kind ?? "plugin";
-  if (!["plugin", "code"].includes(kind)) throw new Error(`kind: ${kind} in vars.yaml; use plugin or code`);
-  return kind === "code";
+  // vars() has already rejected any other kind, naming the file.
+  return values.kind === "code";
 }
 
 // A skill's name on a host: skill_prefix + the shared name, unless vars.yaml
@@ -110,7 +125,12 @@ export function hostSkillName(values, name) {
 export function sharedText(name, where) {
   const file = join(sharedTextDir, `${name}.md`);
   if (!existsSync(file)) throw new Error(`${where}: there's no shared/text/${name}.md`);
-  return readFileSync(file, "utf8").replace(/\n$/, "");
+  // Trimmed, so a trailing blank line or a CRLF ending doesn't end up in a string.
+  const text = readFileSync(file, "utf8").trim();
+  if (text.includes("{{")) {
+    throw new Error(`shared/text/${name}.md uses {{…}}; a snippet is a plain fact, and the text around it adds what differs per host`);
+  }
+  return text;
 }
 
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
@@ -118,10 +138,14 @@ export function sharedText(name, where) {
 // as a quoted string literal (JSON), for code.
 function fill(text, values, where) {
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));
-  return text.replace(/\{\{\s*([a-z_]+)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
+  return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
       if (!values.skills.includes(arg)) {
-        const why = skillNames().includes(arg) ? "this host skips it (skip_skills)" : "there's no such skill";
+        const why = !skillNames().includes(arg)
+          ? "there's no such skill"
+          : isCodeHost(values)
+            ? "a code host (kind: code) ships no skills"
+            : "this host skips it (skip_skills)";
         throw new Error(`${where}: ${token} names a skill this host doesn't ship: ${why}`);
       }
       return hostSkillName(values, arg);
@@ -173,6 +197,16 @@ export function renderHost(host) {
     // A code host's README documents the integration here; it isn't part of the code.
     if (isCodeHost(values) && file === "README.md") continue;
     out.set(file, renderFile(join(platform, file), values));
+  }
+
+  // A token the render didn't fill (a mistyped one, or in a file type outside
+  // textFile) would otherwise ship as it is. Binary files (not valid UTF-8) are skipped.
+  for (const [path, buf] of out) {
+    const text = buf.toString("utf8");
+    const token = Buffer.from(text, "utf8").equals(buf) && text.match(leftoverToken);
+    if (token) {
+      throw new Error(`${host}: ${path} still has an unrendered ${token[0]}`);
+    }
   }
   return out;
 }

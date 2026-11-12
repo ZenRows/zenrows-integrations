@@ -9,6 +9,7 @@
     "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "render": "node scripts/render.mjs",
     "validate": "node scripts/validate.mjs",
+    "test": "node --test scripts/test.mjs",
     "override": "node scripts/override.mjs create",
     "override:ack": "node scripts/override.mjs ack",
     "new-host": "node scripts/new-host.mjs",
