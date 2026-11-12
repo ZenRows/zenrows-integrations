@@ -23,7 +23,7 @@ export const extractStructuredDataAction = createAction({
     method: Property.StaticDropdown<'css' | 'auto'>({
       displayName: 'Extraction Method',
       description:
-        'CSS Selectors works on any site. Automatic needs no setup but only works on sites ZenRows supports for automatic extraction.',
+        'CSS Selectors works on any site. Automatic needs no setup and works on any domain prepared for Extract; prepare one with the Custom API Call action (POST /extract/prepared-domains).',
       required: true,
       defaultValue: 'css',
       options: {

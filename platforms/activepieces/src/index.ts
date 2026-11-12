@@ -12,7 +12,8 @@ export const zenrows = createPiece({
     'Web scraping API that gets past anti-bot systems and returns pages as Markdown, HTML, screenshots or structured JSON.',
   auth: zenrowsAuth,
   minimumSupportedRelease: '0.88.2',
-  logoUrl: 'https://cdn.activepieces.com/pieces/zenrows.png',
+  // Served from this repo until Activepieces hosts it on their CDN.
+  logoUrl: 'https://raw.githubusercontent.com/ZenRows/zenrows-integrations/main/shared/assets/logo.png',
   categories: [PieceCategory.ARTIFICIAL_INTELLIGENCE, PieceCategory.PRODUCTIVITY],
   authors: ['imoital'],
   actions: [
