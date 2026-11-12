@@ -12,9 +12,8 @@ platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
-  scripts/                   the host's own tooling, never shipped: validate.mjs (run by npm run validate on
-                             dist/<host>), package.sh (run by npm run package -- <host>) and check.sh (a code
-                             host's build and test, run by its CI workflow), when the host needs them
+  scripts/                   the host's own tooling, never shipped; validate.mjs and package.sh are run by
+                             npm run validate and npm run package -- <host>, the rest by the host itself
   everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
