@@ -1,8 +1,8 @@
 // Shared by render.mjs, validate.mjs and override.mjs: where things live, how a
 // host's plugin is rendered, and how override hashes are computed.
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 
@@ -69,6 +69,48 @@ export function vars(host) {
   // release-please entry; it then has no {{version}}.
   if (!version && !isCodeHost(v)) throw new Error(`.release-please-manifest.json has no "dist/${host}" entry`);
   return version ? { ...v, version } : v;
+}
+
+// The published API spec, which validate checks each host's api: against.
+// ZENROWS_OPENAPI names a file to use instead (tests, a spec not published
+// yet). The last download is kept in .cache/openapi.json for when the network
+// is down.
+export const openapiUrl = "https://www.zenrows.com/openapi.json";
+const openapiCache = join(root, ".cache", "openapi.json");
+export async function openapi() {
+  if (process.env.ZENROWS_OPENAPI) return JSON.parse(readFileSync(process.env.ZENROWS_OPENAPI, "utf8"));
+  try {
+    const res = await fetch(openapiUrl, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const spec = JSON.parse(text);
+    mkdirSync(dirname(openapiCache), { recursive: true });
+    writeFileSync(openapiCache, text);
+    return spec;
+  } catch (e) {
+    if (!existsSync(openapiCache)) {
+      throw new Error(`couldn't download the API spec from ${openapiUrl} (${e.message}), and there's no copy in .cache/openapi.json yet`);
+    }
+    console.warn(`⚠️ couldn't download the API spec from ${openapiUrl} (${e.message}); using the copy in .cache/openapi.json`);
+    return JSON.parse(readFileSync(openapiCache, "utf8"));
+  }
+}
+
+// The query parameters an operation ("GET /") takes: the path's and the
+// operation's own, with $refs resolved. undefined if the spec has no such operation.
+export function apiParameters(spec, operation) {
+  const [method, path] = operation.trim().split(/\s+/);
+  const item = spec.paths?.[path];
+  const op = method && item?.[method.toLowerCase()];
+  if (!op) return undefined;
+  const resolve = (p) => {
+    while (p?.$ref) p = p.$ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], spec);
+    return p;
+  };
+  return [...(item.parameters ?? []), ...(op.parameters ?? [])]
+    .map(resolve)
+    .filter((p) => p?.in === "query")
+    .map((p) => p.name);
 }
 
 // overrides.lock: "<shared path>: <sha256>" per line; # starts a comment.
