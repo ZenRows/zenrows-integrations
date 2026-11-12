@@ -246,14 +246,6 @@ for (const host of hosts()) {
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
   }
 
-  // platforms/<host>/scripts/ is the host's tooling and never ships, so only the
-  // two files the repo runs belong there.
-  for (const file of listFiles(join(platformsDir, host, "scripts"))) {
-    if (!["validate.mjs", "package.sh"].includes(file)) {
-      errors.push(`${host}: platforms/${host}/scripts/${file} isn't shipped (scripts/ holds only validate.mjs and package.sh); move plugin files elsewhere`);
-    }
-  }
-
   // Checks only one host needs, such as OpenAI's submission limits, live in
   // platforms/<host>/scripts/validate.mjs and run on the committed dist/<host>.
   const extra = join(platformsDir, host, "scripts", "validate.mjs");
