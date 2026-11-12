@@ -1,0 +1,121 @@
+name: API changed
+
+# Runs when the docs repo publishes a new API spec (it sends a repository_dispatch
+# with the file's sha256), or by hand. Waits for www.zenrows.com/openapi.json to
+# carry that spec, then runs npm run validate, which checks every host's api:
+# against it. A failure opens (or updates) the issue "API change: hosts to
+# update" and posts to #proj-integrations; a clean run closes the issue.
+
+on:
+  repository_dispatch:
+    types: [api-spec-changed]
+  workflow_dispatch:
+    inputs:
+      sha256:
+        description: "sha256 of the spec to wait for (empty: don't wait)"
+        type: string
+        required: false
+
+permissions: {}
+
+# Two pings minutes apart (a push and a fix-up) run one after the other, so
+# they can't both open the issue.
+concurrency:
+  group: api-changed
+  cancel-in-progress: false
+
+env:
+  SPEC_URL: https://www.zenrows.com/openapi.json
+  ISSUE_TITLE: "API change: hosts to update"
+
+jobs:
+  check:
+    name: Check the hosts against the API spec
+    runs-on: ubuntu-latest
+    # The release environment holds the Slack webhook and deploys only from main.
+    environment: release
+    permissions:
+      contents: read
+      issues: write
+    env:
+      EXPECTED_SHA256: ${{ github.event.client_payload.sha256 || inputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+
+      # The site deploys a few minutes after the push that sent the ping, so
+      # the published file can still be the old one for a while.
+      - name: Wait for the published spec
+        if: env.EXPECTED_SHA256 != ''
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            actual=$(curl -fsS --max-time 20 "$SPEC_URL" | sha256sum | cut -d' ' -f1 || true)
+            if [ "$actual" = "$EXPECTED_SHA256" ]; then
+              echo "The published spec matches ($actual)."
+              exit 0
+            fi
+            echo "Published spec is $actual, waiting for $EXPECTED_SHA256 ($i/30)…"
+            sleep 60
+          done
+          echo "::error::The published spec didn't reach $EXPECTED_SHA256 within 30 minutes; checking against what's published now."
+
+      - name: Validate every host against it
+        id: validate
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          rm -f .cache/openapi.json
+          npm run -s validate 2>&1 | tee validate.log
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEBHOOK: ${{ secrets.SLACK_WEBHOOK_INTEGRATIONS }}
+          MENTION: "<!subteam^S098279QJNA>"
+          FAILED: ${{ steps.validate.outcome == 'failure' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          existing=$(gh issue list --search "\"$ISSUE_TITLE\" in:title" --state open --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -1)
+          # Only a host out of step with the spec is the hosts' problem; anything
+          # else (the spec didn't download, a broken render) is this run's.
+          problems=$(grep '^❌ .*vars\.yaml api:' validate.log || true)
+
+          if [ "$FAILED" = "true" ] && [ -z "$problems" ]; then
+            echo "::error::validate failed for a reason other than the API spec; see the log above."
+            exit 1
+          fi
+          if [ "$FAILED" != "true" ]; then
+            echo "Every host matches the published spec."
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --comment "The hosts match the published API spec again ($RUN_URL)."
+            fi
+            exit 0
+          fi
+
+          fence='```'
+          body="The API spec changed, and npm run validate says a host sends something the API no longer takes:"$'\n\n'"$fence"$'\n'"$problems"$'\n'"$fence"$'\n\n'"From $RUN_URL. Fix the host, and this issue closes on the next clean run."
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body "$body"
+            issue_url=$(gh issue view "$existing" --json url --jq .url)
+          else
+            issue_url=$(gh issue create --title "$ISSUE_TITLE" --body "$body")
+          fi
+          echo "::error::$problems"
+
+          payload=$(jq -n --arg mention "$MENTION" --arg problems "$problems" --arg issue "$issue_url" '{
+            text: ("\($mention) :warning: The API spec changed and a host is out of date.\n" + $problems + "\n<\($issue)|Issue>")
+          }')
+          if [ -z "$WEBHOOK" ]; then
+            echo "::warning::No SLACK_WEBHOOK_INTEGRATIONS secret, so nothing was posted to Slack; the issue is $issue_url."
+          else
+            curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$WEBHOOK" >/dev/null
+          fi
+          exit 1
