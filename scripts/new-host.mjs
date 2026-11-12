@@ -65,6 +65,10 @@ files.set(
     "#   scrape-webpage: zenrows-scrape",
     "# To leave a shared skill out on this host, list it here, for example:",
     "# skip_skills: [using-zenrows]",
+    "# Where each release is uploaded by hand, if anywhere: to: <where>, url: <link>.",
+    "# The release workflow posts it to #proj-integrations. false: installs read",
+    "# this repo or its mirror, so nothing is uploaded. See CONTRIBUTING.md.",
+    'upload: "TODO(new-host): false, or to: and url:"',
     "",
   ].join("\n"),
 );
