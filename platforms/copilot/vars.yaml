@@ -9,3 +9,7 @@ skill_prefix: ""
 # Published to this repo too on each release, for installs that name it
 # (copilot plugin marketplace add ZenRows/copilot-zenrows). See CONTRIBUTING.md.
 mirror: ZenRows/copilot-zenrows
+# Where each release is uploaded by hand, if anywhere: to: <where>, url: <link>.
+# The release workflow posts it to #proj-integrations. false: installs read
+# this repo or its mirror, so nothing is uploaded. See CONTRIBUTING.md.
+upload: false
