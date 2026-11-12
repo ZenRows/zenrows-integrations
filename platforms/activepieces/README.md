@@ -20,6 +20,14 @@ It copies `dist/activepieces/` into the activepieces checkout, registers it in `
 
 `upstream` in `vars.yaml` pins the activepieces commit. Moving it is its own PR, so CI shows whether their newer code breaks the piece.
 
+## Try it live
+
+```
+platforms/activepieces/scripts/smoke.sh
+```
+
+It builds the piece as above, asks for your Zenrows API key (kept in that process only), then runs each action against the live API with a fake Activepieces context: Scrape URL as Markdown, a screenshot and a JSON page, Extract by CSS and automatic on a listing and a product page, Get Account Usage, Custom API Call, and two failures that should show the API's code with our hint. Each run spends a few credits, so it isn't in CI. It can't check the forms; for those, run Activepieces locally with `AP_DEV_PIECES=zenrows`.
+
 ## How it ships
 
 Not yet. First as our own npm package; then as a PR to activepieces once they agree to take it (they close outside PRs that weren't discussed with them first; see their CONTRIBUTING.md). Both release steps come in later PRs.
