@@ -19,3 +19,7 @@ skill_prefix: ""
 # Published to this repo too on each release, for installs that name it (the
 # Cursor Marketplace reads it). See CONTRIBUTING.md.
 mirror: ZenRows/cursor-zenrows
+# Each release is submitted to the Cursor Marketplace by hand, which reviews every version.
+upload:
+  to: the Cursor Marketplace
+  url: https://cursor.com/marketplace/publish
