@@ -14,10 +14,12 @@ platforms/<host>/
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
   readme/setup.md            the host's Setup section of its README (readme/more.md: optional extra sections)
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
+  scripts/                   the host's own tooling, never shipped; validate.mjs and package.sh are run by
+                             npm run validate and npm run package -- <host>, the rest by the host itself
   everything else            the host's manifests, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
-scripts/                     render, validate, override, new-host, mirror, test
+scripts/                     render, validate, override, new-host, package, mirror, test
 ```
 
 ### Marketplace catalogs
