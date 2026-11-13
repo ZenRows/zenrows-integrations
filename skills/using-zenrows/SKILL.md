@@ -5,7 +5,7 @@ description: Overview of the Zenrows tools for live web data. Use when a task ne
 
 # Using Zenrows
 
-Zenrows gives {{host}} live web data through the Zenrows MCP server: page fetching, structured extraction, batch jobs over many URLs, crawls from a start URL, and hosted browser sessions. Zenrows is a paid service: every request uses credits on the user's Zenrows plan.
+Zenrows gives {{host}} live web data through the Zenrows MCP server: {{host}} can {{< zenrows-description}}. Zenrows is a paid service: every request uses credits on the user's Zenrows plan.
 
 The {{connection}} signs in with OAuth. If the Zenrows tools are missing or return `AUTH003`, use the `{{skill:getting-started}}` skill. Never ask the user to paste an API key into the conversation.
 
