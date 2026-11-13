@@ -9,7 +9,7 @@ import { ZENROWS_API_BASE_URL } from './lib/common/client';
 export const zenrows = createPiece({
   displayName: 'ZenRows',
   description:
-    'Web scraping API that gets past anti-bot systems and returns pages as Markdown, HTML, screenshots or structured JSON.',
+    'Live web data for your flows: ' + "fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows" + '.',
   auth: zenrowsAuth,
   minimumSupportedRelease: '0.88.2',
   // Served from this repo until Activepieces hosts it on their CDN.

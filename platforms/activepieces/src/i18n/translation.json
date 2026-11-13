@@ -1,5 +1,5 @@
 {
-  "Web scraping API that gets past anti-bot systems and returns pages as Markdown, HTML, screenshots or structured JSON.": "Web scraping API that gets past anti-bot systems and returns pages as Markdown, HTML, screenshots or structured JSON.",
+  "{{< zenrows-description}}.": "{{< zenrows-description}}.",
   "\n**Get your ZenRows API key:**\n\n1. Sign in at https://app.zenrows.com (or create a free account).\n2. Open the **Builder** or **Settings** page.\n3. Copy your API key and paste it here.\n  ": "\n**Get your ZenRows API key:**\n\n1. Sign in at https://app.zenrows.com (or create a free account).\n2. Open the **Builder** or **Settings** page.\n3. Copy your API key and paste it here.\n  ",
   "Scrape URL": "Scrape URL",
   "Extract Structured Data": "Extract Structured Data",
