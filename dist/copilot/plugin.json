@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "zenrows",
   "version": "0.1.1",
-  "description": "Live web data for GitHub Copilot: fetch pages, extract structured data, run batch jobs and drive hosted browser sessions through the Zenrows MCP server.",
+  "description": "Live web data for GitHub Copilot through the Zenrows MCP server: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows.",
   "author": {
     "name": "Zenrows",
     "email": "integrations@zenrows.com",
