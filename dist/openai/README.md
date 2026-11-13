@@ -56,6 +56,7 @@ The plugin sends the URLs and options you ask the model to fetch to Zenrows, whi
 ## Support
 
 - Documentation: [docs.zenrows.com](https://docs.zenrows.com)
+- MCP server documentation: [docs.zenrows.com/mcp/overview](https://docs.zenrows.com/mcp/overview)
 - Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
 
 ## License
