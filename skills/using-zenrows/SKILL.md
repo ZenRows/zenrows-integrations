@@ -78,8 +78,8 @@ Reads the connected account's plan and usage. It changes nothing.
 
 - Do not build manual retry loops around a request. Zenrows already escalates to heavier settings when a page needs it.
 - `401` or `AUTH003`: Zenrows is not connected, or the sign-in is no longer valid (for example the API key was rotated). Use the `{{skill:getting-started}}` skill to reconnect. Do not ask for a key.
-- `AUTH004` (the account's credit allowance is spent) or `AUTH014` (this API key reached its credit cap): a plan limit, not a sign-in problem. Reconnecting doesn't clear it. Tell the user; they can check their usage and plan in the Zenrows dashboard, or raise the key's cap.
-- `AUTH006`: too many requests are running at once. Wait for running requests to finish, then retry.
+- `AUTH004` ({{< auth004}}) or `AUTH014` ({{< auth014}}): a plan limit, not a sign-in problem. Reconnecting doesn't clear it. Tell the user; they can check their usage and plan in the Zenrows dashboard, or raise the key's cap.
+- `AUTH006`: {{< auth006}}. Wait for running requests to finish, then retry.
 - `413`: the response is too large. Narrow it with `css_extractor`.
 - `REQS007` (or the older `AUTH010`) from `extract`: read its `reason`. `domain_not_prepared`: prepare the domain with `prepare_domain` and wait for `prepared_domain_status` to say `ready`. `page_not_recognised`: try a product, article or listing page, or `mode='css'`; don't prepare the domain again. `domain_not_enabled`: use `mode='css'`. Not charged in any case. Details in the `{{skill:extract-structured-data}}` skill.
 - Look up any other error code at https://docs.zenrows.com.
