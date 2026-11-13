@@ -2,7 +2,7 @@
 // (against the JSON Schema they declare), the marketplace catalogs at the top of
 // the repo, and that no whole-file override was copied from an older shared file.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
 import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
@@ -278,6 +278,12 @@ for (const file of listFiles(sharedTextDir)) {
   // _ and [ ] don't count: parameter names (js_render) and [{...}] use them.
   if (/[`*]/.test(text) || /\]\(/.test(text) || /^#/.test(text.trim())) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
   if (text.trim().includes("\n")) errors.push(`shared/text/${file} has more than one line; keep one fact per snippet`);
+  // A copy of the fact written out would miss the next change to it.
+  for (const source of snippetSources) {
+    if (readFileSync(source, "utf8").includes(text.trim())) {
+      errors.push(`${relative(root, source)} writes out shared/text/${file}; use {{< ${name}}} (or {{text:${name}}} in code) instead`);
+    }
+  }
 }
 
 console.log(report.join("\n"));
