@@ -1,21 +1,21 @@
 # Zenrows for ChatGPT and Codex
 
-Live web data for ChatGPT and Codex. This plugin connects them to the Zenrows MCP server, so the model can read the current content of any public page, pull structured fields from it, run batch jobs over many URLs, crawl from a start page, and drive a hosted browser for pages that need clicks, forms or pagination. It also adds skills that tell the model which Zenrows tool fits each task and how to keep requests efficient.
+Live web data: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows. This plugin connects the model to the Zenrows MCP server and adds skills that tell the model which Zenrows tool fits each task and how to keep requests efficient.
 
 ## What you get
 
 - The Zenrows MCP server (`https://mcp.zenrows.com/mcp`). You sign in to your Zenrows account with OAuth; there is no API key to copy.
-- Nine skills:
+- Skills:
 
 | Skill | Use it for |
 |---|---|
 | `using-zenrows` | Overview: tools, defaults, errors and plan limits |
-| `getting-started` | First-run checks and troubleshooting (the plugin's onboarding skill) |
+| `getting-started` | First-run checks and troubleshooting |
 | `scrape-webpage` | Reading one page |
 | `extract-structured-data` | Named fields or JSON from one page |
 | `batch` | A list of five or more URLs as one job |
-| `crawl` | Many pages behind one start URL, with the Crawl tools |
-| `map` | Listing a site's URLs from its sitemap without fetching them |
+| `crawl` | Many pages under one site section |
+| `map` | Listing a site's URLs without fetching them |
 | `browser-automation` | Clicks, forms, pagination and multi-step flows |
 | `capture-api-calls` | Finding the API calls a page makes |
 
@@ -23,14 +23,11 @@ Live web data for ChatGPT and Codex. This plugin connects them to the Zenrows MC
 
 A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register).
 
-## Privacy
+## Setup
 
-The plugin sends the URLs and options you ask the model to fetch to Zenrows, which processes them under the [Zenrows privacy policy](https://www.zenrows.com/legal/privacy).
+Install Zenrows from the plugins directory in ChatGPT or Codex, then sign in to your Zenrows account when the model first asks to use it.
 
-## Support
-
-- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
-- Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
+Then ask something like: "Use Zenrows to get the product names and prices from https://www.scrapingcourse.com/ecommerce/".
 
 ## For maintainers
 
@@ -51,6 +48,16 @@ Things to know before submitting:
 - **`mcp.json` declares OAuth under `extensions.com.openai.auth`**, as OpenAI's [authentication reference](https://developers.openai.com/plugins/build/plugins#configure-mcp-authentication) says. The generic Agent Plugins MCP schema doesn't list `extensions` on a server; OpenAI's own examples combine both, so this follows OpenAI.
 - **The tool scan reads the live server.** Every tool on `mcp.zenrows.com` needs `readOnlyHint`, `destructiveHint` and `openWorldHint` before submission ([ZenRows/zenrows-mcp#43](https://github.com/ZenRows/zenrows-mcp/pull/43)).
 - **Bump `version` and add a `CHANGELOG.md` entry for every upload.** OpenAI requires a new version for each release.
+
+## Privacy
+
+The plugin sends the URLs and options you ask the model to fetch to Zenrows, which processes them under the [Zenrows privacy policy](https://www.zenrows.com/legal/privacy).
+
+## Support
+
+- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
+- MCP server documentation: [docs.zenrows.com/mcp/overview](https://docs.zenrows.com/mcp/overview)
+- Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
 
 ## License
 

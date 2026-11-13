@@ -5,7 +5,7 @@ description: Overview of the Zenrows tools for live web data. Use when a task ne
 
 # Using Zenrows
 
-Zenrows gives the model live web data through the Zenrows MCP server: the model can fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows. Zenrows is a paid service: every request uses credits on the user's Zenrows plan.
+Live web data: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows. ChatGPT and Codex reaches it through the Zenrows MCP server. Zenrows is a paid service: every request uses credits on the user's Zenrows plan.
 
 The Zenrows plugin signs in with OAuth. If the Zenrows tools are missing or return `AUTH003`, use the `getting-started` skill. Never ask the user to paste an API key into the conversation.
 
