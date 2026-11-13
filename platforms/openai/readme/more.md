@@ -16,4 +16,4 @@ Things to know before submitting:
 - **`demo_recording_url` must open without signing in.** It is required for MCP review.
 - **`mcp.json` declares OAuth under `extensions.com.openai.auth`**, as OpenAI's [authentication reference](https://developers.openai.com/plugins/build/plugins#configure-mcp-authentication) says. The generic Agent Plugins MCP schema doesn't list `extensions` on a server; OpenAI's own examples combine both, so this follows OpenAI.
 - **The tool scan reads the live server.** Every tool on `mcp.zenrows.com` needs `readOnlyHint`, `destructiveHint` and `openWorldHint` before submission ([ZenRows/zenrows-mcp#43](https://github.com/ZenRows/zenrows-mcp/pull/43)).
-- **Bump `version` and add a `CHANGELOG.md` entry for every upload.** OpenAI requires a new version for each release.
+- **Each upload needs a new `version`.** OpenAI requires it; release-please bumps it on every release.
