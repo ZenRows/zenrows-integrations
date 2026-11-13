@@ -1,0 +1,8 @@
+# A code host: the Zenrows piece for Activepieces, rendered into dist/activepieces/
+# exactly as it sits in activepieces' packages/pieces/community/zenrows.
+kind: code
+host: "Activepieces"
+host_full: "Activepieces"
+# The activepieces commit the piece is built and tested against (scripts/check.sh).
+# Moving it is its own PR, so CI shows whether their newer code breaks the piece.
+upstream: "6f4be340d7c4bef9fb6ff874ca72224e4933d3d2"
