@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "zenrows": {
+      "url": "https://mcp.zenrows.com/mcp",
+      "description": "Enable this plugin and connect your Zenrows account in OpenClaw. A Zenrows account is required; usage is billed by Zenrows.",
+      "auth": "oauth",
+      "type": "http"
+    }
+  }
+}

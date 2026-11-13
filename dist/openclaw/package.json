@@ -1,0 +1,18 @@
+{
+  "name": "@zenrows/openclaw-zenrows",
+  "version": "0.1.4",
+  "description": "Live web data: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows.",
+  "license": "MIT",
+  "author": "Zenrows <integrations@zenrows.com>",
+  "homepage": "https://docs.zenrows.com/integrations/openclaw",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ZenRows/zenrows-integrations.git"
+  },
+  "keywords": ["openclaw", "mcp", "web-scraping", "data-extraction", "browser-automation", "zenrows"],
+  "openclaw": {
+    "build": {
+      "openclawVersion": "2026.9.8"
+    }
+  }
+}

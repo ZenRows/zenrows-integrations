@@ -1,0 +1,26 @@
+# Text that differs per host. Shared skills use these as {{name}}; {{version}}
+# comes from .release-please-manifest.json.
+# The name the skills use for the host, as in "Zenrows gives <host> live web data".
+host: "the agent"
+# The full product name, as in "the Zenrows plugin in <host_full>".
+host_full: "OpenClaw"
+# What the host calls Zenrows once connected, as in "The <connection> signs in with OAuth"
+# (Claude: Zenrows connector).
+connection: "Zenrows plugin"
+# Where the agent can write files, as in "if you can write files (for example in <this>)".
+write_files_example: "OpenClaw"
+# Prefix for skill folder names (OpenClaw uses zenrows-).
+skill_prefix: "zenrows-"
+# Skills whose OpenClaw name isn't just the prefix plus the shared name.
+skill_names:
+  using-zenrows: zenrows
+  browser-automation: zenrows-browser
+  extract-structured-data: zenrows-extract
+  scrape-webpage: zenrows-scrape
+# Published to this repo too on each release, for installs that name it
+# (ClawHub publishes it at a commit; see RELEASING.md). See CONTRIBUTING.md.
+mirror: ZenRows/openclaw-zenrows
+# Each release is published to ClawHub by hand from the mirror (see RELEASING.md).
+upload:
+  to: ClawHub
+  url: https://clawhub.ai/zenrows/plugins/openclaw-zenrows
