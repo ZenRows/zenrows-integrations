@@ -26,7 +26,7 @@ const piece = {
 // Runs render then validate in a copy of the repo with `files` written over it
 // (null deletes). Returns { ok, out, dist }: out is the failing step's output,
 // dist(path) reads a rendered file.
-function run(files) {
+function run(files, reads = []) {
   const dir = mkdtempSync(join(tmpdir(), "zenrows-integrations-test-"));
   try {
     for (const path of copied) {
@@ -47,10 +47,8 @@ function run(files) {
       const r = spawnSync("node", [join("scripts", `${script}.mjs`)], { cwd: dir, encoding: "utf8" });
       if (r.status !== 0) return { ok: false, out: `${r.stdout}${r.stderr}` };
     }
-    const rendered = new Map(Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => {
-      const out = p.replace(/^platforms\//, "dist/");
-      return [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined];
-    }));
+    const outs = [...Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => p.replace(/^platforms\//, "dist/")), ...reads];
+    const rendered = new Map(outs.map((out) => [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined]));
     return { ok: true, out: "", dist: (path) => rendered.get(path) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -133,6 +131,27 @@ test("other tools' {{…}} ship as written", () => {
   for (const [path, text] of Object.entries(theirs)) assert.equal(r.dist(path.replace(/^platforms\//, "dist/")), text);
 });
 
+// A plugin's README is shared/README.md with the host's slots from readme/.
+const copilotReadme = () => readFileSync(join(root, "dist/copilot/README.md"), "utf8");
+test("a plugin host with its own README.md fails", fails({ "platforms/copilot/README.md": "# Copilot\n" }, "a plugin's README comes from shared/README.md"));
+test("a plugin host without readme/setup.md fails", fails({ "platforms/copilot/readme/setup.md": null }, "slot {{> setup}} has no platforms/copilot/readme/setup.md"));
+test("a readme/ file shared/README.md has no slot for fails", fails({ "platforms/copilot/readme/extra.md": "x\n" }, "platforms/copilot/readme/extra.md: shared/README.md has no slot for it"));
+test("the optional more slot is left out without its file and put in with it", () => {
+  assert.ok(!copilotReadme().includes("{{"), "no slot token left in the rendered README");
+  assert.ok(!copilotReadme().includes("For maintainers"));
+  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, ["dist/copilot/README.md"]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist("dist/copilot/README.md"), /## Setup\n[\s\S]*## For maintainers\n\nRelease notes live elsewhere\.\n\n## Privacy/);
+});
+
+// A host's scripts/ is its own tooling: never shipped, and its validate.mjs runs.
+test("a host's scripts/ isn't shipped", () => {
+  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, ["dist/copilot/scripts/tool.sh"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/copilot/scripts/tool.sh"), undefined);
+});
+test("a host's own scripts/validate.mjs failing fails validate", fails({ "platforms/copilot/scripts/validate.mjs": "console.error('too long'); process.exit(1);\n" }, "copilot: platforms/copilot/scripts/validate.mjs failed:\ntoo long"));
+
 // Snippets: plain text, one line, used somewhere.
 const snippet = (text) => ({ ...piece, "shared/text/cost.md": text, "platforms/piece/src/index.ts": "export const cost = {{text:cost}};\n" });
 test("a snippet with parameter names and brackets passes", passes(snippet("A request with js_render returns [{...}] and costs 5 credits.\n")));
@@ -149,5 +168,6 @@ test("a snippet with a {{…}} fails", fails(snippet("Ask {{host}} to sign in.\n
 test("a snippet named only in a vars.yaml comment fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
 test("a snippet on two lines fails", fails(snippet("One fact.\nAnother fact.\n"), "has more than one line"));
 test("a snippet named only in a code host README fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
+test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
 test("an unused snippet fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "isn't used by any skill or host"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));

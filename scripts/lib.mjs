@@ -15,9 +15,13 @@ export const sharedTextDir = join(root, "shared", "text");
 // Files copied into every host's plugin as they are.
 const sharedFiles = { LICENSE: "LICENSE" };
 const sharedDirs = { "shared/assets": "assets" };
-// In platforms/<host>/, these are inputs to the render, not files of the plugin.
+// In platforms/<host>/, these are inputs to the render or the host's own tooling
+// (scripts/validate.mjs, scripts/package.sh), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
-const reserved = ["vars.yaml", "overrides.lock", "skills/"];
+const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/"];
+// A plugin host's README.md is rendered from this template, with the host's
+// slots from platforms/<host>/readme/.
+const readmeTemplate = join(root, "shared", "README.md");
 // What's left of one of this tool's tokens ({{name}}, {{skill:x}}, {{text:x}},
 // {{< x}}, {{> x}}) after the render, for example in a file type it doesn't
 // fill, or with a stray space, capital letter, _ or . the fill regexes don't
@@ -158,6 +162,23 @@ function fill(text, values, where) {
 }
 
 // Renders one host. Returns Map<path under dist/<host>, Buffer>.
+// Puts a host's slot files into text: {{> slot}} needs <dir>/<slot>.md; {{>? slot}}
+// is optional, and without the file its line (and one blank line after it) goes.
+// Records each slot file used in usedSlots.
+function fillSlots(text, dir, where, usedSlots) {
+  return text
+    .replace(/^[ \t]*\{\{>\?\s*([a-z0-9_-]+)\s*\}\}[ \t]*\n(\n)?/gm, (line, slot) => (existsSync(join(dir, `${slot}.md`)) ? line : ""))
+    .replace(/\{\{>(\?)?\s*([a-z0-9_-]+)\s*\}\}/g, (_, optional, slot) => {
+      const file = join(dir, `${slot}.md`);
+      if (!existsSync(file)) {
+        if (optional) return "";
+        throw new Error(`${where}: slot {{> ${slot}}} has no ${relative(root, file)}`);
+      }
+      usedSlots.add(relative(root, file));
+      return readFileSync(file, "utf8").replace(/\n$/, "");
+    });
+}
+
 export function renderHost(host) {
   const values = vars(host);
   const skills = hostSkills(host, values);
@@ -171,12 +192,7 @@ export function renderHost(host) {
     const own = join(platform, "skills", name, "SKILL.md");
     const source = existsSync(own) ? own : join(skillsDir, name, "SKILL.md");
     const where = relative(root, source);
-    let text = readFileSync(source, "utf8").replace(/\{\{>\s*([a-z0-9_-]+)\s*\}\}/g, (_, slot) => {
-      const file = join(platform, "skills", name, `${slot}.md`);
-      if (!existsSync(file)) throw new Error(`${where}: slot {{> ${slot}}} has no ${relative(root, file)}`);
-      usedSlots.add(relative(root, file));
-      return readFileSync(file, "utf8").replace(/\n$/, "");
-    });
+    let text = fillSlots(readFileSync(source, "utf8"), join(platform, "skills", name), where, usedSlots);
     text = fill(text, values, where);
     out.set(`skills/${hostSkillName(values, name)}/SKILL.md`, Buffer.from(text));
   }
@@ -185,6 +201,18 @@ export function renderHost(host) {
     const path = relative(root, join(platform, "skills", file));
     if (file.endsWith("/SKILL.md")) continue;
     if (!usedSlots.has(path)) throw new Error(`${path}: no skill this host ships has this slot`);
+  }
+
+  if (!isCodeHost(values)) {
+    if (existsSync(join(platform, "README.md"))) {
+      throw new Error(`platforms/${host}/README.md: a plugin's README comes from shared/README.md; put the host's own text in platforms/${host}/readme/setup.md (and readme/more.md)`);
+    }
+    const where = relative(root, readmeTemplate);
+    out.set("README.md", Buffer.from(fill(fillSlots(readFileSync(readmeTemplate, "utf8"), join(platform, "readme"), where, usedSlots), values, where)));
+    for (const file of listFiles(join(platform, "readme"))) {
+      const path = relative(root, join(platform, "readme", file));
+      if (!usedSlots.has(path)) throw new Error(`${path}: shared/README.md has no slot for it`);
+    }
   }
 
   for (const [from, to] of isCodeHost(values) ? [] : Object.entries(sharedFiles)) out.set(to, readFileSync(join(root, from)));

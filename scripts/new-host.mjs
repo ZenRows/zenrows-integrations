@@ -1,6 +1,6 @@
 // npm run new-host: asks for the host's id and full name, and creates
 // platforms/<id>/ from templates (vars, a generic manifest and MCP config, the
-// README and the getting-started sign-in slot) plus the host's release-please
+// README setup slot and the getting-started sign-in slot) plus the host's release-please
 // package. What only a person can decide is marked TODO(new-host), and
 // npm run validate fails until it's done.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -74,13 +74,13 @@ files.set(
 );
 
 // A generic manifest and MCP config. Each host reads its own layout, so the
-// README's TODO asks for them to be moved and completed.
+// setup slot's TODO asks for them to be moved and completed.
 files.set(
   "plugin.json",
   json({
     name: "zenrows",
     version: "{{version}}",
-    description: `Live web data for ${name}: fetch pages, extract structured data, run batch jobs and drive hosted browser sessions through the Zenrows MCP server.`,
+    description: "{{< zenrows-description}}.",
     author: { name: "Zenrows", email: "integrations@zenrows.com", url: "https://www.zenrows.com" },
     homepage: "https://docs.zenrows.com",
     repository: "https://github.com/ZenRows/zenrows-integrations",
@@ -98,36 +98,14 @@ files.set(
     `  - TODO(new-host): how to connect and sign in to the \`zenrows\` server in ${name}, one bullet per app (CLI, IDE, …).\n`,
 );
 
+// The README comes from shared/README.md; the host writes only its Setup section.
 files.set(
-  "README.md",
-  `# Zenrows for ${name}
-
-TODO(new-host): before this host ships, check its plugin files. platforms/${id}/plugin.json and mcp.json are generic templates: move them to the paths ${name} reads (for example .claude-plugin/plugin.json), add the fields it needs, update the manifest path in release-please-config.json, and add a marketplace catalog at the top of the repo if ${name} installs from a subfolder. Then delete this paragraph.
-
-Live web data for ${name}. This plugin connects ${name} to the Zenrows MCP server, so it can fetch the current content of any public page, pull structured fields from it, run batch jobs over many URLs, and drive a hosted browser for pages that need clicks, forms or pagination. It also adds skills that tell ${name} which Zenrows tool fits each task and how to keep requests efficient.
-
-## Requirements
-
-A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register).
-
-## Setup
+  "readme/setup.md",
+  `TODO(new-host): before this host ships, check its plugin files. platforms/${id}/plugin.json and mcp.json are generic templates: move them to the paths ${name} reads (for example .claude-plugin/plugin.json), add the fields it needs, update the manifest path in release-please-config.json, and add a marketplace catalog at the top of the repo if ${name} installs from a subfolder. Then delete this paragraph.
 
 TODO(new-host): how to install the plugin in ${name}, and how to sign in to Zenrows.
 
 Then ask ${name} something like: "Use Zenrows to get the product names and prices from https://www.scrapingcourse.com/ecommerce/".
-
-## Privacy
-
-The plugin sends the URLs and options you ask ${name} to fetch to Zenrows, which processes them under the [Zenrows privacy policy](https://www.zenrows.com/legal/privacy).
-
-## Support
-
-- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
-- Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
-
-## License
-
-MIT
 `,
 );
 
@@ -163,7 +141,7 @@ writeFileSync(manifestPath, json(versions));
 console.log(`
 Created platforms/${id}/ from templates. Next:
   1. Fill in every TODO(new-host): grep -rn "TODO(new-host)" platforms/${id}
-     (npm run validate fails until they're gone). The README's first TODO covers
+     (npm run validate fails until they're gone). readme/setup.md's first TODO covers
      moving plugin.json and mcp.json to the layout ${name} reads.
   2. npm run render, then npm run validate, and commit platforms/${id}, dist/${id}
      and the release-please files together.`);
