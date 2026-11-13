@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "zenrows",
   "version": "{{version}}",
-  "description": "Live web data for ChatGPT and Codex: read pages, extract structured data, run batch jobs and site crawls, and drive hosted browser sessions through the Zenrows MCP server.",
+  "description": "{{< zenrows-description}}.",
   "author": {
     "name": "Zenrows",
     "email": "integrations@zenrows.com",
