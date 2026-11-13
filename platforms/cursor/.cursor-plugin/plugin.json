@@ -2,7 +2,7 @@
   "name": "zenrows",
   "displayName": "Zenrows",
   "version": "{{version}}",
-  "description": "Web data for Cursor: scrape, crawl, map, browser automation, and structured extraction, straight from your AI agent. Powered by Zenrows Fetch and Browser Sessions.",
+  "description": "{{< zenrows-description}}.",
   "author": {
     "name": "Zenrows",
     "email": "integrations@zenrows.com"

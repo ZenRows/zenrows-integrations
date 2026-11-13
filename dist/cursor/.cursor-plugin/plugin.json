@@ -2,7 +2,7 @@
   "name": "zenrows",
   "displayName": "Zenrows",
   "version": "0.2.2",
-  "description": "Web data for Cursor: scrape, crawl, map, browser automation, and structured extraction, straight from your AI agent. Powered by Zenrows Fetch and Browser Sessions.",
+  "description": "Live web data: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows.",
   "author": {
     "name": "Zenrows",
     "email": "integrations@zenrows.com"

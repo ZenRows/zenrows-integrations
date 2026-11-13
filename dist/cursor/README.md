@@ -1,13 +1,29 @@
-# Zenrows Cursor Plugin
+# Zenrows for Cursor
 
-Web data for Cursor. Scrape, crawl, and map any site, run browser automation, and pull structured data, straight from your AI agent in plain English. Powered by [Zenrows Fetch](https://docs.zenrows.com/fetch/api-reference) and [Browser Sessions](https://docs.zenrows.com/browser-sessions/introduction).
+Live web data: fetch any public page as Markdown, HTML or text, pull structured fields from it as JSON, run batch jobs over many URLs, crawl a site from one start URL and drive a hosted browser for pages that need clicks, forms or pagination, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows. This plugin connects Cursor to the Zenrows MCP server and adds skills that tell Cursor which Zenrows tool fits each task and how to keep requests efficient.
 
-## Prerequisites
+## What you get
 
-- [Cursor](https://cursor.com)
-- A [Zenrows account](https://app.zenrows.com/register) to authorize with
+- The Zenrows MCP server (`https://mcp.zenrows.com/mcp`). You sign in to your Zenrows account with OAuth; there is no API key to copy.
+- Skills:
 
-## Installation
+| Skill | Use it for |
+|---|---|
+| `using-zenrows` | Overview: tools, defaults, errors and plan limits |
+| `getting-started` | First-run checks and troubleshooting |
+| `scrape-webpage` | Reading one page |
+| `extract-structured-data` | Named fields or JSON from one page |
+| `batch` | A list of five or more URLs as one job |
+| `crawl` | Many pages under one site section |
+| `map` | Listing a site's URLs without fetching them |
+| `browser-automation` | Clicks, forms, pagination and multi-step flows |
+| `capture-api-calls` | Finding the API calls a page makes |
+
+## Requirements
+
+A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register).
+
+## Setup
 
 ### 1. Install the plugin
 
@@ -34,23 +50,17 @@ Run `/zenrows-doctor` in a chat to confirm the connection is live and authorized
 | Log into this site, open the first result, and give me its content. | Runs a browser session through the steps. |
 | What internal API does this page use to load its data? | Inspects the page's network calls and surfaces the endpoint. |
 
-## What's included
+The plugin also adds `/zenrows-doctor`, which checks that the Zenrows connection is live and authorized.
 
-| Component | Purpose |
-|-----------|---------|
-| `skills/` | An overview of the Zenrows tools (`using-zenrows`), and task workflows: scrape, extract, batch, crawl, map, browser automation, API discovery, getting started |
-| `commands/zenrows-doctor.md` | `/zenrows-doctor` connection and auth check |
-| `mcp.json` | Connects to the hosted Zenrows MCP server over OAuth |
+## Privacy
 
-## Links
+The plugin sends the URLs and options you ask Cursor to fetch to Zenrows, which processes them under the [Zenrows privacy policy](https://www.zenrows.com/legal/privacy).
 
-- [Zenrows MCP documentation](https://docs.zenrows.com/mcp/overview)
-- [Create a Zenrows account](https://app.zenrows.com/register)
+## Support
 
-## Contributing
-
-The plugin is built from [ZenRows/zenrows-integrations](https://github.com/ZenRows/zenrows-integrations). See its [CONTRIBUTING.md](https://github.com/ZenRows/zenrows-integrations/blob/main/CONTRIBUTING.md).
+- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
+- Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT
