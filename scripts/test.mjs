@@ -26,7 +26,7 @@ const piece = {
 // Runs render then validate in a copy of the repo with `files` written over it
 // (null deletes). Returns { ok, out, dist }: out is the failing step's output,
 // dist(path) reads a rendered file.
-function run(files) {
+function run(files, reads = []) {
   const dir = mkdtempSync(join(tmpdir(), "zenrows-integrations-test-"));
   try {
     for (const path of copied) {
@@ -47,10 +47,8 @@ function run(files) {
       const r = spawnSync("node", [join("scripts", `${script}.mjs`)], { cwd: dir, encoding: "utf8" });
       if (r.status !== 0) return { ok: false, out: `${r.stdout}${r.stderr}` };
     }
-    const rendered = new Map(Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => {
-      const out = p.replace(/^platforms\//, "dist/");
-      return [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined];
-    }));
+    const outs = [...Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => p.replace(/^platforms\//, "dist/")), ...reads];
+    const rendered = new Map(outs.map((out) => [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined]));
     return { ok: true, out: "", dist: (path) => rendered.get(path) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -131,6 +129,19 @@ test("other tools' {{…}} ship as written", () => {
   const r = run({ ...piece, ...theirs });
   assert.ok(r.ok, r.out);
   for (const [path, text] of Object.entries(theirs)) assert.equal(r.dist(path.replace(/^platforms\//, "dist/")), text);
+});
+
+// A plugin's README is shared/README.md with the host's slots from readme/.
+const copilotReadme = () => readFileSync(join(root, "dist/copilot/README.md"), "utf8");
+test("a plugin host with its own README.md fails", fails({ "platforms/copilot/README.md": "# Copilot\n" }, "a plugin's README comes from shared/README.md"));
+test("a plugin host without readme/setup.md fails", fails({ "platforms/copilot/readme/setup.md": null }, "slot {{> setup}} has no platforms/copilot/readme/setup.md"));
+test("a readme/ file shared/README.md has no slot for fails", fails({ "platforms/copilot/readme/extra.md": "x\n" }, "platforms/copilot/readme/extra.md: shared/README.md has no slot for it"));
+test("the optional more slot is left out without its file and put in with it", () => {
+  assert.ok(!copilotReadme().includes("{{"), "no slot token left in the rendered README");
+  assert.ok(!copilotReadme().includes("For maintainers"));
+  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, ["dist/copilot/README.md"]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist("dist/copilot/README.md"), /## Setup\n[\s\S]*## For maintainers\n\nRelease notes live elsewhere\.\n\n## Privacy/);
 });
 
 // Snippets: plain text, one line, used somewhere.

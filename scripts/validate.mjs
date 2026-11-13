@@ -253,6 +253,7 @@ for (const host of hosts()) {
 // inputs, so a snippet named only there isn't used.
 const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `${h}/README.md`);
 const snippetSources = [
+  join(root, "shared", "README.md"),
   ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
   ...listFiles(platformsDir)
     .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))
