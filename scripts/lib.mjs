@@ -256,9 +256,9 @@ export function catalogs() {
 }
 
 // A host with mirror: <owner/repo> in vars.yaml is also published to that repo,
-// whose root is dist/<host>/ plus the host's marketplace catalogs (see
-// catalogs()) at the same paths, listing only this host with source "./" (the
-// mirror's root), and a banner under README.md's title pointing back here.
+// whose root is dist/<host>/ plus the host's marketplace catalogs, if it has
+// any (see catalogs()), at the same paths, listing only this host with source
+// "./" (the mirror's root), and a banner under README.md's title pointing back here.
 // The banner names the release tag, or for a sync with no tag, the commit.
 // Reads the committed files, which render --check and validate keep current.
 // Returns Map<path, Buffer>.
