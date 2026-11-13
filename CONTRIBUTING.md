@@ -6,15 +6,17 @@ Each host's plugin in `dist/<host>/` is rendered from shared skills plus that ho
 
 ```
 skills/<skill>/SKILL.md      shared skills; {{var}} and {{> slot}} mark what differs per host
+shared/README.md             every plugin's README; {{> setup}} and {{>? more}} take the host's own sections
 shared/assets/               files every plugin host ships as they are (logo)
 shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
 platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
+  readme/setup.md            the host's Setup section of its README (readme/more.md: optional extra sections)
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
   scripts/                   the host's own tooling, never shipped; validate.mjs and package.sh are run by
                              npm run validate and npm run package -- <host>, the rest by the host itself
-  everything else            the host's manifests, README, …, copied into dist/<host>/ ({{version}} comes from release-please)
+  everything else            the host's manifests, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
 scripts/                     render, validate, override, new-host, package, mirror, test
@@ -36,6 +38,8 @@ Requires Node 22. Run `npm ci` once.
 
 - **A word or phrase:** use a variable, for example `{{host}}`, and set it in `platforms/<host>/vars.yaml`.
 - **A paragraph or a few lines:** use a slot, for example `{{> connect}}`, and write the host's text in `platforms/<host>/skills/<skill>/connect.md`. Everything outside the slot stays shared, so later fixes still reach the host.
+- **An optional paragraph:** `{{>? name}}` is a slot a host may leave out; without the file, its line goes. The README uses it for `readme/more.md`.
+- **The README:** every plugin's README is `shared/README.md`. A host writes only `readme/setup.md` (how to install and sign in) and, if it needs more, `readme/more.md`; its own `README.md` fails the render. Code hosts keep their own README.
 - **The whole file, as a last resort:** `npm run override -- <host> <skill>` copies the shared skill into `platforms/<host>/` and records which version it was copied from in `overrides.lock`. When the shared skill changes later, `npm run validate` fails until someone updates the copy, or confirms the change doesn't apply, and runs `npm run override:ack -- <host> <skill>`.
 - **A skill only one host has:** put it in `platforms/<host>/skills/<name>/SKILL.md`, with no shared skill of that name. It ships only on that host and needs no `overrides.lock` entry.
 - **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
