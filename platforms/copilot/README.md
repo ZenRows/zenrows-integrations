@@ -1,6 +1,6 @@
 # Zenrows for GitHub Copilot
 
-Live web data for GitHub Copilot. This plugin connects Copilot to the Zenrows MCP server, so Copilot can fetch the current content of any public page, pull structured fields from it, run batch jobs over many URLs, and drive a hosted browser for pages that need clicks, forms or pagination. It also adds skills that tell Copilot which Zenrows tool fits each task and how to keep requests efficient.
+Live web data for {{host_full}}. This plugin connects {{host}} to the Zenrows MCP server, so it can {{< zenrows-description}}. It also adds skills that tell Copilot which Zenrows tool fits each task and how to keep requests efficient.
 
 ## What you get
 
