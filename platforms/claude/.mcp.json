@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "zenrows": {
+      "type": "http",
+      "url": "https://mcp.zenrows.com/mcp"
+    }
+  }
+}

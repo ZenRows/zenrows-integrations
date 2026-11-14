@@ -1,3 +1,4 @@
 {
-  "dist/copilot": "0.1.1"
+  "dist/copilot": "0.1.1",
+  "dist/claude": "0.1.6"
 }
