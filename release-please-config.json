@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "simple",
   "include-component-in-tag": true,
-  "skip-changelog": true,
+  "separate-pull-requests": true,
   "pull-request-title-pattern": "chore: release ${component} ${version}",
   "changelog-sections": [
     {
@@ -97,6 +97,17 @@
           "type": "json",
           "path": "/.claude-plugin/marketplace.json",
           "jsonpath": "$.plugins[0].version"
+        }
+      ]
+    },
+    "dist/openai": {
+      "component": "openai",
+      "package-name": "openai",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin.json",
+          "jsonpath": "$.version"
         }
       ]
     }

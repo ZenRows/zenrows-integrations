@@ -17,7 +17,7 @@ platforms/<host>/
   scripts/                   the host's own tooling, never shipped; validate.mjs and package.sh are run by
                              npm run validate and npm run package -- <host>, the rest by the host itself
   everything else            the host's manifests, …, copied into dist/<host>/ ({{version}} comes from release-please)
-dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files
+dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files (CHANGELOG.md comes from release-please)
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
 scripts/                     render, validate, override, new-host, package, mirror, test
 ```
@@ -80,7 +80,7 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
 
-Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release.
+Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release. The release PR also adds the version's entry to `dist/<host>/CHANGELOG.md`, from the `feat`, `fix`, `perf` and `revert` commits since the last release, so the changelog ships with the plugin and its mirror. The render keeps that file as it is.
 
 ### Mirror repos
 
