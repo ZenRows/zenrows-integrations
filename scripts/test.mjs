@@ -152,6 +152,13 @@ test("a host's scripts/ isn't shipped", () => {
 });
 test("a host's own scripts/validate.mjs failing fails validate", fails({ "platforms/copilot/scripts/validate.mjs": "console.error('too long'); process.exit(1);\n" }, "copilot: platforms/copilot/scripts/validate.mjs failed:\ntoo long"));
 
+// dist/<host>/CHANGELOG.md is release-please's: the render keeps it.
+test("the render keeps a host's CHANGELOG.md", () => {
+  const r = run({ "dist/copilot/CHANGELOG.md": "# Changelog\n\n## 0.2.0\n" }, ["dist/copilot/CHANGELOG.md"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/copilot/CHANGELOG.md"), "# Changelog\n\n## 0.2.0\n");
+});
+
 // Snippets: plain text, one line, used somewhere.
 const snippet = (text) => ({ ...piece, "shared/text/cost.md": text, "platforms/piece/src/index.ts": "export const cost = {{text:cost}};\n" });
 test("a snippet with parameter names and brackets passes", passes(snippet("A request with js_render returns [{...}] and costs 5 credits.\n")));
