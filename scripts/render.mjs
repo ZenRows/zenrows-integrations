@@ -12,6 +12,9 @@ const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const expected = new Map();
 for (const host of only.length ? only : hosts()) {
   for (const [file, buf] of renderHost(host)) expected.set(`dist/${host}/${file}`, buf);
+  // release-please writes dist/<host>/CHANGELOG.md on each release; keep it as committed.
+  const changelog = join(distDir, host, "CHANGELOG.md");
+  if (existsSync(changelog)) expected.set(`dist/${host}/CHANGELOG.md`, readFileSync(changelog));
 }
 expected.set("README.md", hostsList());
 
