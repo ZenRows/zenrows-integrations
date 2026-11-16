@@ -28,6 +28,69 @@ jobs:
           manifest-file: .release-please-manifest.json
           skip-github-release: true
 
+      # release-please rewrites each release PR's description on every push, so
+      # this adds back what changes in dist/<host> since the host's last tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Add the dist diff to each release PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          marker='<!-- dist-diff -->'
+          prefix=release-please--branches--main--components--
+          limit=50000
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --author app/github-actions --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"$prefix\")) | \"\(.number) \(.headRefName)\"" |
+          while read -r number branch; do
+            host=${branch#"$prefix"}
+            package=$(jq -r --arg c "$host" '.packages | to_entries[] | select((.value.component // (.key | split("/") | last)) == $c) | .key' release-please-config.json)
+            if [ -z "$package" ]; then echo "::warning::#$number: no package has the component $host"; continue; fi
+            git fetch -q origin "$branch"
+            # The manifest on main still has the version this PR replaces.
+            previous="$host-v$(jq -r --arg p "$package" '.[$p]' .release-please-manifest.json)"
+            {
+              echo "$marker"
+              echo "## What changes in $package"
+              echo
+              if git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
+                echo "Compared with $previous: [full diff on GitHub]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$branch)"
+                echo
+                echo '````'
+                git diff --stat "$previous" FETCH_HEAD -- "$package"
+                echo '````'
+                diff=$(git diff "$previous" FETCH_HEAD -- "$package")
+                echo
+                echo '<details><summary>Diff</summary>'
+                echo
+                echo '````diff'
+                if [ "${#diff}" -gt "$limit" ]; then
+                  echo "${diff:0:$limit}"
+                  echo "… cut at $limit characters; the full diff on GitHub has the rest"
+                else
+                  echo "$diff"
+                fi
+                echo '````'
+                echo '</details>'
+              else
+                echo "There's no $previous tag here: this is the first release of $package from this repo. Its files:"
+                echo
+                echo '````'
+                git ls-tree -r --name-only FETCH_HEAD -- "$package"
+                echo '````'
+              fi
+            } >section.md
+            body=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+            # Drop the section from the last run; $(…) also drops the newlines before it.
+            body=$(printf '%s' "${body%%"$marker"*}")
+            printf '%s\n\n%s\n' "$body" "$(cat section.md)" |
+              gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --body-file -
+            echo "#$number: updated the $package section (against $previous)"
+          done
+
   detect:
     name: Detect a release
     runs-on: ubuntu-latest

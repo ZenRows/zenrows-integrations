@@ -80,7 +80,7 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
 
-Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release. The release PR also adds the version's entry to `dist/<host>/CHANGELOG.md`, from the `feat`, `fix`, `perf` and `revert` commits since the last release, so the changelog ships with the plugin and its mirror. The render keeps that file as it is.
+Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release. The release PR also adds the version's entry to `dist/<host>/CHANGELOG.md`, from the `feat`, `fix`, `perf` and `revert` commits since the last release, so the changelog ships with the plugin and its mirror. The render keeps that file as it is. After each update, the release workflow adds a "What changes in dist/<host>" section to the release PR's description: the diff of `dist/<host>/` since the host's last release tag, cut at 50 000 characters with a link to the full diff.
 
 ### Mirror repos
 
