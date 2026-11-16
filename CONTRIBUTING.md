@@ -37,7 +37,8 @@ Requires Node 22. Run `npm ci` once.
 ## Text that differs per host
 
 - **A word or phrase:** use a variable, for example `{{host}}`, and set it in `platforms/<host>/vars.yaml`.
-- **A paragraph or a few lines:** use a slot, for example `{{> connect}}`, and write the host's text in `platforms/<host>/skills/<skill>/connect.md`. Everything outside the slot stays shared, so later fixes still reach the host. Every host needs the file for a `{{> slot}}`. Write `{{>? slot}}` for text only some hosts add, for example OpenClaw's frontmatter `metadata`: on a host without the file, the line disappears (and validate fails if no host has it, to catch a typo).
+- **A paragraph or a few lines:** use a slot, for example `{{> connect}}`, and write the host's text in `platforms/<host>/skills/<skill>/connect.md`. Everything outside the slot stays shared, so later fixes still reach the host.
+- **An optional paragraph:** `{{>? name}}` is a slot a host may leave out; without the file, its line goes. The README uses it for `readme/more.md`, and OpenClaw for its skills' frontmatter `metadata`.
 - **The README:** every plugin's README is `shared/README.md`. A host writes only `readme/setup.md` (how to install and sign in) and, if it needs more, `readme/more.md`; its own `README.md` fails the render. Code hosts keep their own README.
 - **The whole file, as a last resort:** `npm run override -- <host> <skill>` copies the shared skill into `platforms/<host>/` and records which version it was copied from in `overrides.lock`. When the shared skill changes later, `npm run validate` fails until someone updates the copy, or confirms the change doesn't apply, and runs `npm run override:ack -- <host> <skill>`.
 - **A skill only one host has:** put it in `platforms/<host>/skills/<name>/SKILL.md`, with no shared skill of that name. It ships only on that host and needs no `overrides.lock` entry.
