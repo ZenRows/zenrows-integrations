@@ -1,0 +1,1 @@
+- Tools missing entirely: the Zenrows account is not connected yet. Ask the user to connect it from the Zenrows plugin, sign in to Zenrows and approve access.
