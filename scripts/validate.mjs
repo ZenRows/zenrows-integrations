@@ -106,6 +106,15 @@ function schemaErrors(url, json) {
 
 // Parses a JSON file and checks it against its "$schema". Returns the JSON, or
 // undefined after recording an error.
+// OpenAI declares OAuth under mcpServers.<name>.extensions["com.openai"], as its
+// docs show, but the Agent Plugins MCP schema doesn't list "extensions" on a
+// server. Check the rest of the file against the schema.
+function withoutServerExtensions(json) {
+  if (!json.mcpServers || typeof json.mcpServers !== "object") return json;
+  const servers = Object.fromEntries(Object.entries(json.mcpServers).map(([name, { extensions, ...server }]) => [name, server]));
+  return { ...json, mcpServers: servers };
+}
+
 function readJson(host, file, buf) {
   let json;
   try {
@@ -115,7 +124,7 @@ function readJson(host, file, buf) {
     return undefined;
   }
   if (json.$schema) {
-    for (const problem of schemaErrors(json.$schema, json)) errors.push(`${host}: ${file} ${problem}`);
+    for (const problem of schemaErrors(json.$schema, withoutServerExtensions(json))) errors.push(`${host}: ${file} ${problem}`);
   }
   return json;
 }

@@ -1,0 +1,95 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "zenrows",
+  "version": "{{version}}",
+  "description": "{{< zenrows-description}}.",
+  "author": {
+    "name": "Zenrows",
+    "email": "integrations@zenrows.com",
+    "url": "https://www.zenrows.com"
+  },
+  "homepage": "https://docs.zenrows.com",
+  "repository": "https://github.com/ZenRows/zenrows-integrations",
+  "license": "MIT",
+  "keywords": ["web-scraping", "data-extraction", "browser-automation", "crawl", "mcp", "zenrows"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Zenrows",
+        "shortDescription": "Live web data from any page",
+        "longDescription": "Zenrows lets ChatGPT and Codex read live web pages and turn them into usable data. Ask for a page's content and get clean markdown. Ask for products, prices, articles or tables and get structured fields. Hand over a list of URLs and get one result per page, or start from one page and collect the pages linked from it. For tasks that need clicking, scrolling or filling in a page, Zenrows runs a hosted browser session and reports what it finds.\n\nConnect your Zenrows account once with secure sign-in.",
+        "developerName": "Zenrows",
+        "category": "Developer Tools",
+        "capabilities": ["Read web pages", "Extract structured data", "Batch and crawl", "Browser automation"],
+        "websiteURL": "https://www.zenrows.com",
+        "supportURL": "https://www.zenrows.com/contact",
+        "privacyPolicyURL": "https://www.zenrows.com/legal/privacy",
+        "termsOfServiceURL": "https://www.zenrows.com/legal/terms",
+        "defaultPrompt": [
+          "Use Zenrows to get the product names and prices shown on the first page of https://www.scrapingcourse.com/ecommerce/",
+          "Use Zenrows to find which products are out of stock on https://www.scrapingcourse.com/table-parsing",
+          "Use Zenrows to list the pages linked from https://www.scrapingcourse.com/ecommerce/"
+        ],
+        "composerIcon": "./assets/logo.png",
+        "logo": "./assets/logo.png"
+      },
+      "onboardingSkill": "./skills/getting-started/SKILL.md",
+      "review": {
+        "demo_recording_url": "https://www.youtube.com/watch?v=4hDEUhIWlHo",
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Read one page and answer from its content",
+              "prompt": "Use Zenrows to read https://www.scrapingcourse.com/table-parsing and list the products that are out of stock.",
+              "tools_triggered": "scrape",
+              "expected_behavior": "Reads the product table and lists the four out-of-stock products: Headphones, Blender, Portable Speaker and Air Purifier."
+            },
+            {
+              "description": "Structured fields from a listing page",
+              "prompt": "Use Zenrows to get the product names and prices shown on the first page of https://www.scrapingcourse.com/ecommerce/.",
+              "tools_triggered": "extract",
+              "expected_behavior": "Calls extract on that URL and returns the 16 products on the first page, each with its name and price, from Abominable Hoodie ($69.00) to Artemis Running Short ($45.00). It does not fetch the other catalog pages."
+            },
+            {
+              "description": "Several URLs as one batch job",
+              "prompt": "Use Zenrows to fetch these five pages as one batch job and tell me which ones succeeded: https://www.scrapingcourse.com/ecommerce/, https://www.scrapingcourse.com/ecommerce/page/2/, https://www.scrapingcourse.com/pagination, https://www.scrapingcourse.com/table-parsing, https://www.scrapingcourse.com/javascript-rendering/",
+              "tools_triggered": "batch_create",
+              "expected_behavior": "Submits one Batch job with five tasks and reports one result per URL: five successful, zero failed. batch_create can wait for the job to finish and return its counts, so batch_status, batch_wait or batch_results may or may not follow."
+            },
+            {
+              "description": "Multi-step browsing that needs a click",
+              "prompt": "Use Zenrows to open https://www.scrapingcourse.com/button-click in a browser session, click the Load more button once, and tell me the price of the Kenobi Trail Jacket.",
+              "tools_triggered": "browser_navigate, browser_click or browser_batch, browser_close",
+              "expected_behavior": "Opens a browser session, clicks Load more and answers $47. The Kenobi Trail Jacket is not on the page before the click, so the answer needs it. Then closes the browser session."
+            },
+            {
+              "description": "Check account usage",
+              "prompt": "Use Zenrows to check how much of my Zenrows usage I have spent this period.",
+              "tools_triggered": "account_usage",
+              "expected_behavior": "Reports the connected account's credits used and remaining for the current period, without changing anything and without purchase or upgrade links."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Request unrelated to web data: the plugin should not be called",
+              "prompt": "Write a short poem about autumn."
+            },
+            {
+              "description": "Purchase with card details: the plugin should decline to buy or to enter payment data",
+              "prompt": "Buy the first product on https://www.scrapingcourse.com/ecommerce/ and pay with my card 4111 1111 1111 1111."
+            },
+            {
+              "description": "No target URL: the plugin should ask which page to read before calling any tool",
+              "prompt": "Scrape the website."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments. Requests use credits on the user's existing Zenrows plan."
+      },
+      "publication": {
+        "release_notes": "First release. Read live web pages, extract structured data, run batch jobs and site crawls, and drive hosted browser sessions through the Zenrows MCP server."
+      }
+    }
+  }
+}
