@@ -1,6 +1,7 @@
 // Checks what each host ships: skill frontmatter, skill references, manifests
 // (against the JSON Schema they declare), the marketplace catalogs at the top of
 // the repo, and that no whole-file override was copied from an older shared file.
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -234,6 +235,14 @@ for (const host of hosts()) {
   for (const file of listFiles(join(platformsDir, host))) {
     const text = readFileSync(join(platformsDir, host, file), "utf8");
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
+  }
+
+  // Checks only one host needs, such as OpenAI's submission limits, live in
+  // platforms/<host>/scripts/validate.mjs and run on the committed dist/<host>.
+  const extra = join(platformsDir, host, "scripts", "validate.mjs");
+  if (existsSync(extra)) {
+    const run = spawnSync(process.execPath, [extra, join(root, "dist", host)], { encoding: "utf8" });
+    if (run.status !== 0) errors.push(`${host}: platforms/${host}/scripts/validate.mjs failed:\n${(run.stderr || run.stdout).trim()}`);
   }
 
   // A code host's README stays here (it isn't shipped) and the repo's hosts
