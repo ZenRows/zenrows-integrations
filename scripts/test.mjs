@@ -144,6 +144,14 @@ test("the optional more slot is left out without its file and put in with it", (
   assert.match(r.dist("dist/copilot/README.md"), /## Setup\n[\s\S]*## For maintainers\n\nRelease notes live elsewhere\.\n\n## Privacy/);
 });
 
+// A host's scripts/ is its own tooling: never shipped, and its validate.mjs runs.
+test("a host's scripts/ isn't shipped", () => {
+  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, ["dist/copilot/scripts/tool.sh"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/copilot/scripts/tool.sh"), undefined);
+});
+test("a host's own scripts/validate.mjs failing fails validate", fails({ "platforms/copilot/scripts/validate.mjs": "console.error('too long'); process.exit(1);\n" }, "copilot: platforms/copilot/scripts/validate.mjs failed:\ntoo long"));
+
 // Snippets: plain text, one line, used somewhere.
 const snippet = (text) => ({ ...piece, "shared/text/cost.md": text, "platforms/piece/src/index.ts": "export const cost = {{text:cost}};\n" });
 test("a snippet with parameter names and brackets passes", passes(snippet("A request with js_render returns [{...}] and costs 5 credits.\n")));
