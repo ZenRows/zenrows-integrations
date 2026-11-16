@@ -1,0 +1,3 @@
+- Tools missing entirely: Zenrows is not connected yet. Tell the user how to connect it:
+  - In Claude (web or desktop): open **Customize → Connectors**, find **Zenrows**, choose **Connect**, sign in to Zenrows and approve access.
+  - In Claude Code: run `/mcp`, select the `zenrows` server and choose **Authenticate**, then sign in to Zenrows in the browser.
