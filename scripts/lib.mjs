@@ -15,9 +15,10 @@ export const sharedTextDir = join(root, "shared", "text");
 // Files copied into every host's plugin as they are.
 const sharedFiles = { LICENSE: "LICENSE" };
 const sharedDirs = { "shared/assets": "assets" };
-// In platforms/<host>/, these are inputs to the render, not files of the plugin.
+// In platforms/<host>/, these are inputs to the render or the host's own tooling
+// (scripts/validate.mjs, scripts/package.sh), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
-const reserved = ["vars.yaml", "overrides.lock", "skills/", "readme/"];
+const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/"];
 // A plugin host's README.md is rendered from this template, with the host's
 // slots from platforms/<host>/readme/.
 const readmeTemplate = join(root, "shared", "README.md");
