@@ -11,6 +11,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 |---|---|
 | ChatGPT and Codex | [dist/openai/README.md](dist/openai/README.md) |
 | Claude | [dist/claude/README.md](dist/claude/README.md) |
+| Cursor | [dist/cursor/README.md](dist/cursor/README.md) |
 | GitHub Copilot | [dist/copilot/README.md](dist/copilot/README.md) |
 <!-- hosts:end -->
 
