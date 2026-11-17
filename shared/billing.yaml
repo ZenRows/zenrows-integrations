@@ -1,0 +1,7 @@
+# How each endpoint is billed, for every host: by the credits each request uses,
+# after it runs (each page or task it fetches), or not at all. Names are a shared
+# endpoint (shared/endpoints.yaml) or an operation ("METHOD /path"). apiEndpoints
+# gives each endpoint its kind; an endpoint not listed here has none yet.
+per_credit: [fetch, extract]
+after_run: [POST /jobs, POST /crawls]
+free: [GET /extract/domains, POST /extract/prepared-domains, "GET /extract/prepared-domains/{domain}", "GET /jobs/{job_id}", "POST /jobs/{job_id}/cancel", "GET /jobs/{job_id}/results", "GET /jobs/{job_id}/tasks/{task_id}/content", "GET /crawls/{crawl_id}", "GET /crawls/{crawl_id}/download", "GET /crawls/{crawl_id}/contents/{content_id}", "POST /crawls/{crawl_id}/stop"]

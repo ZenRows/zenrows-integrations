@@ -247,15 +247,24 @@ test("a host's render script returning a file the host already has fails", fails
 // apiEndpoints lists every operation in the spec as a host's endpoints, minus the excluded ones.
 const lister = (excluded) => `export default ({ apiEndpoints }) => ({ "ids.json": JSON.stringify(apiEndpoints(${JSON.stringify(excluded)}).map((e) => e.id)) });\n`;
 test("a render script lists the API's endpoints, without the excluded ones", () => {
-  const r = run(renders(lister(["POST /jobs"]), { "shared/endpoints.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  const r = run(renders(lister(["POST /jobs"]), { "shared/endpoints.yaml": "{}\n", "shared/billing.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/piece/ids.json"), '["fetch_page","get_job"]');
 });
 test("apiEndpoints lists a shared endpoint instead of the operation it splits", () => {
-  const r = run(renders(lister([]), { "shared/endpoints.yaml": "a:\n  operation: GET /\n  parameters: [url]\nb:\n  operation: GET /\n  parameters: [mode]\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  const r = run(renders(lister([]), { "shared/endpoints.yaml": "a:\n  operation: GET /\n  parameters: [url]\nb:\n  operation: GET /\n  parameters: [mode]\n", "shared/billing.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/piece/ids.json"), '["a","b","get_job","create_job"]');
 });
+// shared/billing.yaml gives each endpoint apiEndpoints lists its billing kind.
+const billed = (yaml) => renders('export default ({ apiEndpoints }) => ({ "billing.json": JSON.stringify(apiEndpoints([]).map((e) => [e.id, e.billing ?? null])) });\n', { "shared/endpoints.yaml": "{}\n", "shared/billing.yaml": yaml });
+test("apiEndpoints gives each endpoint its kind from shared/billing.yaml", () => {
+  const r = run(billed("per_credit: [GET /]\nfree: [\"GET /jobs/{job_id}\"]\n"), tokenSpec, ["dist/piece/billing.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/billing.json"), '[["fetch_page","per_credit"],["get_job","free"],["create_job",null]]');
+});
+test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(billed("free: [GET /nope]\n"), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
+test("shared/billing.yaml with an endpoint in two kinds fails", fails(billed("free: [GET /]\nper_credit: [GET /]\n"), 'shared/billing.yaml: "GET /" is both free and per_credit', tokenSpec));
 test("apiEndpoints excluding an operation the API doesn't have fails", fails(renders(lister(["GET /nope"])), 'excludes "GET /nope", which the API doesn\'t have', tokenSpec));
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);

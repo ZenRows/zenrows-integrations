@@ -195,17 +195,35 @@ function sharedEndpoints() {
 // Every operation in the spec except excluded ("METHOD /path"), as the endpoints a
 // host offers: an operation shared/endpoints.yaml splits (GET / into fetch and
 // extract) as those. Each is { key, id, operation, method, path, name,
-// description, server, input, example, security }: key is the shared name or the
-// operation, id the shared name or the operationId in snake_case, description
-// undefined where the spec has none, input the query, path and body schemas it
-// takes, and security its key schemes from the spec.
+// description, server, input, example, security, billing }: key is the shared
+// name or the operation, id the shared name or the operationId in snake_case,
+// description undefined where the spec has none, input the query, path and body
+// schemas it takes, security its key schemes from the spec, and billing its kind
+// in shared/billing.yaml (undefined where it has none).
 const httpMethods = ["get", "post", "put", "patch", "delete"];
+// shared/billing.yaml as { endpoint: kind }. Every name must be an endpoint, and in
+// one kind only.
+function sharedBilling(spec, operations, shared) {
+  const file = join(root, "shared", "billing.yaml");
+  const kinds = existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
+  const byEndpoint = {};
+  for (const [kind, names] of Object.entries(kinds)) {
+    for (const name of names) {
+      if (!operations.includes(name) && !(name in shared)) throw new Error(`shared/billing.yaml: ${kind} names "${name}", which is neither an API operation nor a shared endpoint`);
+      if (byEndpoint[name]) throw new Error(`shared/billing.yaml: "${name}" is both ${byEndpoint[name]} and ${kind}`);
+      byEndpoint[name] = kind;
+    }
+  }
+  return byEndpoint;
+}
+
 export function apiEndpoints(spec, excluded, where) {
   const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
   for (const operation of excluded) {
     if (!all.includes(operation)) throw new Error(`${where}: excludes "${operation}", which the API doesn't have`);
   }
   const shared = sharedEndpoints();
+  const billing = sharedBilling(spec, all, shared);
   return all
     .filter((operation) => !excluded.includes(operation))
     .flatMap((operation) => {
@@ -234,6 +252,7 @@ export function apiEndpoints(spec, excluded, where) {
           input,
           example: value("example"),
           security: (op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => ({ name, ...spec.components?.securitySchemes?.[name] })),
+          billing: billing[key],
         };
       });
     });
