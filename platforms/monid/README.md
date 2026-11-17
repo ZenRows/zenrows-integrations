@@ -92,6 +92,7 @@ platforms/monid/scripts/check.sh                     # clones monid at vars.yaml
 platforms/monid/scripts/check.sh ~/path/to/monid     # or reuse a checkout you already have
 SCOPE=connectors/zenrows/ platforms/monid/scripts/check.sh   # the fast loop
 FMT=1 platforms/monid/scripts/check.sh               # add deno fmt --check and deno lint
+LIVE=1 ZENROWS_API_KEY=... platforms/monid/scripts/check.sh  # run the live tests against the real API
 ```
 
 It copies `dist/monid/connectors/zenrows` into the monid checkout, applies the
@@ -106,6 +107,12 @@ Their CI runs neither `deno fmt` nor `deno lint`, but their review config says
 `fmt` uses `indentWidth: 4`. The rendered output has to be formatted, not the
 source, so a `{{text:…}}` snippet goes on its own line and the long string it
 becomes is left alone.
+
+The live tests are `ignored` unless a credential resolves, so an ordinary run
+never calls the vendor. `LIVE=1` switches to their `test:live` task (which adds
+`--allow-net`) and forwards `ZENROWS_API_KEY` into the container by name, so the
+value never reaches a command line. A wrong variable name shows up as
+`ignored` rather than as a pass.
 
 `upstream` in `vars.yaml` pins the monid commit. Moving it is its own pull
 request, so CI shows whether their newer code breaks the connector.
