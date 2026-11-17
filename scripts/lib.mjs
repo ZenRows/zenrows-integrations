@@ -192,17 +192,18 @@ function sharedEndpoints() {
   return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
 }
 
-// Every operation in the spec except excluded ("METHOD /path"), as the endpoints a
-// host offers: an operation shared/endpoints.yaml splits (GET / into fetch and
+// The endpoints we offer (every one shared/billing.yaml gives a kind other than
+// not_offered): an operation shared/endpoints.yaml splits (GET / into fetch and
 // extract) as those. Each is { key, id, operation, method, path, name,
 // description, server, input, example, security, billing }: key is the shared
 // name or the operation, id the shared name or the operationId in snake_case,
 // description undefined where the spec has none, input the query, path and body
 // schemas it takes, security its key schemes from the spec, and billing its kind
-// in shared/billing.yaml (undefined where it has none).
+// in shared/billing.yaml.
 const httpMethods = ["get", "post", "put", "patch", "delete"];
-// shared/billing.yaml as { endpoint: kind }. Every name must be an endpoint, and in
-// one kind only.
+// shared/billing.yaml as { endpoint: kind }. Every name must be an API operation or
+// a shared endpoint, in one kind only, and every API operation must be named,
+// itself or through a shared endpoint that splits it.
 function sharedBilling(spec, operations, shared) {
   const file = join(root, "shared", "billing.yaml");
   const kinds = existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
@@ -214,25 +215,33 @@ function sharedBilling(spec, operations, shared) {
       byEndpoint[name] = kind;
     }
   }
+  for (const operation of operations) {
+    const named = operation in byEndpoint || Object.keys(shared).some((name) => shared[name].operation === operation && name in byEndpoint);
+    if (!named) throw new Error(`shared/billing.yaml: the API's "${operation}" is in none of ${Object.keys(kinds).join(", ")}; add it to one`);
+  }
   return byEndpoint;
 }
 
-export function apiEndpoints(spec, excluded, where) {
+// The API operations shared/billing.yaml lists as not_offered.
+export function apiNotOffered(spec) {
   const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
-  for (const operation of excluded) {
-    if (!all.includes(operation)) throw new Error(`${where}: excludes "${operation}", which the API doesn't have`);
-  }
+  const billing = sharedBilling(spec, all, sharedEndpoints());
+  return all.filter((operation) => billing[operation] === "not_offered");
+}
+
+export function apiEndpoints(spec, where) {
+  const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
   const shared = sharedEndpoints();
   const billing = sharedBilling(spec, all, shared);
   return all
-    .filter((operation) => !excluded.includes(operation))
+    .filter((operation) => billing[operation] !== "not_offered")
     .flatMap((operation) => {
       const [method, path] = operation.split(" ");
       const op = spec.paths[path][method.toLowerCase()];
       const slices = Object.keys(shared).filter((name) => shared[name].operation === operation);
       if (!slices.length && !op.operationId) throw new Error(`${where}: the spec's ${operation} has no operationId to name it by`);
       const named = slices.length ? slices.map((name) => [name, name]) : [[operation, op.operationId.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()]];
-      return named.map(([key, id]) => {
+      return named.filter(([key]) => billing[key] && billing[key] !== "not_offered").map(([key, id]) => {
         const value = (part) => apiValue(spec, key, part, undefined, where);
         const input = {};
         for (const part of ["query", "path", "body"]) {
@@ -515,7 +524,8 @@ export function renderHost(host) {
       spec: loadedSpec.spec,
       specSha256: loadedSpec.sha256,
       apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
-      apiEndpoints: (excluded = []) => apiEndpoints(loadedSpec.spec, excluded, where),
+      apiEndpoints: () => apiEndpoints(loadedSpec.spec, where),
+      apiNotOffered: () => apiNotOffered(loadedSpec.spec),
       fill: (text) => fill(text, values, where),
       sharedText: (name) => sharedText(name, where),
     });

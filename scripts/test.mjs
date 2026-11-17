@@ -193,7 +193,18 @@ const tokenSpecText = JSON.stringify({
     },
   },
 });
-const usesToken = (token) => ({ ...piece, "openapi-tokens.json": tokenSpecText, "platforms/piece/src/index.ts": `export const p = ${token};\n` });
+// shared/billing.yaml must place every API operation, so the cases' stub operations go
+// in it too: not_offered unless a case gives them a kind.
+const stubOperations = ["GET /stub", "GET /stub/{job_id}", "POST /stub-jobs"];
+// covered: stub operations a case places through shared endpoints that split them.
+const billingWith = (kinds = {}, covered = []) => {
+  const billing = parseYaml(readFileSync(join(root, "shared/billing.yaml"), "utf8"));
+  for (const [kind, names] of Object.entries(kinds)) billing[kind] = [...(billing[kind] ?? []), ...names];
+  const placed = [...Object.values(kinds).flat(), ...covered];
+  billing.not_offered = [...billing.not_offered, ...stubOperations.filter((op) => !placed.includes(op))];
+  return JSON.stringify(billing);
+};
+const usesToken = (token) => ({ ...piece, "openapi-tokens.json": tokenSpecText, "shared/billing.yaml": billingWith(), "platforms/piece/src/index.ts": `export const p = ${token};\n` });
 const tokenSpec = { ZENROWS_OPENAPI: "openapi-tokens.json" };
 const rendersTo = (token, expected) => () => {
   const r = run(usesToken(token), tokenSpec, ["dist/piece/src/index.ts"]);
@@ -242,6 +253,7 @@ test("{{api:… example}} builds the example request from the spec's parameter a
 const renders = (script, extra = {}) => ({
   ...piece,
   "openapi-tokens.json": tokenSpecText,
+  "shared/billing.yaml": billingWith(),
   "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nlisting_name: Piece listing\n",
   "platforms/piece/scripts/render.mjs": script,
   ...extra,
@@ -257,36 +269,33 @@ test("a host's render script's files ship", () => {
 });
 test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
 test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));
-// apiEndpoints lists every operation in the spec as a host's endpoints, minus the excluded ones.
-// Only the stub operations: the published spec's own are the real hosts'.
-const lister = (excluded) => `export default ({ apiEndpoints }) => ({ "ids.json": JSON.stringify(apiEndpoints(${JSON.stringify(excluded)}).filter((e) => e.path.startsWith("/stub")).map((e) => e.id)) });\n`;
-test("a render script lists the API's endpoints, without the excluded ones", () => {
-  const r = run(renders(lister(["POST /stub-jobs"])), tokenSpec, ["dist/piece/ids.json"]);
+// apiEndpoints lists the endpoints shared/billing.yaml offers, with their kind. Only
+// the stub operations are looked at: the published spec's own are the real hosts'.
+const offered = (kinds, extra = {}, covered = []) =>
+  renders('export default ({ apiEndpoints }) => ({ "offered.json": JSON.stringify(apiEndpoints().filter((e) => e.path.startsWith("/stub")).map((e) => [e.id, e.billing])) });\n', { "shared/billing.yaml": billingWith(kinds, covered), ...extra });
+test("apiEndpoints lists the offered endpoints with their billing kind", () => {
+  const r = run(offered({ per_credit: ["GET /stub"], free: ["GET /stub/{job_id}"] }), tokenSpec, ["dist/piece/offered.json"]);
   assert.ok(r.ok, r.out);
-  assert.equal(r.dist("dist/piece/ids.json"), '["fetch_page","get_job"]');
+  assert.equal(r.dist("dist/piece/offered.json"), '[["fetch_page","per_credit"],["get_job","free"]]');
 });
 test("apiEndpoints lists a shared endpoint instead of the operation it splits", () => {
   const endpoints = readFileSync(join(root, "shared/endpoints.yaml"), "utf8") + "a:\n  operation: GET /stub\n  parameters: [url]\nb:\n  operation: GET /stub\n  parameters: [mode]\n";
-  const r = run(renders(lister([]), { "shared/endpoints.yaml": endpoints }), tokenSpec, ["dist/piece/ids.json"]);
+  const r = run(offered({ free: ["a", "b"] }, { "shared/endpoints.yaml": endpoints }, ["GET /stub"]), tokenSpec, ["dist/piece/offered.json"]);
   assert.ok(r.ok, r.out);
-  assert.equal(r.dist("dist/piece/ids.json"), '["a","b","get_job","create_job"]');
+  assert.equal(r.dist("dist/piece/offered.json"), '[["a","free"],["b","free"]]');
 });
-// shared/billing.yaml gives each endpoint apiEndpoints lists its billing kind. The
-// cases add the stub operations to the real file.
-const billed = (extra) => {
-  const billing = parseYaml(readFileSync(join(root, "shared/billing.yaml"), "utf8"));
-  for (const [kind, names] of Object.entries(extra)) billing[kind] = [...(billing[kind] ?? []), ...names];
-  const script = 'export default ({ apiEndpoints }) => ({ "billing.json": JSON.stringify(apiEndpoints([]).filter((e) => e.path.startsWith("/stub")).map((e) => [e.id, e.billing ?? null])) });\n';
-  return renders(script, { "shared/billing.yaml": JSON.stringify(billing) });
-};
-test("apiEndpoints gives each endpoint its kind from shared/billing.yaml", () => {
-  const r = run(billed({ per_credit: ["GET /stub"], free: ["GET /stub/{job_id}"] }), tokenSpec, ["dist/piece/billing.json"]);
+test("an API operation shared/billing.yaml doesn't place fails", () => {
+  const billing = parseYaml(billingWith());
+  billing.not_offered = billing.not_offered.filter((op) => op !== "POST /stub-jobs");
+  fails(renders('export default ({ apiEndpoints }) => ({ "x.json": JSON.stringify(apiEndpoints().length) });\n', { "shared/billing.yaml": JSON.stringify(billing) }), 'shared/billing.yaml: the API\'s "POST /stub-jobs" is in none of', tokenSpec)();
+});
+test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(offered({ free: ["GET /nope"] }), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
+test("shared/billing.yaml with an endpoint in two kinds fails", fails(offered({ free: ["GET /stub"], per_credit: ["GET /stub"] }), 'shared/billing.yaml: "GET /stub" is both', tokenSpec));
+test("apiNotOffered lists what shared/billing.yaml doesn't offer", () => {
+  const r = run(renders('export default ({ apiNotOffered }) => ({ "not.json": JSON.stringify(apiNotOffered().filter((op) => op.includes("/stub"))) });\n'), tokenSpec, ["dist/piece/not.json"]);
   assert.ok(r.ok, r.out);
-  assert.equal(r.dist("dist/piece/billing.json"), '[["fetch_page","per_credit"],["get_job","free"],["create_job",null]]');
+  assert.equal(r.dist("dist/piece/not.json"), '["GET /stub","GET /stub/{job_id}","POST /stub-jobs"]');
 });
-test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(billed({ free: ["GET /nope"] }), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
-test("shared/billing.yaml with an endpoint in two kinds fails", fails(billed({ free: ["GET /stub"], per_credit: ["GET /stub"] }), 'shared/billing.yaml: "GET /stub" is both per_credit and free', tokenSpec));
-test("apiEndpoints excluding an operation the API doesn't have fails", fails(renders(lister(["GET /nope"])), 'excludes "GET /nope", which the API doesn\'t have', tokenSpec));
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);
