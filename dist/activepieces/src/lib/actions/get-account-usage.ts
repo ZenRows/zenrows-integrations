@@ -8,7 +8,7 @@ export const getAccountUsageAction = createAction({
   name: 'get_account_usage',
   classification: 'READ',
   displayName: 'Get Account Usage',
-  description: 'Get your ZenRows plan, credits used this period and concurrency.',
+  description: "Return the calling key's plan: credit allowance, credits used, and the concurrency it is allowed. Use it to budget before a large run.",
   audience: 'both',
   outputSchema: usageOutputSchema(),
   aiMetadata: {

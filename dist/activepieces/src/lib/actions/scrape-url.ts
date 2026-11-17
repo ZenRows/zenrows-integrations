@@ -1,17 +1,17 @@
 import { randomUUID } from 'crypto';
 import { createAction, OutputSchema, Property } from '@activepieces/pieces-framework';
 import { zenrowsAuth } from '../auth';
-import { zenrowsClient } from '../common/client';
+import { FETCH_PARAMS, FetchParams, FetchValue, zenrowsClient } from '../common/client';
 
 type OutputFormat = 'markdown' | 'html' | 'plaintext' | 'screenshot';
 
 // What each format adds to the request. A screenshot needs a real browser, so
 // it sets js_render itself instead of leaving the choice to Adaptive Stealth Mode.
-const FORMAT_PARAMS: Record<OutputFormat, Record<string, string>> = {
-  markdown: { response_type: 'markdown' },
+const FORMAT_PARAMS: Record<OutputFormat, FetchParams> = {
+  markdown: { response_type: 'markdown' satisfies FetchValue<'response_type'> },
   html: {},
-  plaintext: { response_type: 'plaintext' },
-  screenshot: { js_render: 'true', screenshot_fullpage: 'true', screenshot_format: 'png' },
+  plaintext: { response_type: 'plaintext' satisfies FetchValue<'response_type'> },
+  screenshot: { js_render: 'true', screenshot_fullpage: 'true', screenshot_format: 'png' satisfies FetchValue<'screenshot_format'> },
 };
 
 export const scrapeUrlAction = createAction({
@@ -31,7 +31,7 @@ export const scrapeUrlAction = createAction({
   props: {
     url: Property.ShortText({
       displayName: 'URL',
-      description: 'The full address of the page to scrape, e.g. https://www.scrapingcourse.com/ecommerce/',
+      description: FETCH_PARAMS.properties.url.description,
       required: true,
     }),
     output_format: Property.StaticDropdown<OutputFormat>({
@@ -51,20 +51,18 @@ export const scrapeUrlAction = createAction({
     }),
     adaptive: Property.Checkbox({
       displayName: 'Adaptive Stealth Mode',
-      description:
-        'Recommended. ZenRows starts with the cheapest setup and adds JS rendering or premium proxies only when the page needs them; you pay only for what succeeds. Turn off for a basic request, or use the Custom API Call action to set each option yourself.',
+      description: FETCH_PARAMS.properties.mode.description,
       required: false,
       defaultValue: true,
     }),
     js_instructions: Property.LongText({
       displayName: 'JavaScript Instructions',
-      description:
-        'Actions to run on the page before it is returned, as a JSON array, e.g. [{"click": ".load-more"}, {"wait": 1000}]. See https://docs.zenrows.com for the full list.',
+      description: FETCH_PARAMS.properties.js_instructions.description,
       required: false,
     }),
     custom_headers: Property.Object({
       displayName: 'Custom Headers',
-      description: 'Headers to send to the target site, such as Cookie or Referer.',
+      description: FETCH_PARAMS.properties.custom_headers.description,
       required: false,
     }),
   },

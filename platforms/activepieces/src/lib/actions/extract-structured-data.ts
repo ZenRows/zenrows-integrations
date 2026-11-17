@@ -1,13 +1,13 @@
 import { createAction, Property } from '@activepieces/pieces-framework';
 import { zenrowsAuth } from '../auth';
-import { zenrowsClient } from '../common/client';
+import { EXTRACT_PARAMS, zenrowsClient } from '../common/client';
 
 export const extractStructuredDataAction = createAction({
   auth: zenrowsAuth,
   name: 'extract_structured_data',
   classification: 'READ',
   displayName: 'Extract Structured Data',
-  description: 'Get specific data from a web page as JSON, using CSS selectors or automatic extraction.',
+  description: {{api:extract description}},
   audience: 'both',
   aiMetadata: {
     description:
@@ -17,7 +17,7 @@ export const extractStructuredDataAction = createAction({
   props: {
     url: Property.ShortText({
       displayName: 'URL',
-      description: 'The full address of the page to extract data from.',
+      description: EXTRACT_PARAMS.properties.url.description,
       required: true,
     }),
     method: Property.StaticDropdown<'css' | 'auto'>({
@@ -36,20 +36,17 @@ export const extractStructuredDataAction = createAction({
     }),
     selectors: Property.Object({
       displayName: 'CSS Selectors',
-      description:
-        'For the CSS Selectors method. Each key is a name for the output field and each value is the CSS selector to read, e.g. title → h1, price → .price. Add @attribute to read an attribute, e.g. link → a.product @href.',
+      description: EXTRACT_PARAMS.properties.css_extractor.description,
       required: false,
     }),
     fields: Property.Array({
       displayName: 'Fields',
-      description:
-        'For the Automatic method. Optional list of fields to return, using dots for nested fields, e.g. products.name. Leave empty to get every field.',
+      description: EXTRACT_PARAMS.properties.extract_fields.description,
       required: false,
     }),
     adaptive: Property.Checkbox({
       displayName: 'Adaptive Stealth Mode',
-      description:
-        'Recommended. ZenRows adds JS rendering or premium proxies only when the page needs them.',
+      description: EXTRACT_PARAMS.properties.mode.description,
       required: false,
       defaultValue: true,
     }),

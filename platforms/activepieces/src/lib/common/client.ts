@@ -44,7 +44,7 @@ async function fetchPage({
   responseType,
 }: {
   apiKey: string;
-  params: Record<string, string>;
+  params: FetchParams;
   forwardedHeaders?: Record<string, string>;
   responseType: 'text' | 'json' | 'arraybuffer';
 }): Promise<HttpResponse> {
@@ -128,7 +128,18 @@ const ERROR_HINTS: Record<string, string> = {
   REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
 };
 
-export const ZENROWS_API_BASE_URL = 'https://api.zenrows.com/v1';
+export const ZENROWS_API_BASE_URL = {{api:GET / server}};
+
+// The parameters the actions send, as the published API spec defines them
+// (rendered from it): a name the API doesn't take fails the build, and the
+// actions take each one's description from here. Extract is the shared slice
+// of GET / (zenrows-integrations' shared/endpoints.yaml).
+export const FETCH_PARAMS = {{api:GET / query url,mode,js_render,js_instructions,response_type,screenshot_fullpage,screenshot_format,custom_headers}} as const;
+export const EXTRACT_PARAMS = {{api:extract query}} as const;
+type FetchParam = keyof typeof FETCH_PARAMS.properties | keyof typeof EXTRACT_PARAMS.properties;
+export type FetchParams = Partial<Record<FetchParam, string>>;
+// The values the spec allows for a parameter with an enum, for example response_type.
+export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;
 
 export const zenrowsClient = {
   request,
