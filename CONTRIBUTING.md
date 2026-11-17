@@ -55,6 +55,18 @@ A fact that more than one place states (what an error code means, what a request
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo.
 
+## Keeping hosts current with the API
+
+A code host that calls the API lists what it sends in `vars.yaml`, operation by operation:
+
+```yaml
+api:
+  GET /: [url, mode, js_instructions]
+  GET /subscriptions/self/details: []
+```
+
+`npm run validate` checks it against the published spec (`https://www.zenrows.com/openapi.json`, the last download kept in `.cache/openapi.json` for when the network is down; `ZENROWS_OPENAPI=<file>` uses a file instead): the operation exists, each parameter is one it takes, and each name appears in the host's rendered files, so the list can't go stale and a mistyped name in the code shows up as not sent. When the spec changes, the docs repo pings this one and `.github/workflows/api-changed.yml` runs the same check: on a failure it opens (or updates) the issue "API change: hosts to update" and posts to #proj-integrations; a clean run closes the issue.
+
 ## Tests
 
 `npm test` (CI runs it too) checks that render and validate catch the mistakes they're meant to: each case in `scripts/test.mjs` makes one change in a temporary copy of the repo (a throwaway code host, a snippet, …) and expects a given error, or a pass. When you add a rule, add a case that breaks it.
@@ -79,6 +91,10 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 ## Commits and releases
 
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
+
+To open a PR as `claude[bot]` instead of yourself, push the branch and run `gh workflow run open-pr-as-claude.yml --ref main -f branch=<branch> -f title="…" -F body=@pr-body.md`. It opens a draft assigned to you, which you can then approve, because you are not its author.
+
+A merged PR's title becomes an entry in its host's `CHANGELOG.md`, so for `feat`, `fix` and `perf` write what changes for someone using the plugin, not how the repo changed, for example `feat(crawl): the crawl skill runs one server-side Crawl job instead of a scrape loop, so include and exclude patterns work`. A PR with several such changes can list them, one title per line, between `BEGIN_COMMIT_OVERRIDE` and `END_COMMIT_OVERRIDE` at the end of its description; each line becomes its own entry. The same block fixes an entry after the merge: release-please reads it on the next push to main.
 
 Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release. The release PR also adds the version's entry to `dist/<host>/CHANGELOG.md`, from the `feat`, `fix`, `perf` and `revert` commits since the last release, so the changelog ships with the plugin and its mirror. The render keeps that file as it is. After each update, the release workflow adds a "What changes in dist/<host>" section to the release PR's description: the diff of `dist/<host>/` since the host's last release tag, one collapsed section per file, cut at 50 000 characters. For a host's first release from this repo, it compares with the host's old repo (its `mirror:`, or `ZenRows/<host>-zenrows`) at that version, which is what users have today.
 
