@@ -325,7 +325,11 @@ const snippetSources = [
     .map((f) => join(platformsDir, f)),
 ];
 const used = new Set();
-const snippetNames = (text) => [...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]);
+// {{< name}} or {{text:name}} in text, or sharedText("name") in a host's render script.
+const snippetNames = (text) => [
+  ...[...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]),
+  ...[...text.matchAll(/\bsharedText\(\s*["'`]([a-z0-9-]+)["'`]/g)].map((m) => m[1]),
+];
 for (const file of snippetSources) {
   if (!textFile.test(file)) continue;
   for (const name of snippetNames(readFileSync(file, "utf8"))) used.add(name);
