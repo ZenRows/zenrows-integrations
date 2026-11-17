@@ -50,36 +50,58 @@ jobs:
             package=$(jq -r --arg c "$host" '.packages | to_entries[] | select((.value.component // (.key | split("/") | last)) == $c) | .key' release-please-config.json)
             if [ -z "$package" ]; then echo "::warning::#$number: no package has the component $host"; continue; fi
             git fetch -q origin "$branch"
+            next="$(git rev-parse FETCH_HEAD):$package"
             # The manifest on main still has the version this PR replaces.
-            previous="$host-v$(jq -r --arg p "$package" '.[$p]' .release-please-manifest.json)"
+            version=$(jq -r --arg p "$package" '.[$p]' .release-please-manifest.json)
+            previous="$host-v$version"
+            if git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
+              last="$previous:$package"
+              against="$previous ([full diff on GitHub]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$branch))"
+            else
+              # The host's first release from here: compare with its old repo
+              # (the mirror, or ZenRows/<host>-zenrows) at that version, which is
+              # what users have today.
+              repo=$(sed -n 's/^mirror: *//p' "platforms/$host/vars.yaml" | tr -d "\"' ")
+              note=" (its marketplace catalog and README banner are added by the mirror, not part of $package)"
+              if [ -z "$repo" ]; then repo="ZenRows/$host-zenrows"; note=""; fi
+              last=""
+              if git fetch -q --no-tags "https://github.com/$repo" "refs/tags/v$version" 2>/dev/null; then
+                last="$(git rev-parse FETCH_HEAD):"
+                against="[$repo at v$version]($GITHUB_SERVER_URL/$repo/tree/v$version), what users have today$note"
+              fi
+            fi
             {
               echo "$marker"
               echo "## What changes in $package"
               echo
-              if git rev-parse -q --verify "refs/tags/$previous" >/dev/null; then
-                echo "Compared with $previous: [full diff on GitHub]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$previous...$branch)"
-                echo
-                echo '````'
-                git diff --stat "$previous" FETCH_HEAD -- "$package"
-                echo '````'
-                diff=$(git diff "$previous" FETCH_HEAD -- "$package")
-                echo
-                echo '<details><summary>Diff</summary>'
-                echo
-                echo '````diff'
-                if [ "${#diff}" -gt "$limit" ]; then
-                  echo "${diff:0:$limit}"
-                  echo "… cut at $limit characters; the full diff on GitHub has the rest"
-                else
+              if [ -n "$last" ]; then
+                echo "Compared with $against:$(git diff --no-renames --shortstat "$last" "$next")."
+                # One collapsed section per file. A fence longer than any run of
+                # backticks in the file's diff, so a code block inside can't end it.
+                size=0
+                git diff --no-renames --numstat "$last" "$next" |
+                while IFS=$'\t' read -r added removed file; do
+                  diff=$(git diff --no-renames "$last" "$next" -- "$file")
+                  size=$((size + ${#diff}))
+                  if [ "$size" -gt "$limit" ]; then
+                    echo "- \`$file\` (+$added −$removed): too long to show here"
+                    continue
+                  fi
+                  fence='```'
+                  while [[ $diff == *"$fence"* ]]; do fence+='`'; done
+                  echo
+                  echo "<details><summary><code>$file</code> (+$added −$removed)</summary>"
+                  echo
+                  echo "${fence}diff"
                   echo "$diff"
-                fi
-                echo '````'
-                echo '</details>'
+                  echo "$fence"
+                  echo '</details>'
+                done
               else
-                echo "There's no $previous tag here: this is the first release of $package from this repo. Its files:"
+                echo "There's no $previous tag here and no v$version in $repo, so there's nothing to compare with. Its files:"
                 echo
                 echo '````'
-                git ls-tree -r --name-only FETCH_HEAD -- "$package"
+                git ls-tree -r --name-only "${next%%:*}" -- "$package"
                 echo '````'
               fi
             } >section.md
@@ -88,7 +110,7 @@ jobs:
             body=$(printf '%s' "${body%%"$marker"*}")
             printf '%s\n\n%s\n' "$body" "$(cat section.md)" |
               gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --body-file -
-            echo "#$number: updated the $package section (against $previous)"
+            echo "#$number: updated the $package section"
           done
 
   detect:
