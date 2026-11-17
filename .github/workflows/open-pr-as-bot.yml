@@ -1,0 +1,91 @@
+name: Open PR as bot
+
+# Opens a pushed branch as a pull request authored by the PR bot app and
+# assigned to whoever ran it, who can then approve it (GitHub doesn't let you
+# approve your own pull request). This repo is public, so it can't call
+# cicd-templates' open-pr-as-claude, which lives in a private repo; this uses
+# public actions only, like conveyor's SDK sync. A pull request the app opens
+# runs CI like any other.
+#
+# Push the branch, write the description, then run it from main:
+#
+#   gh workflow run open-pr-as-bot.yml --ref main \
+#      -f branch=ci/my-change -f title="ci(release): ..." -F body=@pr-body.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to open the pull request from (already pushed)"
+        required: true
+        type: string
+      base:
+        description: "Branch to merge into"
+        required: false
+        type: string
+        default: main
+      title:
+        description: "Pull request title (a Conventional Commit, as commit-hygiene checks)"
+        required: true
+        type: string
+      body:
+        description: "Pull request description, posted as given"
+        required: true
+        type: string
+      draft:
+        description: "Open as a draft"
+        required: false
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  open-pr:
+    name: Open the pull request
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Token for the PR bot
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-issues: write # assigning the pull request goes through the issues API
+
+      # Inputs reach the shell only through environment variables.
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_HEAD: ${{ inputs.branch }}
+          PR_BASE: ${{ inputs.base }}
+          PR_TITLE: ${{ inputs.title }}
+          PR_BODY: ${{ inputs.body }}
+          PR_DRAFT: ${{ inputs.draft }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PR_BODY//[[:space:]]/}" ]; then
+            echo "::error::The description is empty. Pass it with -F body=@pr-body.md."
+            exit 1
+          fi
+          if ! gh api "repos/$GH_REPO/branches/$PR_HEAD" --silent 2>/dev/null; then
+            echo "::error::The branch $PR_HEAD isn't on GitHub. Push it first."
+            exit 1
+          fi
+          open=$(gh pr list --head "$PR_HEAD" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$open" ]; then
+            echo "::error::$PR_HEAD already has an open pull request: $open"
+            exit 1
+          fi
+          printf '%s\n' "$PR_BODY" >"$RUNNER_TEMP/body.md"
+          draft=()
+          if [ "$PR_DRAFT" = true ]; then draft=(--draft); fi
+          url=$(gh pr create --head "$PR_HEAD" --base "$PR_BASE" --title "$PR_TITLE" \
+            --body-file "$RUNNER_TEMP/body.md" --assignee "$ACTOR" "${draft[@]}")
+          echo "Opened $url"
+          echo "Opened $url, assigned to @$ACTOR." >>"$GITHUB_STEP_SUMMARY"

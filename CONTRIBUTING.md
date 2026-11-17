@@ -92,7 +92,7 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
 
-To open a PR as `claude[bot]` instead of yourself, push the branch and run `gh workflow run open-pr-as-claude.yml --ref main -f branch=<branch> -f title="…" -F body=@pr-body.md`. It opens a draft assigned to you, which you can then approve, because you are not its author.
+To open a PR as the PR bot instead of yourself, push the branch and run `gh workflow run open-pr-as-bot.yml --ref main -f branch=<branch> -f title="…" -F body=@pr-body.md`. It opens a draft assigned to you, which you can then approve, because you are not its author. It needs the PR bot app installed here and its `PR_BOT_APP_ID` and `PR_BOT_APP_PRIVATE_KEY` secrets.
 
 A merged PR's title becomes an entry in its host's `CHANGELOG.md`, so for `feat`, `fix` and `perf` write what changes for someone using the plugin, not how the repo changed, for example `feat(crawl): the crawl skill runs one server-side Crawl job instead of a scrape loop, so include and exclude patterns work`. A PR with several such changes can list them, one title per line, between `BEGIN_COMMIT_OVERRIDE` and `END_COMMIT_OVERRIDE` at the end of its description; each line becomes its own entry. The same block fixes an entry after the merge: release-please reads it on the next push to main.
 
