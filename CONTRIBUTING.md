@@ -45,7 +45,7 @@ Requires Node 22. Run `npm ci` once.
 - **A shared skill a host shouldn't ship:** list it under `skip_skills:` in that host's `vars.yaml` (Cursor uses a rules file instead of `using-zenrows`). A `{{skill:…}}` reference to a skipped skill fails the render.
 - **A reference to another skill:** write `{{skill:batch}}`, never the plain name. It renders as that skill's name on the host: `skill_prefix` plus the shared name, unless `skill_names` in `vars.yaml` renames it (OpenClaw ships `scrape-webpage` as `zenrows-scrape`). The skill's own `name:` in its frontmatter uses it too.
 
-Unknown variables, unknown skill names, missing slots, unused slot files, unknown snippets and any of these tokens left in a rendered file (a typo, or a file type the render doesn't fill) fail the render. Other `{{…}}`, such as an n8n or Make expression or JSX's `style={{…}}`, isn't one of these tokens and ships as written, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
+Unknown variables, unknown skill names, missing slots, unused slot files, unknown snippets and any of these placeholders left in a rendered file (a typo, or a file type the render doesn't fill) fail the render. Other `{{…}}`, such as an n8n or Make expression or JSX's `style={{…}}`, isn't one of these placeholders and ships as written, and `npm run validate` fails on a reference to a skill the host doesn't ship, and on a skill name written plainly instead of as `{{skill:…}}`.
 
 ## Shared text
 
