@@ -1,0 +1,19 @@
+# A code host: the Zenrows connector for Monid, rendered into dist/monid/
+# exactly as it sits in monid's connectors/zenrows.
+kind: code
+host: "Monid"
+host_full: "Monid"
+# The monid commit the connector is built and tested against (scripts/check.sh).
+# Moving it is its own PR, so CI shows whether their newer code breaks the
+# connector rather than it breaking silently on someone else's machine.
+upstream: "e9d4e79b7f82ae1d880fc49eea6c86c43e01da83"
+# The Deno the connector is checked with. check.sh uses this one from PATH when
+# it is there, and runs the pinned image otherwise.
+deno: "2.5.3"
+# The API operations and parameters this host sends, checked against the
+# published spec by npm run validate and by the api-changed workflow.
+api:
+  "GET /": [url, mode, js_render, js_instructions, custom_headers, premium_proxy,
+            proxy_country, session_id, original_status, allowed_status_codes,
+            wait_for, wait, block_resources, response_type, css_extractor,
+            outputs, extract, extract_fields]
