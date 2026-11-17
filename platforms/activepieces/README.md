@@ -2,6 +2,10 @@
 
 The Zenrows [piece](https://www.activepieces.com/docs/build-pieces/building-pieces/overview) for Activepieces: Scrape URL, Extract structured data, Get account usage, and a custom API call.
 
+## Actions
+
+Scrape URL, Extract Structured Data and Get Account Usage are written by hand, in `src/lib/actions/`. Every other endpoint we offer (`shared/billing.yaml`) gets a generated action: `scripts/render.mjs` writes each into its own `src/lib/actions/<name>.ts` from the published API spec, and `src/lib/actions/generated.ts` lists them for `index.ts`. Each has the operation's summary in Title Case as the name, its description, and one field per parameter or body field (text, number, checkbox, dropdown for an enum, JSON for an object or list). They send the key in `X-API-Key` (as `apikey` where an endpoint takes only that) and go through the same client as the hand-written ones, so errors read the same. A new endpoint in `shared/billing.yaml` becomes a new action at the next render. A custom API call covers the rest.
+
 This is a code host (`kind: code` in `vars.yaml`). `npm run render` writes `dist/activepieces/`, which is the piece exactly as it sits in the activepieces repo (`packages/pieces/community/zenrows`): package `@activepieces/piece-zenrows`, on their workspace packages. This README stays here and isn't part of the piece.
 
 ## Shared wording

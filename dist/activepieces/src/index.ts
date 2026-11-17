@@ -1,6 +1,7 @@
 import { createCustomApiCallAction } from '@activepieces/pieces-common';
 import { createPiece, PieceCategory } from '@activepieces/pieces-framework';
 import { extractStructuredDataAction } from './lib/actions/extract-structured-data';
+import { generatedActions } from './lib/actions/generated';
 import { getAccountUsageAction } from './lib/actions/get-account-usage';
 import { scrapeUrlAction } from './lib/actions/scrape-url';
 import { zenrowsAuth } from './lib/auth';
@@ -20,6 +21,7 @@ export const zenrows = createPiece({
     scrapeUrlAction,
     extractStructuredDataAction,
     getAccountUsageAction,
+    ...generatedActions,
     createCustomApiCallAction({
       baseUrl: () => ZENROWS_API_BASE_URL,
       auth: zenrowsAuth,

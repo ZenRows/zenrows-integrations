@@ -35,6 +35,56 @@ async function request<TResponse extends HttpMessageBody>({
   }
 }
 
+// One API operation as the generated actions describe it (generated.ts): the
+// values go into the path, the query or the JSON body by name; empty ones are left out.
+type Operation = {
+  method: string;
+  server: string;
+  path: string;
+  key: 'header' | 'query';
+  query?: string[];
+  body?: string[];
+};
+
+async function callOperation({
+  apiKey,
+  operation,
+  values,
+}: {
+  apiKey: string;
+  operation: Operation;
+  values: Record<string, unknown>;
+}): Promise<unknown> {
+  const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
+  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
+  const queryParams: Record<string, string> = {};
+  for (const name of (operation.query ?? []).filter(given)) {
+    queryParams[name] = String(values[name]);
+  }
+  if (operation.key === 'query') {
+    queryParams['apikey'] = apiKey;
+  }
+  const body = operation.body
+    ? Object.fromEntries(operation.body.filter(given).map((name) => [name, values[name]]))
+    : undefined;
+  try {
+    const response = await httpClient.sendRequest({
+      method: operation.method as HttpMethod,
+      url: `${operation.server}${path}`,
+      queryParams,
+      headers: {
+        ...(operation.key === 'header' ? { 'X-API-Key': apiKey } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...CLIENT_HEADERS,
+      },
+      body,
+    });
+    return response.body;
+  } catch (error) {
+    throw toZenrowsError({ error });
+  }
+}
+
 // responseType: 'text' keeps a page as it is (a JSON page would otherwise come
 // back parsed), 'json' is for Extract's output, 'arraybuffer' for a screenshot.
 async function fetchPage({
@@ -143,6 +193,7 @@ export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof
 
 export const zenrowsClient = {
   request,
+  callOperation,
   fetchPage,
   readHeader,
 };
