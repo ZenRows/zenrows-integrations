@@ -1,6 +1,6 @@
-# Endpoints that are a slice of one API operation, defined once for every host.
-# The spec has GET / for both Fetch and Extract; each takes some of its query
-# parameters. {{api:extract query}}, {{api:extract summary}} and the others use
+# Endpoints defined once for every host, on top of the spec: a slice of one API
+# operation (the spec has GET / for both Fetch and Extract; each takes some of its
+# query parameters), or an operation with text the spec doesn't have yet. {{api:extract query}}, {{api:extract summary}} and the others use
 # these like an operation; name and description fall back to the spec's.
 fetch:
   operation: GET /
@@ -15,3 +15,9 @@ extract:
     request it runs: {{< extract-no-credits}}. A domain that is not prepared yet answers 403
     REQS007: prepare it with POST /v1/extract/prepared-domains, then retry.
   parameters: [url, extract, extract_fields, css_extractor, mode, js_render, premium_proxy, proxy_country]
+# The spec has no description for GET /jobs/{job_id} yet.
+get_batch_job:
+  operation: GET /jobs/{job_id}
+  description: >-
+    The job and its latest run. Progress is in latest_run.stats and spend in
+    latest_run.stats.spend. Poll with backoff until latest_run.status is terminal.

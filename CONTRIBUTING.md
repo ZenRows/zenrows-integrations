@@ -10,7 +10,7 @@ shared/README.md             every plugin's README; {{> setup}} and {{>? more}} 
 shared/assets/               files every plugin host ships as they are (logo)
 shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
 shared/vars.yaml             values every host gets as {{name}} (contact_email); a host's vars.yaml can override one
-shared/endpoints.yaml        endpoints that are a slice of one API operation (fetch, extract), for {{api:…}}
+shared/endpoints.yaml        endpoints on top of the spec: a slice of one operation (fetch, extract), or text it lacks
 shared/billing.yaml          how each endpoint is billed: per_credit, after_run or free
 platforms/<host>/
   vars.yaml                  values for {{var}}
