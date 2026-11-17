@@ -14,8 +14,9 @@ platforms/<host>/
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
   readme/setup.md            the host's Setup section of its README (readme/more.md: optional extra sections)
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
-  scripts/                   the host's own tooling, never shipped; validate.mjs and package.sh are run by
-                             npm run validate and npm run package -- <host>, the rest by the host itself
+  scripts/                   the host's own tooling, never shipped; render.mjs, validate.mjs and package.sh are
+                             run by npm run render, npm run validate and npm run package -- <host>, the rest by the host itself
+  data/                      what the host's scripts/render.mjs reads, never shipped
   everything else            the host's manifests, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files (CHANGELOG.md comes from release-please)
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
@@ -54,6 +55,8 @@ A fact that more than one place states (what an error code means, what a request
 ## Code hosts
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo.
+
+A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, dataDir, spec, specSha256, apiValue, sharedText }` (`apiValue` is what the `{{api:…}}` placeholders render) and returns `{ "<path in dist/<host>>": text }`. Its inputs go in `data/`. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
 
 ## Keeping hosts current with the API
 

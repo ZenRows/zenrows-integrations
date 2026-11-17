@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
@@ -16,9 +16,10 @@ export const sharedTextDir = join(root, "shared", "text");
 const sharedFiles = { LICENSE: "LICENSE" };
 const sharedDirs = { "shared/assets": "assets" };
 // In platforms/<host>/, these are inputs to the render or the host's own tooling
-// (scripts/validate.mjs, scripts/package.sh), not files of the plugin.
+// (scripts/validate.mjs, scripts/render.mjs, scripts/package.sh, and data/ for
+// what a render script reads), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
-const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/"];
+const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/", "data/"];
 // A plugin host's README.md is rendered from this template, with the host's
 // slots from platforms/<host>/readme/.
 const readmeTemplate = join(root, "shared", "README.md");
@@ -105,16 +106,21 @@ async function openapiText() {
   }
 }
 
-// The spec the {{api:…}} tokens read. The render is synchronous, so render and
-// validate call loadApiSpec() first; it downloads the spec only when a file the
-// render reads uses one of the tokens.
+// What the render needs before it starts: the API spec, when a file uses an
+// {{api:…}} placeholder or a host has its own scripts/render.mjs, and each such
+// script. The render itself is synchronous, so render and validate call this first.
 let loadedSpec;
-export async function loadApiSpec() {
+const hostRenderers = {};
+export async function prepareRender() {
+  for (const host of hosts()) {
+    const script = join(platformsDir, host, "scripts", "render.mjs");
+    if (existsSync(script)) hostRenderers[host] = (await import(pathToFileURL(script).href)).default;
+  }
   const dirs = [platformsDir, skillsDir, join(root, "shared")];
   const uses = dirs.some((dir) =>
     listFiles(dir).some((f) => textFile.test(f) && readFileSync(join(dir, f), "utf8").includes("{{api")),
   );
-  if (!uses) return;
+  if (!uses && !Object.keys(hostRenderers).length) return;
   const text = await openapiText();
   loadedSpec = { spec: JSON.parse(text), sha256: sha256(text) };
 }
@@ -295,7 +301,7 @@ function fill(text, values, where) {
 
 // Renders one host. Returns Map<path under dist/<host>, Buffer>.
 function apiSpecFor(where) {
-  if (!loadedSpec) throw new Error(`${where}: uses {{api…}}, but the API spec wasn't loaded (call loadApiSpec() before rendering)`);
+  if (!loadedSpec) throw new Error(`${where}: uses {{api…}}, but the API spec wasn't loaded (call prepareRender() before rendering)`);
   return loadedSpec;
 }
 
@@ -361,6 +367,26 @@ export function renderHost(host) {
     // A code host's README documents the integration here; it isn't part of the code.
     if (isCodeHost(values) && file === "README.md") continue;
     out.set(file, renderFile(join(platform, file), values));
+  }
+
+  // A host's own scripts/render.mjs builds files from the spec and its data/
+  // (for example a listing generated whole). It gets what the placeholders use
+  // and returns { "<path in dist/<host>>": string or Buffer }.
+  if (hostRenderers[host]) {
+    const where = `platforms/${host}/scripts/render.mjs`;
+    const files = hostRenderers[host]({
+      host,
+      values,
+      dataDir: join(platform, "data"),
+      spec: loadedSpec.spec,
+      specSha256: loadedSpec.sha256,
+      apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
+      sharedText: (name) => sharedText(name, where),
+    });
+    for (const [path, content] of Object.entries(files ?? {})) {
+      if (out.has(path)) throw new Error(`${where} returns ${path}, which platforms/${host}/ already has`);
+      out.set(path, Buffer.isBuffer(content) ? content : Buffer.from(content));
+    }
   }
 
   // A token the render didn't fill (a mistyped one, or in a file type outside

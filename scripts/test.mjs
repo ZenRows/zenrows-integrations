@@ -191,6 +191,29 @@ test("{{api:… summary}} and {{api:… description}} render the operation's tex
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
 
+// A host's scripts/render.mjs builds files from the spec and its data/, which isn't shipped.
+const renders = (script, extra = {}) => ({
+  ...piece,
+  "openapi-tokens.json": tokenSpecText,
+  "platforms/piece/data/name.txt": "Piece listing\n",
+  "platforms/piece/scripts/render.mjs": script,
+  ...extra,
+});
+const generator = `import { readFileSync } from "node:fs";
+import { join } from "node:path";
+export default ({ dataDir, apiValue, specSha256 }) => ({
+  "listing.json": JSON.stringify({ name: readFileSync(join(dataDir, "name.txt"), "utf8").trim(), required: apiValue("GET /", "query").required, sha: specSha256.length }) + "\\n",
+});
+`;
+test("a host's render script's files ship, and its data/ doesn't", () => {
+  const r = run(renders(generator), tokenSpec, ["dist/piece/listing.json", "dist/piece/data/name.txt"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/listing.json"), '{"name":"Piece listing","required":["url"],"sha":64}\n');
+  assert.equal(r.dist("dist/piece/data/name.txt"), undefined);
+});
+test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
+test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));
+
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {
   // JSX, with a string, a number and a variable value, spaced or not.
