@@ -178,7 +178,7 @@ test("a host's own scripts/validate.mjs failing fails validate", fails({ "platfo
 
 // dist/<host>/CHANGELOG.md is release-please's: the render keeps it.
 test("the render keeps a host's CHANGELOG.md", () => {
-  const r = run({ "dist/copilot/CHANGELOG.md": "# Changelog\n\n## 0.2.0\n" }, ["dist/copilot/CHANGELOG.md"]);
+  const r = run({ "dist/copilot/CHANGELOG.md": "# Changelog\n\n## 0.2.0\n" }, {}, ["dist/copilot/CHANGELOG.md"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/copilot/CHANGELOG.md"), "# Changelog\n\n## 0.2.0\n");
 });
