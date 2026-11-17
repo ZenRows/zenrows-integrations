@@ -1,39 +1,10 @@
 import {
   HttpError,
   HttpHeaders,
-  HttpMessageBody,
   HttpMethod,
   HttpResponse,
   httpClient,
 } from '@activepieces/pieces-common';
-
-async function request<TResponse extends HttpMessageBody>({
-  apiKey,
-  method,
-  path,
-  body,
-}: {
-  apiKey: string;
-  method: HttpMethod;
-  path: string;
-  body?: unknown;
-}): Promise<TResponse> {
-  try {
-    const response = await httpClient.sendRequest<TResponse>({
-      method,
-      url: `${ZENROWS_API_BASE_URL}${path}`,
-      headers: {
-        'X-API-Key': apiKey,
-        'Content-Type': 'application/json',
-        ...CLIENT_HEADERS,
-      },
-      body,
-    });
-    return response.body;
-  } catch (error) {
-    throw toZenrowsError({ error });
-  }
-}
 
 // One API operation as the generated actions describe it (generated.ts): the
 // values go into the path, the query or the JSON body by name; empty ones are left out.
@@ -78,6 +49,7 @@ async function callOperation({
         ...CLIENT_HEADERS,
       },
       body,
+      timeout: FETCH_TIMEOUT_MS,
     });
     return response.body;
   } catch (error) {
@@ -86,7 +58,7 @@ async function callOperation({
 }
 
 // responseType: 'text' keeps a page as it is (a JSON page would otherwise come
-// back parsed), 'json' is for Extract's output, 'arraybuffer' for a screenshot.
+// back parsed), 'arraybuffer' is for a screenshot.
 async function fetchPage({
   apiKey,
   params,
@@ -96,7 +68,7 @@ async function fetchPage({
   apiKey: string;
   params: FetchParams;
   forwardedHeaders?: Record<string, string>;
-  responseType: 'text' | 'json' | 'arraybuffer';
+  responseType: 'text' | 'arraybuffer';
 }): Promise<HttpResponse> {
   try {
     return await httpClient.sendRequest({
@@ -182,17 +154,13 @@ export const ZENROWS_API_BASE_URL = {{api:GET / server}};
 
 // The parameters the actions send, as the published API spec defines them
 // (rendered from it): a name the API doesn't take fails the build, and the
-// actions take each one's description from here. Extract is the shared slice
-// of GET / (zenrows-integrations' shared/endpoints.yaml).
+// actions take each one's description from here.
 export const FETCH_PARAMS = {{api:GET / query url,mode,js_render,js_instructions,response_type,screenshot_fullpage,screenshot_format,custom_headers}} as const;
-export const EXTRACT_PARAMS = {{api:extract query}} as const;
-type FetchParam = keyof typeof FETCH_PARAMS.properties | keyof typeof EXTRACT_PARAMS.properties;
-export type FetchParams = Partial<Record<FetchParam, string>>;
+export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, string>>;
 // The values the spec allows for a parameter with an enum, for example response_type.
 export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;
 
 export const zenrowsClient = {
-  request,
   callOperation,
   fetchPage,
   readHeader,

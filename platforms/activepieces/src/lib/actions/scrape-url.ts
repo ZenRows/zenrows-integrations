@@ -25,7 +25,7 @@ export const scrapeUrlAction = createAction({
   outputSchema: scrapeOutputSchema(),
   aiMetadata: {
     description:
-      'Fetches one web page through ZenRows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends ZenRows credits.',
+      'Fetches one web page through ZenRows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data From A Page when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends ZenRows credits.',
     idempotent: true,
   },
   props: {

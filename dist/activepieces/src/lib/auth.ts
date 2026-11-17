@@ -1,6 +1,5 @@
-import { HttpMethod } from '@activepieces/pieces-common';
 import { PieceAuth } from '@activepieces/pieces-framework';
-import { zenrowsClient } from './common/client';
+import { ZENROWS_API_BASE_URL, zenrowsClient } from './common/client';
 
 export const zenrowsAuth = PieceAuth.SecretText({
   displayName: 'API Key',
@@ -14,10 +13,10 @@ export const zenrowsAuth = PieceAuth.SecretText({
   `,
   validate: async ({ auth }) => {
     try {
-      await zenrowsClient.request({
+      await zenrowsClient.callOperation({
         apiKey: auth,
-        method: HttpMethod.GET,
-        path: '/subscriptions/self/details',
+        operation: { method: 'GET', server: ZENROWS_API_BASE_URL, path: '/subscriptions/self/details', key: 'header' },
+        values: {},
       });
       return { valid: true };
     } catch (e) {

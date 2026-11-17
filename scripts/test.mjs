@@ -341,7 +341,8 @@ test("Activepieces gets an action per offered endpoint, and none for the rest", 
   assert.ok(create.includes('urls: Property.Json({ displayName: "URLs", required: false }),'), create);
   assert.ok(create.includes('operation: {"method":"POST","server":"https://jobs.example.com/v1","path":"/stub-jobs","key":"query","body":["urls"]}'), create);
   assert.equal(r.dist(actionFile("fetch-page")), undefined, "GET /stub isn't offered, so it has no action");
-  assert.ok(!r.dist(actionFile("fetch")) && !r.dist(actionFile("extract")) && !list.includes("fetchAction"), "Fetch and Extract are hand-written");
+  assert.ok(!r.dist(actionFile("fetch")) && !list.includes("fetchAction"), "Fetch is hand-written (Scrape URL)");
+  assert.ok(r.dist(actionFile("extract")).includes('name: "extract",'), "Extract, the shared slice of GET /, is generated");
 });
 test("Activepieces maps each parameter type to its prop, and sends the key in X-API-Key where it can", () => {
   const r = actions({ free: ["GET /stub-types"] });
