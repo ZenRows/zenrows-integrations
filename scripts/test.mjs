@@ -166,7 +166,7 @@ const tokenSpecText = JSON.stringify({
         { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
         { $ref: "#/components/parameters/stubMode" },
       ],
-      get: { operationId: "fetchPage", summary: "Fetch a page" },
+      get: { operationId: "fetchPage", summary: "Fetch a page", description: "Fetches a stub page." },
     },
     "/stub/{job_id}": {
       servers: [{ url: "https://async.example.com/v1" }],
@@ -274,9 +274,9 @@ test("a host's render script returning a file the host already has fails", fails
 const offered = (kinds, extra = {}, covered = []) =>
   renders('export default ({ apiEndpoints }) => ({ "offered.json": JSON.stringify(apiEndpoints().filter((e) => e.path.startsWith("/stub")).map((e) => [e.id, e.billing])) });\n', { "shared/billing.yaml": billingWith(kinds, covered), ...extra });
 test("apiEndpoints lists the offered endpoints with their billing kind", () => {
-  const r = run(offered({ per_credit: ["GET /stub"], free: ["GET /stub/{job_id}"] }), tokenSpec, ["dist/piece/offered.json"]);
+  const r = run(offered({ per_credit: ["GET /stub"], free: ["POST /stub-jobs"] }), tokenSpec, ["dist/piece/offered.json"]);
   assert.ok(r.ok, r.out);
-  assert.equal(r.dist("dist/piece/offered.json"), '[["fetch_page","per_credit"],["get_job","free"]]');
+  assert.equal(r.dist("dist/piece/offered.json"), '[["fetch_page","per_credit"],["create_job","free"]]');
 });
 test("apiEndpoints lists a shared endpoint instead of the operation it splits", () => {
   const endpoints = readFileSync(join(root, "shared/endpoints.yaml"), "utf8") + "a:\n  operation: GET /stub\n  parameters: [url]\nb:\n  operation: GET /stub\n  parameters: [mode]\n";
