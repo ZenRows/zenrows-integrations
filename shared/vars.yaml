@@ -2,3 +2,5 @@
 # one of these itself to override it).
 # Where users and partners reach us, in manifests, READMEs and listings.
 contact_email: "integrations@zenrows.com"
+# The logo marketplaces and code hosts show; this repo is public, so the raw file works.
+logo_url: "https://raw.githubusercontent.com/ZenRows/zenrows-integrations/main/shared/assets/logo.png"
