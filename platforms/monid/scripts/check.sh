@@ -12,6 +12,11 @@
 #   FMT=1                       also run `deno fmt --check` and `deno lint` on
 #                               the connector. Their CI runs neither, but their
 #                               review config says deno fmt governs formatting.
+#   LIVE=1                      run the live tests too, against the real API.
+#                               Needs ZENROWS_API_KEY in the environment; it is
+#                               forwarded by name, so the value never reaches a
+#                               command line. Without it the live tests are
+#                               `ignored` and nothing calls the vendor.
 #
 # dist/monid/connectors/zenrows is copied to <dir>/connectors/zenrows, so a
 # checkout you pass in gets this repo's version of the connector. Run
@@ -80,13 +85,23 @@ run() {
     (cd "$monid" && sh -c "$1")
   else
     docker run --rm -v "$monid:/work" -w /work -v monid-deno:/deno-dir \
-      -e DENO_DIR=/deno-dir "denoland/deno:$deno_version" sh -c "$1"
+      -e DENO_DIR=/deno-dir ${ZENROWS_API_KEY:+-e ZENROWS_API_KEY} \
+      "denoland/deno:$deno_version" sh -c "$1"
   fi
 }
 
 scope="${SCOPE:-}"
 run "deno task check"
-run "deno task test ${scope}"
+if [ -n "${LIVE:-}" ]; then
+  # test:live is their task that adds --allow-net. The gate inside each live
+  # test still skips unless the credential resolves, so a wrong variable name
+  # shows up as "ignored" rather than as a pass.
+  [ -n "${ZENROWS_API_KEY:-}" ] || {
+    echo "LIVE=1 needs ZENROWS_API_KEY in the environment" >&2; exit 1; }
+  run "deno task test:live ${scope}"
+else
+  run "deno task test ${scope}"
+fi
 if [ -n "${FMT:-}" ]; then
   run "deno fmt --check connectors/zenrows/ && deno lint connectors/zenrows/"
 fi
