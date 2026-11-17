@@ -3,9 +3,9 @@ name: API changed
 # Runs when the docs repo publishes a new API spec (it sends a repository_dispatch
 # with the file's sha256), or by hand. Waits for www.zenrows.com/openapi.json to
 # carry that spec, then runs npm run validate, which checks every host's api:
-# and {{api:…}} tokens against it. A failure opens (or updates) the issue "API
+# and {{api:…}} placeholders against it. A failure opens (or updates) the issue "API
 # change: hosts to update" and posts to #proj-integrations; a clean run closes
-# the issue, and if the new spec changes what the {{api:…}} tokens render, opens
+# the issue, and if the new spec changes what the {{api:…}} placeholders render, opens
 # a pull request with the re-rendered files.
 
 on:
@@ -123,7 +123,7 @@ jobs:
           fi
           exit 1
 
-      # The hosts are valid, but {{api:…}} tokens may render differently now (a
+      # The hosts are valid, but {{api:…}} placeholders may render differently now (a
       # new enum value, a reworded description). One pull request per spec, so
       # it's never force-pushed; an older one still open is closed.
       - name: Open a pull request with the re-rendered files
@@ -149,7 +149,7 @@ jobs:
           git commit -qam "chore(render): follow the API spec ($sha)"
           git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
           url=$(gh pr create --head "$branch" --title "chore(render): follow the API spec ($sha)" \
-            --body "The published API spec changed what the {{api:…}} tokens render. This is \`npm run render\` against it. Check the diff, then merge; CI doesn't start on its own for a pull request opened by GitHub Actions, so re-run it from here first.")
+            --body "The published API spec changed what the {{api:…}} placeholders render. This is \`npm run render\` against it. Check the diff, then merge; CI doesn't start on its own for a pull request opened by GitHub Actions, so re-run it from here first.")
           for old in $(gh pr list --state open --json number,headRefName --jq ".[] | select((.headRefName | startswith(\"chore/follow-api-spec-\")) and .headRefName != \"$branch\") | .number"); do
             gh pr close "$old" --delete-branch --comment "Replaced by $url."
           done
