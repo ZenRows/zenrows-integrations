@@ -16,7 +16,6 @@ platforms/<host>/
   overrides.lock             whole-file overrides and the shared version each was copied from (only once one exists)
   scripts/                   the host's own tooling, never shipped; render.mjs, validate.mjs and package.sh are
                              run by npm run render, npm run validate and npm run package -- <host>, the rest by the host itself
-  data/                      what the host's scripts/render.mjs reads, never shipped
   everything else            the host's manifests, …, copied into dist/<host>/ ({{version}} comes from release-please)
 dist/<host>/                 GENERATED: the plugin the host installs, or a code host's files (CHANGELOG.md comes from release-please)
 .github/plugin/marketplace.json  Copilot's marketplace catalog (see below)
@@ -56,7 +55,7 @@ A fact that more than one place states (what an error code means, what a request
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo.
 
-A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, dataDir, spec, specSha256, apiValue, sharedText }` (`apiValue` is what the `{{api:…}}` placeholders render) and returns `{ "<path in dist/<host>>": text }`. Its inputs go in `data/`. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
+A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, spec, specSha256, apiValue, sharedText }` (`values` is the host's `vars.yaml`, and `apiValue` is what the `{{api:…}}` placeholders render) and returns `{ "<path in dist/<host>>": text }`. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
 
 ## Keeping hosts current with the API
 
@@ -70,7 +69,6 @@ A code host takes what it sends to the API from the published spec (`{{openapi_u
 | `{{api:POST /jobs summary}}`, `{{api:POST /jobs description}}` | the operation's summary or description, as a JSON string |
 | `{{api:POST /jobs server}}` | its base URL: the operation's `servers`, else the path's, else the spec's |
 | `{{api:POST /crawls example}}` | its example request, `{ queryParams, pathParams, body }`, from the spec's parameter and body examples |
-| `{{api:POST /crawls responses}}` | its response examples, `[{ status, contentType, description, body }]` |
 | `{{api-sha256}}` | the sha256 of the spec |
 
 JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have, and on a summary, description or server it doesn't give.

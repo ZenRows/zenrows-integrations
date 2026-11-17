@@ -164,11 +164,6 @@ const tokenSpecText = JSON.stringify({
         description: "Sends every URL at once.",
         servers: [{ url: "https://jobs.example.com/v1" }],
         requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" }, examples: { two: { value: { urls: ["https://a.example/"] } } } } } },
-        responses: {
-          201: { description: "Created", content: { "application/json": { example: { job_id: "J1" } } } },
-          401: { description: "No key", content: { "application/problem+json": { example: { code: "AUTH001" } } } },
-          default: { description: "Other", content: { "application/json": { example: {} } } },
-        },
       },
     },
   },
@@ -196,28 +191,23 @@ test("{{api:… summary}} and {{api:… description}} render the operation's tex
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
 test("{{api:… example}} builds the example request from the spec's parameter and body examples", rendersTo("[{{api:GET / example}}, {{api:GET /jobs/{job_id} example}}, {{api:POST /jobs example}}]", '[{"queryParams":{"url":"https://example.com/"}}, {"pathParams":{"job_id":"J1"}}, {"body":{"urls":["https://a.example/"]}}]'));
-test("{{api:… responses}} lists the spec's response examples in order, without default", rendersTo("{{api:POST /jobs responses}}", '[{"status":201,"contentType":"application/json","description":"Created","body":{"job_id":"J1"}},{"status":401,"contentType":"application/problem+json","description":"No key","body":{"code":"AUTH001"}}]'));
-test("{{api:… responses}} is empty where the spec has no response examples", rendersTo("{{api:GET /jobs/{job_id} responses}}", "[]"));
 
-// A host's scripts/render.mjs builds files from the spec and its data/, which isn't shipped.
+// A host's scripts/render.mjs builds files from the spec and its vars.yaml.
 const renders = (script, extra = {}) => ({
   ...piece,
   "openapi-tokens.json": tokenSpecText,
-  "platforms/piece/data/name.txt": "Piece listing\n",
+  "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nlisting_name: Piece listing\n",
   "platforms/piece/scripts/render.mjs": script,
   ...extra,
 });
-const generator = `import { readFileSync } from "node:fs";
-import { join } from "node:path";
-export default ({ dataDir, apiValue, specSha256 }) => ({
-  "listing.json": JSON.stringify({ name: readFileSync(join(dataDir, "name.txt"), "utf8").trim(), required: apiValue("GET /", "query").required, sha: specSha256.length }) + "\\n",
+const generator = `export default ({ values, apiValue, specSha256 }) => ({
+  "listing.json": JSON.stringify({ name: values.listing_name, required: apiValue("GET /", "query").required, sha: specSha256.length }) + "\\n",
 });
 `;
-test("a host's render script's files ship, and its data/ doesn't", () => {
-  const r = run(renders(generator), tokenSpec, ["dist/piece/listing.json", "dist/piece/data/name.txt"]);
+test("a host's render script's files ship", () => {
+  const r = run(renders(generator), tokenSpec, ["dist/piece/listing.json"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/piece/listing.json"), '{"name":"Piece listing","required":["url"],"sha":64}\n');
-  assert.equal(r.dist("dist/piece/data/name.txt"), undefined);
 });
 test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
 test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));

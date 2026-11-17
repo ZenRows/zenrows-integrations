@@ -16,10 +16,9 @@ export const sharedTextDir = join(root, "shared", "text");
 const sharedFiles = { LICENSE: "LICENSE" };
 const sharedDirs = { "shared/assets": "assets" };
 // In platforms/<host>/, these are inputs to the render or the host's own tooling
-// (scripts/validate.mjs, scripts/render.mjs, scripts/package.sh, and data/ for
-// what a render script reads), not files of the plugin.
+// (scripts/validate.mjs, scripts/render.mjs, scripts/package.sh), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
-const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/", "data/"];
+const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/"];
 // A plugin host's README.md is rendered from this template, with the host's
 // slots from platforms/<host>/readme/.
 const readmeTemplate = join(root, "shared", "README.md");
@@ -170,34 +169,21 @@ function apiExample(spec, item, op) {
   return out;
 }
 
-// Every response example the spec gives an operation, in its order:
-// [{ status, contentType, description, body }]. "default" responses have no status, so they're left out.
-function apiResponses(spec, op) {
-  return Object.entries(op.responses ?? {}).flatMap(([status, response]) => {
-    if (!/^\d{3}$/.test(status)) return [];
-    const r = specRef(spec, response);
-    return Object.entries(r?.content ?? {}).flatMap(([contentType, content]) => {
-      const body = firstExample(content);
-      return body === undefined ? [] : [{ status: Number(status), contentType, description: r.description ?? "", body: inlineRefs(spec, body) }];
-    });
-  });
-}
-
 // What {{api:<METHOD> <path> <part> [names]}} renders. For query, path and body:
 // a JSON Schema object for that part of the operation (query or path parameters,
 // or the JSON body), with each property's schema and description from the spec;
 // names (comma-separated) picks some, and without them it's all of the part.
 // For summary, description and server: that string from the spec (server: the
 // operation's servers, else the path's, else the spec's). For example: the
-// example request (see apiExample); for responses: the response examples (see apiResponses).
+// example request (see apiExample).
 export function apiValue(spec, operation, part, names, where) {
   const [method, path] = operation.split(/\s+/);
   const item = spec.paths?.[path];
   const op = item?.[method.toLowerCase()];
   if (!op) throw new Error(`${where}: the API has no operation "${operation}"`);
-  if (part === "example" || part === "responses") {
-    if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
-    return part === "example" ? apiExample(spec, item, op) : apiResponses(spec, op);
+  if (part === "example") {
+    if (names) throw new Error(`${where}: {{api:… example}} takes no names`);
+    return apiExample(spec, item, op);
   }
   if (["summary", "description", "server"].includes(part)) {
     if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
@@ -319,7 +305,7 @@ export function sharedText(name, where) {
 // that part of an API operation as JSON Schema, or its summary, description or
 // server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
-  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server|example|responses)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
+  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server|example)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
     JSON.stringify(apiValue(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
@@ -414,7 +400,7 @@ export function renderHost(host) {
     out.set(file, renderFile(join(platform, file), values));
   }
 
-  // A host's own scripts/render.mjs builds files from the spec and its data/
+  // A host's own scripts/render.mjs builds files from the spec and its vars.yaml
   // (for example a listing generated whole). It gets what the placeholders use
   // and returns { "<path in dist/<host>>": string or Buffer }.
   if (hostRenderers[host]) {
@@ -422,7 +408,6 @@ export function renderHost(host) {
     const files = hostRenderers[host]({
       host,
       values,
-      dataDir: join(platform, "data"),
       spec: loadedSpec.spec,
       specSha256: loadedSpec.sha256,
       apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
