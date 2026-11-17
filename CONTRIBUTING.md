@@ -58,7 +58,7 @@ A fact that more than one place states (what an error code means, what a request
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo. A listing, such as `platforms/o11/`, is checked against the schema its first line names (`# yaml-language-server: $schema=<url>`), with no duplicate keys or YAML aliases, by `npm run validate`.
 
-A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, spec, specSha256, apiValue, apiEndpoints, apiNotOffered, fill, sharedText }` and returns `{ "<path in dist/<host>>": text }`. `values` is the host's `vars.yaml`; `apiValue` is what the `{{api:…}}` placeholders render; `apiEndpoints()` lists the endpoints we offer (`shared/billing.yaml`), with their id, name, description, server, inputs, example, key schemes and billing kind (an operation `shared/endpoints.yaml` splits as those endpoints), and `apiNotOffered()` the operations we don't. Every API operation must be in `shared/billing.yaml`, so a new one fails the render until it's placed; `fill(text)` fills a template's placeholders, so the host's fixed parts can stay in a YAML template next to the script. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
+A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ values, fill, apiEndpoints, apiNotOffered }` and returns `{ "<path in dist/<host>>": text }`. `values` is the host's `vars.yaml`; `apiEndpoints()` lists the endpoints we offer (`shared/billing.yaml`), with their id, name, description, server, inputs, example, where they take the key (`keyIn`) and billing kind (an operation `shared/endpoints.yaml` splits as those endpoints), and `apiNotOffered()` the operations we don't. Every API operation must be in `shared/billing.yaml`, so a new one fails the render until it's placed; `fill(text)` fills a template's placeholders, so the host's fixed parts can stay in a YAML template next to the script. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
 
 ## Keeping hosts current with the API
 
@@ -77,16 +77,6 @@ A code host takes what it sends to the API from the published spec (`{{openapi_u
 JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have, and on a summary, description or server it doesn't give.
 
 Where the spec has one operation for what hosts offer as several endpoints (`GET /` is both Fetch and Extract), `shared/endpoints.yaml` defines each one once: its operation, its query parameters, and its own name and description where the spec's don't fit. A placeholder names it instead of the operation, `{{api:extract query}}` or `{{api:extract summary}}`, and the render fails on a parameter its operation doesn't take.
-
-Where a host's code can't carry the placeholder, it lists what it sends in `vars.yaml` instead, operation by operation:
-
-```yaml
-api:
-  GET /: [url, mode, js_instructions]
-  GET /subscriptions/self/details: []
-```
-
-`npm run validate` checks it against the spec: the operation exists, each parameter is one it takes, and each name appears in the host's rendered files.
 
 The render and validate download the spec each run and keep the last copy in `.cache/openapi.json` for when the network is down (CI caches it the same way); `ZENROWS_OPENAPI=<file>` uses a file instead. When the spec changes, the docs repo pings this one and `.github/workflows/api-changed.yml` checks every host against it: on a failure it opens (or updates) the issue "API change: hosts to update" and posts to #proj-integrations; a clean run closes the issue, and if the placeholders now render differently, it opens a pull request with the re-rendered files.
 

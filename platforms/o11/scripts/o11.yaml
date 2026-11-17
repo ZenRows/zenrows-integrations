@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://docs.o11.ai/schemas/o11-listing/2026-11-01.json
 # The listing's fixed parts. render.mjs (next to this file) fills the placeholders,
-# adds one endpoint per API operation that vars.yaml doesn't exclude, gives each the
+# adds one endpoint per operation we offer (shared/billing.yaml), gives each the
 # block under prices for its billing kind (shared/billing.yaml), and writes dist/o11/o11.yaml.
 spec: 2026-11-01
 provider:
@@ -28,7 +28,7 @@ listings:
       excluded: []
       conflicts: []
 
-# Not part of the listing. The reason every operation vars.yaml excludes gets:
+# Not part of the listing. The reason every operation we don't offer gets:
 excludedReason: Not offered on o11.
 # What render.mjs gives each endpoint, by its billing kind in shared/billing.yaml:
 prices:
@@ -40,7 +40,7 @@ prices:
       chargeOn: success
       unit: credit
       meter: { kind: response_usage }
-      maximumMicros: {{request_max_micros}}
+      maximumMicros: # render.mjs: credit_price_micros × request_max_credits
       evidence:
         url: https://docs.zenrows.com/first-steps/pricing
         observedAt: {{observed_at}}

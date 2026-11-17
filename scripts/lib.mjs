@@ -87,7 +87,7 @@ export function vars(host) {
   return version ? { ...values, version } : values;
 }
 
-// The published API spec, which validate checks each host's api: against.
+// The published API spec, which the {{api:…}} placeholders and render scripts read.
 // ZENROWS_OPENAPI names a file to use instead (tests, a spec not published
 // yet). The last download is kept in .cache/openapi.json for when the network
 // is down.
@@ -115,9 +115,9 @@ async function openapiText() {
   }
 }
 
-// What the render needs before it starts: the API spec, when a file uses an
-// {{api:…}} placeholder or a host has its own scripts/render.mjs, and each such
-// script. The render itself is synchronous, so render and validate call this first.
+// What the render needs before it starts: the API spec and each host's own
+// scripts/render.mjs. The render itself is synchronous, so render and validate
+// call this first.
 let loadedSpec;
 const hostRenderers = {};
 export async function prepareRender() {
@@ -125,11 +125,6 @@ export async function prepareRender() {
     const script = join(platformsDir, host, "scripts", "render.mjs");
     if (existsSync(script)) hostRenderers[host] = (await import(pathToFileURL(script).href)).default;
   }
-  const dirs = [platformsDir, skillsDir, join(root, "shared")];
-  const uses = dirs.some((dir) =>
-    listFiles(dir).some((f) => textFile.test(f) && readFileSync(join(dir, f), "utf8").includes("{{api")),
-  );
-  if (!uses && !Object.keys(hostRenderers).length) return;
   const text = await openapiText();
   loadedSpec = { spec: JSON.parse(text), sha256: sha256(text) };
 }
@@ -260,7 +255,8 @@ export function apiEndpoints(spec, where) {
           server: value("server"),
           input,
           example: value("example"),
-          security: (op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => ({ name, ...spec.components?.securitySchemes?.[name] })),
+          // Where the operation takes the key: { header: "X-API-Key", query: "apikey" }, or one of them.
+          keyIn: Object.fromEntries((op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => spec.components?.securitySchemes?.[name]).filter((s) => s?.type === "apiKey").map((s) => [s.in, s.name])),
           billing: billing[key],
         };
       });
@@ -332,23 +328,6 @@ export function apiValue(spec, operation, part, names, where) {
     properties: Object.fromEntries(picked.map((n) => [n, schema.properties[n]])),
     ...(required.length ? { required } : {}),
   };
-}
-
-// The query parameters an operation ("GET /") takes: the path's and the
-// operation's own, with $refs resolved. undefined if the spec has no such operation.
-export function apiParameters(spec, operation) {
-  const [method, path] = operation.trim().split(/\s+/);
-  const item = spec.paths?.[path];
-  const op = method && item?.[method.toLowerCase()];
-  if (!op) return undefined;
-  const resolve = (p) => {
-    while (p?.$ref) p = p.$ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], spec);
-    return p;
-  };
-  return [...(item.parameters ?? []), ...(op.parameters ?? [])]
-    .map(resolve)
-    .filter((p) => p?.in === "query")
-    .map((p) => p.name);
 }
 
 // overrides.lock: "<shared path>: <sha256>" per line; # starts a comment.
@@ -519,15 +498,10 @@ export function renderHost(host) {
   if (hostRenderers[host]) {
     const where = `platforms/${host}/scripts/render.mjs`;
     const files = hostRenderers[host]({
-      host,
       values,
-      spec: loadedSpec.spec,
-      specSha256: loadedSpec.sha256,
-      apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
+      fill: (text) => fill(text, values, where),
       apiEndpoints: () => apiEndpoints(loadedSpec.spec, where),
       apiNotOffered: () => apiNotOffered(loadedSpec.spec),
-      fill: (text) => fill(text, values, where),
-      sharedText: (name) => sharedText(name, where),
     });
     for (const [path, content] of Object.entries(files ?? {})) {
       if (out.has(path)) throw new Error(`${where} returns ${path}, which platforms/${host}/ already has`);

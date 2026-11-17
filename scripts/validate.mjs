@@ -7,21 +7,11 @@ import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { parse as parseYaml, parseDocument, visit } from "yaml";
-import { apiParameters, catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, openapi, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
 await prepareRender();
 
-// The API spec, downloaded once, and only if a host declares api:.
-let spec;
-const apiSpec = async () => (spec ??= await openapi());
-
-// Whether a host's files send a parameter: as a key (name: …, name = …), a
-// quoted string, or a JavaScript shorthand property ({ url, mode }).
-function sendsParameter(text, name) {
-  const n = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(?<![\\w-])${n}(?![\\w-])\\s*[:=]|["'\`]${n}["'\`]|[{,]\\s*${n}\\s*[,}]`).test(text);
-}
 const report = [];
 
 // Every name a skill has anywhere: shared names, each host's own skills, and
@@ -283,33 +273,6 @@ for (const host of hosts()) {
     if (text.includes("TODO(new-host)")) errors.push(`${host}: platforms/${host}/${file} still has a TODO(new-host)`);
   }
 
-  // api: in vars.yaml lists the API operations and parameters the host sends.
-  // Each operation must exist in the published spec, each parameter must be one
-  // it takes, and each name must appear in the host's own files, so the list
-  // can't go stale and a mistyped name in the code shows up as "unused".
-  if (values.api !== undefined) {
-    if (typeof values.api !== "object" || Array.isArray(values.api)) {
-      errors.push(`${host}: vars.yaml api: must map "METHOD /path" to a list of parameter names`);
-    } else {
-      const sent = [...files].filter(([f]) => textFile.test(f)).map(([, buf]) => buf.toString("utf8")).join("\n");
-      for (const [operation, names] of Object.entries(values.api)) {
-        const takes = apiParameters(await apiSpec(), operation);
-        if (!takes) {
-          errors.push(`${host}: vars.yaml api: the API has no operation "${operation}"`);
-          continue;
-        }
-        if (names != null && !Array.isArray(names)) {
-          errors.push(`${host}: vars.yaml api: ${operation} must list parameter names, for example [url, mode]`);
-          continue;
-        }
-        for (const name of names ?? []) {
-          if (!takes.includes(name)) errors.push(`${host}: vars.yaml api: ${operation} doesn't take "${name}"`);
-          else if (!sendsParameter(sent, name)) errors.push(`${host}: vars.yaml api: declares "${name}" for ${operation}, but no file in dist/${host} sends it`);
-        }
-      }
-    }
-  }
-
   // Checks only one host needs, such as OpenAI's submission limits, live in
   // platforms/<host>/scripts/validate.mjs and run on the committed dist/<host>.
   const extra = join(platformsDir, host, "scripts", "validate.mjs");
@@ -350,19 +313,11 @@ const snippetSources = [
     .map((f) => join(platformsDir, f)),
 ];
 const used = new Set();
-// {{< name}} or {{text:name}} in text, or sharedText("name") in a host's render script.
-const snippetNames = (text) => [
-  ...[...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]),
-  ...[...text.matchAll(/\bsharedText\(\s*["'`]([a-z0-9-]+)["'`]/g)].map((m) => m[1]),
-];
+// {{< name}} or {{text:name}}.
+const snippetNames = (text) => [...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]);
 for (const file of snippetSources) {
   if (!textFile.test(file)) continue;
   for (const name of snippetNames(readFileSync(file, "utf8"))) used.add(name);
-}
-// A host with its own scripts/render.mjs renders text from its vars.yaml values
-// (not its comments), so a snippet named there is used.
-for (const host of hosts().filter((h) => existsSync(join(platformsDir, h, "scripts", "render.mjs")))) {
-  for (const name of snippetNames(JSON.stringify(vars(host)))) used.add(name);
 }
 for (const file of listFiles(sharedTextDir)) {
   const name = file.replace(/\.md$/, "");
