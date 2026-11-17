@@ -227,7 +227,8 @@ test("a shared endpoint with a parameter its operation doesn't take fails", fail
 test("a placeholder naming no shared endpoint fails", fails(usesToken("{{api:nothing query}}"), 'shared/endpoints.yaml has no endpoint "nothing"', tokenSpec));
 // shared/vars.yaml: values every host gets, under its own.
 test("a shared variable reaches every host, and a host can override it", () => {
-  const files = { ...piece, "shared/vars.yaml": "contact_email: team@example.com\n", "platforms/piece/src/index.ts": 'export const c = "{{contact_email}}";\n' };
+  const sharedVars = readFileSync(join(root, "shared/vars.yaml"), "utf8").replace(/^contact_email: .*$/m, "contact_email: team@example.com");
+  const files = { ...piece, "shared/vars.yaml": sharedVars, "platforms/piece/src/index.ts": 'export const c = "{{contact_email}}";\n' };
   const shared = run(files, {}, ["dist/piece/src/index.ts"]);
   assert.ok(shared.ok, shared.out);
   assert.equal(shared.dist("dist/piece/src/index.ts"), 'export const c = "team@example.com";\n');
