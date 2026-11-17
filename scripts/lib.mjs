@@ -143,17 +143,62 @@ function inlineRefs(spec, node, seen = []) {
   return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, inlineRefs(spec, v, seen)]));
 }
 
+// An example value as the spec gives it: example, else the first of examples
+// (an OpenAPI Example object's value, or a JSON Schema examples array).
+function firstExample(node) {
+  if (node?.example !== undefined) return node.example;
+  const examples = node?.examples;
+  if (Array.isArray(examples)) return examples[0];
+  if (examples && typeof examples === "object") return Object.values(examples)[0]?.value;
+  return undefined;
+}
+
+// The spec's example request for an operation: its query and path parameters'
+// examples and its JSON body's, with the parts it has none for left out.
+function apiExample(spec, item, op) {
+  const out = {};
+  const params = [...(item.parameters ?? []), ...(op.parameters ?? [])].map((p) => specRef(spec, p));
+  for (const [part, key] of [["query", "queryParams"], ["path", "pathParams"]]) {
+    for (const p of params.filter((p) => p?.in === part)) {
+      const value = firstExample(p) ?? firstExample(specRef(spec, p.schema));
+      if (value !== undefined) (out[key] ??= {})[p.name] = value;
+    }
+  }
+  const body = op.requestBody?.content?.["application/json"];
+  const value = firstExample(body) ?? firstExample(specRef(spec, body?.schema));
+  if (value !== undefined) out.body = inlineRefs(spec, value);
+  return out;
+}
+
+// Every response example the spec gives an operation, in its order:
+// [{ status, contentType, description, body }]. "default" responses have no status, so they're left out.
+function apiResponses(spec, op) {
+  return Object.entries(op.responses ?? {}).flatMap(([status, response]) => {
+    if (!/^\d{3}$/.test(status)) return [];
+    const r = specRef(spec, response);
+    return Object.entries(r?.content ?? {}).flatMap(([contentType, content]) => {
+      const body = firstExample(content);
+      return body === undefined ? [] : [{ status: Number(status), contentType, description: r.description ?? "", body: inlineRefs(spec, body) }];
+    });
+  });
+}
+
 // What {{api:<METHOD> <path> <part> [names]}} renders. For query, path and body:
 // a JSON Schema object for that part of the operation (query or path parameters,
 // or the JSON body), with each property's schema and description from the spec;
 // names (comma-separated) picks some, and without them it's all of the part.
 // For summary, description and server: that string from the spec (server: the
-// operation's servers, else the path's, else the spec's).
+// operation's servers, else the path's, else the spec's). For example: the
+// example request (see apiExample); for responses: the response examples (see apiResponses).
 export function apiValue(spec, operation, part, names, where) {
   const [method, path] = operation.split(/\s+/);
   const item = spec.paths?.[path];
   const op = item?.[method.toLowerCase()];
   if (!op) throw new Error(`${where}: the API has no operation "${operation}"`);
+  if (part === "example" || part === "responses") {
+    if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
+    return part === "example" ? apiExample(spec, item, op) : apiResponses(spec, op);
+  }
   if (["summary", "description", "server"].includes(part)) {
     if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
     const value = part === "server" ? (op.servers ?? item.servers ?? spec.servers)?.[0]?.url : op[part];
@@ -274,7 +319,7 @@ export function sharedText(name, where) {
 // that part of an API operation as JSON Schema, or its summary, description or
 // server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
-  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
+  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server|example|responses)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
     JSON.stringify(apiValue(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);

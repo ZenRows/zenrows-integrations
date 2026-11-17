@@ -149,21 +149,26 @@ const tokenSpecText = JSON.stringify({
   paths: {
     "/": {
       parameters: [
-        { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" } },
+        { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
         { $ref: "#/components/parameters/mode" },
       ],
       get: {},
     },
     "/jobs/{job_id}": {
       servers: [{ url: "https://async.example.com/v1" }],
-      get: { summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] },
+      get: { summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
     },
     "/jobs": {
       post: {
         summary: "Create a job",
         description: "Sends every URL at once.",
         servers: [{ url: "https://jobs.example.com/v1" }],
-        requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } } },
+        requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" }, examples: { two: { value: { urls: ["https://a.example/"] } } } } } },
+        responses: {
+          201: { description: "Created", content: { "application/json": { example: { job_id: "J1" } } } },
+          401: { description: "No key", content: { "application/problem+json": { example: { code: "AUTH001" } } } },
+          default: { description: "Other", content: { "application/json": { example: {} } } },
+        },
       },
     },
   },
@@ -182,7 +187,7 @@ const rendersTo = (token, expected) => () => {
 };
 test("{{api:…}} renders the query parameters it names", rendersTo("{{api:GET / query url}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."}},"required":["url"]}'));
 test("{{api:…}} without names renders the whole part, $refs resolved", rendersTo("{{api:GET / query}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."},"mode":{"type":"string","enum":["auto"]}},"required":["url"]}'));
-test("{{api:…}} renders path parameters", rendersTo("{{api:GET /jobs/{job_id} path}}", '{"type":"object","properties":{"job_id":{"type":"string"}},"required":["job_id"]}'));
+test("{{api:…}} renders path parameters", rendersTo("{{api:GET /jobs/{job_id} path}}", '{"type":"object","properties":{"job_id":{"type":"string","examples":["J1"]}},"required":["job_id"]}'));
 test("{{api:…}} renders a JSON body with its $refs inlined", rendersTo("{{api:POST /jobs body}}", '{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}}}}'));
 test("{{api-sha256}} is the sha256 of the spec", rendersTo('"{{api-sha256}}"', JSON.stringify(createHash("sha256").update(tokenSpecText).digest("hex"))));
 test("{{api:…}} for an operation the API doesn't have fails", fails(usesToken("{{api:GET /nope query}}"), 'the API has no operation "GET /nope"', tokenSpec));
@@ -190,6 +195,9 @@ test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesT
 test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /jobs summary}}, {{api:POST /jobs description}}]", '["Create a job", "Sends every URL at once."]'));
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
+test("{{api:… example}} builds the example request from the spec's parameter and body examples", rendersTo("[{{api:GET / example}}, {{api:GET /jobs/{job_id} example}}, {{api:POST /jobs example}}]", '[{"queryParams":{"url":"https://example.com/"}}, {"pathParams":{"job_id":"J1"}}, {"body":{"urls":["https://a.example/"]}}]'));
+test("{{api:… responses}} lists the spec's response examples in order, without default", rendersTo("{{api:POST /jobs responses}}", '[{"status":201,"contentType":"application/json","description":"Created","body":{"job_id":"J1"}},{"status":401,"contentType":"application/problem+json","description":"No key","body":{"code":"AUTH001"}}]'));
+test("{{api:… responses}} is empty where the spec has no response examples", rendersTo("{{api:GET /jobs/{job_id} responses}}", "[]"));
 
 // A host's scripts/render.mjs builds files from the spec and its data/, which isn't shipped.
 const renders = (script, extra = {}) => ({
