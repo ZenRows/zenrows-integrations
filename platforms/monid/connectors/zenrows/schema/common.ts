@@ -15,8 +15,14 @@ import { z } from "zod";
  * rules reach an agent and the vendor answers a violation as error-as-data.
  */
 export const zFetchParams = z.strictObject({
-    url: z.url({ protocol: /^https?$/ }).describe(
-        "The URL of the page to fetch, http or https.",
+    // The scheme is pinned with .regex() rather than z.url()'s `protocol`
+    // option: `protocol` is a refinement, and refinements do not survive
+    // `z.toJSONSchema` (design D6), so the compiled doc would carry a bare
+    // `format: "uri"` and accept ftp:, file: and javascript: URLs. A
+    // `.regex()` reaches the doc as a JSON Schema `pattern` and holds.
+    url: z.url().regex(/^https?:\/\//).describe(
+        "The URL of the page to fetch. It must be http or https; any other " +
+            "scheme is rejected before the request leaves.",
     ),
     mode: z.literal("auto").describe(
         "Set to 'auto' to turn on Adaptive Stealth Mode. " +
