@@ -6,9 +6,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { apiParameters, catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, openapi, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
+import { apiParameters, catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, loadApiSpec, openapi, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
+await loadApiSpec();
 
 // The API spec, downloaded once, and only if a host declares api:.
 let spec;

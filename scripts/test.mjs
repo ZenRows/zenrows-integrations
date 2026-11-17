@@ -3,6 +3,7 @@
 // snippet, …), runs npm run render and npm run validate there, and checks the
 // first failure, or that both pass. Add a case whenever a new rule is added.
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -141,6 +142,40 @@ test("an api: parameter the operation doesn't take fails", fails(sends('GET /: [
 test("an api: parameter sent as a JavaScript shorthand property passes", passes(sends('GET /: [url, mode]', 'export const q = ({ url, mode }) => ({ url, mode });'), withSpec));
 test("an api: operation whose value isn't a list fails", fails(sends('GET /: url', 'export const q = { url: "x" };'), 'GET / must list parameter names', withSpec));
 test("an api: parameter the host never sends fails", fails(sends('GET /: [url, mode]', 'export const q = { mode: "auto" };'), 'declares "url" for GET /, but no file in dist/piece sends it', withSpec));
+
+// {{api:…}} renders part of an operation from the spec as JSON Schema; {{api-sha256}} the spec's hash.
+const tokenSpecText = JSON.stringify({
+  openapi: "3.1.0",
+  paths: {
+    "/": {
+      parameters: [
+        { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" } },
+        { $ref: "#/components/parameters/mode" },
+      ],
+      get: {},
+    },
+    "/jobs/{job_id}": { get: { parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] } },
+    "/jobs": { post: { requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } } } } },
+  },
+  components: {
+    parameters: { mode: { name: "mode", in: "query", schema: { type: "string", enum: ["auto"] } } },
+    schemas: { Job: { type: "object", properties: { urls: { type: "array", items: { $ref: "#/components/schemas/Url" } } } }, Url: { type: "string" } },
+  },
+});
+const usesToken = (token) => ({ ...piece, "openapi-tokens.json": tokenSpecText, "platforms/piece/src/index.ts": `export const p = ${token};\n` });
+const tokenSpec = { ZENROWS_OPENAPI: "openapi-tokens.json" };
+const rendersTo = (token, expected) => () => {
+  const r = run(usesToken(token), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), `export const p = ${expected};\n`);
+};
+test("{{api:…}} renders the query parameters it names", rendersTo("{{api:GET / query url}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."}},"required":["url"]}'));
+test("{{api:…}} without names renders the whole part, $refs resolved", rendersTo("{{api:GET / query}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."},"mode":{"type":"string","enum":["auto"]}},"required":["url"]}'));
+test("{{api:…}} renders path parameters", rendersTo("{{api:GET /jobs/{job_id} path}}", '{"type":"object","properties":{"job_id":{"type":"string"}},"required":["job_id"]}'));
+test("{{api:…}} renders a JSON body with its $refs inlined", rendersTo("{{api:POST /jobs body}}", '{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}}}}'));
+test("{{api-sha256}} is the sha256 of the spec", rendersTo('"{{api-sha256}}"', JSON.stringify(createHash("sha256").update(tokenSpecText).digest("hex"))));
+test("{{api:…}} for an operation the API doesn't have fails", fails(usesToken("{{api:GET /nope query}}"), 'the API has no operation "GET /nope"', tokenSpec));
+test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesToken("{{api:GET / query url,page}}"), 'GET / has no query parameter "page"', tokenSpec));
 
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {

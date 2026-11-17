@@ -72,7 +72,9 @@ export function vars(host) {
   // A code host may not be released from here (yet), so it needs no
   // release-please entry; it then has no {{version}}.
   if (!version && !isCodeHost(v)) throw new Error(`.release-please-manifest.json has no "dist/${host}" entry`);
-  return version ? { ...v, version } : v;
+  // {{openapi_url}}: the published API spec, the one {{api:…}} and api: read.
+  const values = { ...v, openapi_url: openapiUrl };
+  return version ? { ...values, version } : values;
 }
 
 // The published API spec, which validate checks each host's api: against.
@@ -82,22 +84,96 @@ export function vars(host) {
 export const openapiUrl = "https://www.zenrows.com/openapi.json";
 const openapiCache = join(root, ".cache", "openapi.json");
 export async function openapi() {
-  if (process.env.ZENROWS_OPENAPI) return JSON.parse(readFileSync(process.env.ZENROWS_OPENAPI, "utf8"));
+  return JSON.parse(await openapiText());
+}
+async function openapiText() {
+  if (process.env.ZENROWS_OPENAPI) return readFileSync(process.env.ZENROWS_OPENAPI, "utf8");
   try {
     const res = await fetch(openapiUrl, { signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const text = await res.text();
-    const spec = JSON.parse(text);
+    JSON.parse(text);
     mkdirSync(dirname(openapiCache), { recursive: true });
     writeFileSync(openapiCache, text);
-    return spec;
+    return text;
   } catch (e) {
     if (!existsSync(openapiCache)) {
       throw new Error(`couldn't download the API spec from ${openapiUrl} (${e.message}), and there's no copy in .cache/openapi.json yet`);
     }
     console.warn(`⚠️ couldn't download the API spec from ${openapiUrl} (${e.message}); using the copy in .cache/openapi.json`);
-    return JSON.parse(readFileSync(openapiCache, "utf8"));
+    return readFileSync(openapiCache, "utf8");
   }
+}
+
+// The spec the {{api:…}} tokens read. The render is synchronous, so render and
+// validate call loadApiSpec() first; it downloads the spec only when a file the
+// render reads uses one of the tokens.
+let loadedSpec;
+export async function loadApiSpec() {
+  const dirs = [platformsDir, skillsDir, join(root, "shared")];
+  const uses = dirs.some((dir) =>
+    listFiles(dir).some((f) => textFile.test(f) && readFileSync(join(dir, f), "utf8").includes("{{api")),
+  );
+  if (!uses) return;
+  const text = await openapiText();
+  loadedSpec = { spec: JSON.parse(text), sha256: sha256(text) };
+}
+
+// A $ref in the spec, followed to what it points at.
+function specRef(spec, node) {
+  while (node?.$ref) node = node.$ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], spec);
+  return node;
+}
+
+// node with every $ref replaced by a copy of its target, so the result stands
+// alone; a $ref that leads back to itself fails, since it can't be inlined.
+function inlineRefs(spec, node, seen = []) {
+  if (Array.isArray(node)) return node.map((n) => inlineRefs(spec, n, seen));
+  if (!node || typeof node !== "object") return node;
+  if (node.$ref) {
+    if (seen.includes(node.$ref)) throw new Error(`the API spec's ${node.$ref} refers to itself, so it can't be inlined`);
+    return inlineRefs(spec, specRef(spec, node), [...seen, node.$ref]);
+  }
+  return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, inlineRefs(spec, v, seen)]));
+}
+
+// What {{api:<METHOD> <path> <part> [names]}} renders: a JSON Schema object for
+// that part of the operation (query or path parameters, or the JSON body), with
+// each property's schema and description from the spec. names (comma-separated)
+// picks some; without them, all of the part.
+export function apiSchema(spec, operation, part, names, where) {
+  const [method, path] = operation.split(/\s+/);
+  const item = spec.paths?.[path];
+  const op = item?.[method.toLowerCase()];
+  if (!op) throw new Error(`${where}: the API has no operation "${operation}"`);
+  let schema;
+  if (part === "body") {
+    const body = op.requestBody?.content?.["application/json"]?.schema;
+    if (!body) throw new Error(`${where}: ${operation} has no JSON body`);
+    schema = inlineRefs(spec, body);
+  } else {
+    const params = [...(item.parameters ?? []), ...(op.parameters ?? [])].map((p) => specRef(spec, p)).filter((p) => p?.in === part);
+    const required = params.filter((p) => p.required).map((p) => p.name);
+    schema = {
+      type: "object",
+      properties: Object.fromEntries(
+        params.map((p) => [p.name, { ...inlineRefs(spec, p.schema ?? {}), ...(p.description ? { description: p.description } : {}) }]),
+      ),
+      ...(required.length ? { required } : {}),
+    };
+  }
+  if (!names) return schema;
+  const picked = names.split(",").map((n) => n.trim()).filter(Boolean);
+  for (const name of picked) {
+    if (!(name in (schema.properties ?? {}))) throw new Error(`${where}: ${operation} has no ${part} parameter "${name}"`);
+  }
+  const { required: all = [], ...rest } = schema;
+  const required = all.filter((n) => picked.includes(n));
+  return {
+    ...rest,
+    properties: Object.fromEntries(picked.map((n) => [n, schema.properties[n]])),
+    ...(required.length ? { required } : {}),
+  };
 }
 
 // The query parameters an operation ("GET /") takes: the path's and the
@@ -180,8 +256,14 @@ export function sharedText(name, where) {
 
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
 // the host; {{< name}} inlines shared/text/<name>.md, and {{text:name}} inserts it
-// as a quoted string literal (JSON), for code.
+// as a quoted string literal (JSON), for code. {{api:GET / query url,mode}} is
+// that part of an API operation as JSON Schema (see apiSchema), and
+// {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
+  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
+    JSON.stringify(apiSchema(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
+  );
+  text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));
   return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
@@ -204,6 +286,11 @@ function fill(text, values, where) {
 }
 
 // Renders one host. Returns Map<path under dist/<host>, Buffer>.
+function apiSpecFor(where) {
+  if (!loadedSpec) throw new Error(`${where}: uses {{api…}}, but the API spec wasn't loaded (call loadApiSpec() before rendering)`);
+  return loadedSpec;
+}
+
 // Puts a host's slot files into text: {{> slot}} needs <dir>/<slot>.md; {{>? slot}}
 // is optional, and without the file its line (and one blank line after it) goes.
 // Records each slot file used in usedSlots.
@@ -272,7 +359,7 @@ export function renderHost(host) {
   // textFile) would otherwise ship as it is. Binary files (not valid UTF-8) are skipped.
   for (const [path, buf] of out) {
     const text = buf.toString("utf8");
-    const token = Buffer.from(text, "utf8").equals(buf) && text.match(leftoverToken);
+    const token = Buffer.from(text, "utf8").equals(buf) && (text.match(leftoverToken) ?? text.match(/\{\{\s*api[-:][^\n]*?\}\}/));
     if (token) {
       throw new Error(`${host}: ${path} still has an unrendered ${token[0]}`);
     }

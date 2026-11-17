@@ -57,7 +57,18 @@ A fact that more than one place states (what an error code means, what a request
 
 ## Keeping hosts current with the API
 
-A code host that calls the API lists what it sends in `vars.yaml`, operation by operation:
+A code host takes what it sends to the API from the published spec (`{{openapi_url}}`, which is `https://www.zenrows.com/openapi.json`), with a token, instead of writing it out:
+
+| Token | Renders to |
+|---|---|
+| `{{api:GET / query url,mode}}` | the named query parameters of `GET /` as one line of JSON Schema: each one's type, enum, default and description from the spec, and which are required. Without names, all of them. |
+| `{{api:GET /jobs/{job_id} path}}` | its path parameters |
+| `{{api:POST /jobs body}}` | its JSON body, with the spec's `$ref`s inlined |
+| `{{api-sha256}}` | the sha256 of the spec |
+
+JSON is valid YAML, so the same token works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have.
+
+Where a host's code can't carry the token, it lists what it sends in `vars.yaml` instead, operation by operation:
 
 ```yaml
 api:
@@ -65,7 +76,9 @@ api:
   GET /subscriptions/self/details: []
 ```
 
-`npm run validate` checks it against the published spec (`https://www.zenrows.com/openapi.json`, the last download kept in `.cache/openapi.json` for when the network is down; `ZENROWS_OPENAPI=<file>` uses a file instead): the operation exists, each parameter is one it takes, and each name appears in the host's rendered files, so the list can't go stale and a mistyped name in the code shows up as not sent. When the spec changes, the docs repo pings this one and `.github/workflows/api-changed.yml` runs the same check: on a failure it opens (or updates) the issue "API change: hosts to update" and posts to #proj-integrations; a clean run closes the issue.
+`npm run validate` checks it against the spec: the operation exists, each parameter is one it takes, and each name appears in the host's rendered files.
+
+The render and validate download the spec each run and keep the last copy in `.cache/openapi.json` for when the network is down (CI caches it the same way); `ZENROWS_OPENAPI=<file>` uses a file instead. When the spec changes, the docs repo pings this one and `.github/workflows/api-changed.yml` checks every host against it: on a failure it opens (or updates) the issue "API change: hosts to update" and posts to #proj-integrations; a clean run closes the issue, and if the tokens now render differently, it opens a pull request with the re-rendered files.
 
 ## Tests
 
