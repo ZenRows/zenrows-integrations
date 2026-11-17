@@ -26,7 +26,10 @@ const piece = {
 // Runs render then validate in a copy of the repo with `files` written over it
 // (null deletes). Returns { ok, out, dist }: out is the failing step's output,
 // dist(path) reads a rendered file.
-function run(files, reads = []) {
+// The API spec validate reads: the last download if there is one, so the tests
+// don't need the network; a case can name its own file in env.ZENROWS_OPENAPI.
+const cachedSpec = join(root, ".cache", "openapi.json");
+function run(files, env = {}, reads = []) {
   const dir = mkdtempSync(join(tmpdir(), "zenrows-integrations-test-"));
   try {
     for (const path of copied) {
@@ -44,7 +47,11 @@ function run(files, reads = []) {
       }
     }
     for (const script of ["render", "validate"]) {
-      const r = spawnSync("node", [join("scripts", `${script}.mjs`)], { cwd: dir, encoding: "utf8" });
+      const r = spawnSync("node", [join("scripts", `${script}.mjs`)], {
+        cwd: dir,
+        encoding: "utf8",
+        env: { ...process.env, ...(existsSync(cachedSpec) ? { ZENROWS_OPENAPI: cachedSpec } : {}), ...env },
+      });
       if (r.status !== 0) return { ok: false, out: `${r.stdout}${r.stderr}` };
     }
     const outs = [...Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => p.replace(/^platforms\//, "dist/")), ...reads];
@@ -55,12 +62,12 @@ function run(files, reads = []) {
   }
 }
 
-const passes = (files) => () => {
-  const r = run(files);
+const passes = (files, env) => () => {
+  const r = run(files, env);
   assert.ok(r.ok, r.out);
 };
-const fails = (files, message) => () => {
-  const r = run(files);
+const fails = (files, message, env) => () => {
+  const r = run(files, env);
   assert.ok(!r.ok, "expected a failure, but render and validate passed");
   assert.ok(r.out.includes(message), `expected "${message}" in:\n${r.out}`);
 };
@@ -118,6 +125,23 @@ test("an unknown kind fails", () => {
 });
 test("a vars.yaml that isn't name: value lines fails", fails({ ...piece, "platforms/piece/vars.yaml": "- host_full: Piece\n" }, "platforms/piece/vars.yaml must be a list of name: value lines"));
 
+// api: in vars.yaml, checked against a small spec stub instead of the published one.
+const stubSpec = {
+  "openapi-stub.json": JSON.stringify({
+    openapi: "3.1.0",
+    paths: { "/": { parameters: [{ $ref: "#/components/parameters/mode" }, { name: "url", in: "query" }], get: {} } },
+    components: { parameters: { mode: { name: "mode", in: "query" } } },
+  }),
+};
+const withSpec = { ZENROWS_OPENAPI: "openapi-stub.json" };
+const sends = (api, code) => ({ ...piece, ...stubSpec, "platforms/piece/vars.yaml": `host_full: Piece\nkind: code\napi:\n  ${api}\n`, "platforms/piece/src/index.ts": `${code}\n` });
+test("a host's api: passes when the API takes each parameter and the host sends it", passes(sends('GET /: [url, mode]', 'export const q = { url: "https://example.com", mode: "auto" };'), withSpec));
+test("an api: operation the API doesn't have fails", fails(sends('GET /nope: []', 'export const q = {};'), 'the API has no operation "GET /nope"', withSpec));
+test("an api: parameter the operation doesn't take fails", fails(sends('GET /: [foo]', 'export const q = { foo: 1 };'), 'GET / doesn\'t take "foo"', withSpec));
+test("an api: parameter sent as a JavaScript shorthand property passes", passes(sends('GET /: [url, mode]', 'export const q = ({ url, mode }) => ({ url, mode });'), withSpec));
+test("an api: operation whose value isn't a list fails", fails(sends('GET /: url', 'export const q = { url: "x" };'), 'GET / must list parameter names', withSpec));
+test("an api: parameter the host never sends fails", fails(sends('GET /: [url, mode]', 'export const q = { mode: "auto" };'), 'declares "url" for GET /, but no file in dist/piece sends it', withSpec));
+
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {
   // JSX, with a string, a number and a variable value, spaced or not.
@@ -139,14 +163,14 @@ test("a readme/ file shared/README.md has no slot for fails", fails({ "platforms
 test("the optional more slot is left out without its file and put in with it", () => {
   assert.ok(!copilotReadme().includes("{{"), "no slot token left in the rendered README");
   assert.ok(!copilotReadme().includes("For maintainers"));
-  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, ["dist/copilot/README.md"]);
+  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, {}, ["dist/copilot/README.md"]);
   assert.ok(r.ok, r.out);
   assert.match(r.dist("dist/copilot/README.md"), /## Setup\n[\s\S]*## For maintainers\n\nRelease notes live elsewhere\.\n\n## Privacy/);
 });
 
 // A host's scripts/ is its own tooling: never shipped, and its validate.mjs runs.
 test("a host's scripts/ isn't shipped", () => {
-  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, ["dist/copilot/scripts/tool.sh"]);
+  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, {}, ["dist/copilot/scripts/tool.sh"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/copilot/scripts/tool.sh"), undefined);
 });
