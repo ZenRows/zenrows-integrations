@@ -3,8 +3,6 @@
 kind: code
 host: "o11.ai"
 host_full: "o11.ai"
-# o11 shows it next to the listing; this repo is public, so the raw file works.
-logo_url: "https://raw.githubusercontent.com/ZenRows/zenrows-integrations/main/shared/assets/logo.png"
 # When the prices and the pages they cite were last checked.
 observed_at: "2026-11-13T09:00:00Z"
 # Each release is uploaded to o11 by hand, and o11 reviews every version.
