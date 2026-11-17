@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://docs.o11.ai/schemas/o11-listing/2026-11-01.json
+# The listing's fixed parts. render.mjs (next to this file) fills the placeholders,
+# adds one endpoint per API operation that vars.yaml doesn't exclude, gives each the
+# block under prices for its billing kind (shared/billing.yaml), and writes dist/o11/o11.yaml.
+spec: 2026-11-01
+provider:
+  id: zenrows
+  name: Zenrows
+  website: https://www.zenrows.com
+  docsUrl: https://docs.zenrows.com
+  contactEmail: {{contact_email}}
+  logoUrl: {{logo_url}}
+  description: >-
+    {{< zenrows-description}}.
+accounts:
+  mode: none
+listings:
+  - type: api
+    id: zenrows
+    baseUrl: {{api:GET / server}}
+    auth: { kind: query, queryParam: apikey }
+    endpoints: []
+    coverage:
+      observedAt: {{observed_at}}
+      sources:
+        - { kind: openapi, reference: {{openapi_url}}, sha256: {{api-sha256}}, observedAt: {{observed_at}} }
+      included: []
+      excluded: []
+      conflicts: []
+
+# Not part of the listing. The reason every operation vars.yaml excludes gets:
+excludedReason: Not offered on o11.
+# What render.mjs gives each endpoint, by its billing kind in shared/billing.yaml:
+prices:
+  per_credit:
+    price:
+      kind: per_unit
+      priceMicros: {{credit_price_micros}}
+      currency: USD
+      chargeOn: success
+      unit: credit
+      meter: { kind: response_usage }
+      maximumMicros: {{request_max_micros}}
+      evidence:
+        url: https://docs.zenrows.com/first-steps/pricing
+        observedAt: {{observed_at}}
+        note: >-
+          Credits per successful request: {{< credit-weights}}; {{< extract-no-credits}}.
+          Each response reports the credits it used in the X-Request-Credits header. The
+          public pay-as-you-go rate is {{< credit-price}}.
+    priceTerms:
+      details: >-
+        Metered from the X-Request-Credits response header: the credits the request used,
+        times the per-credit price; {{< failed-not-billed}}.
+  after_run:
+    price:
+      kind: unresolved
+      reason: >-
+        Billed after it runs: each page or task it fetches is a Fetch request of 1 to
+        {{request_max_credits}} credits at {{< credit-price}}, so the charge is only known as it runs.
+  free:
+    price:
+      kind: free
+      evidence:
+        url: https://docs.zenrows.com/first-steps/pricing
+        observedAt: {{observed_at}}
+        note: "Uses no credits: it fetches no pages."

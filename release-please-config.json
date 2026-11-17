@@ -110,6 +110,10 @@
           "jsonpath": "$.version"
         }
       ]
+    },
+    "dist/o11": {
+      "component": "o11",
+      "package-name": "o11"
     }
   }
 }
