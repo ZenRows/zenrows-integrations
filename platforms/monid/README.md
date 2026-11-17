@@ -128,7 +128,23 @@ render.
 
 ## How it ships
 
-Not yet. The connector is tested against a pinned monid commit here; landing it
-in their repo is a pull request to `monid-ai/monid`, and
-`openspec/changes/add-connector-zenrows/` is the change they review. That step
-comes later.
+Landing it in their repo is a pull request to `monid-ai/monid`. Their README
+documents the process; the steps that matter here are that CI needs no vendor
+keys, and that the pull request alone does not start their review.
+
+Point `check.sh` at a checkout of your fork and it builds the submission:
+
+```
+bash platforms/monid/scripts/check.sh ~/src/monid    # your fork, on a branch
+```
+
+It copies the connector into `connectors/zenrows`, copies the change into
+`openspec/changes/add-connector-zenrows`, applies the two edits above, and runs
+their gate. What is left in `git status` is exactly the pull request: two new
+directories, and the two one-line edits to `shared/testing/fixtures.ts` and
+`connectors/ids.lock.json`.
+
+Then email [support@monid.ai](mailto:support@monid.ai) with the pull request
+link, a link to the Zenrows API docs and the company name. Their README asks
+for it, they review every connector by hand, and the mail is what starts that
+rather than the pull request sitting in the queue.
