@@ -13,7 +13,7 @@ export const zenrows = createPiece({
   auth: zenrowsAuth,
   minimumSupportedRelease: '0.88.2',
   // Served from this repo until Activepieces hosts it on their CDN.
-  logoUrl: 'https://raw.githubusercontent.com/ZenRows/zenrows-integrations/main/shared/assets/logo.png',
+  logoUrl: '{{logo_url}}',
   categories: [PieceCategory.ARTIFICIAL_INTELLIGENCE, PieceCategory.PRODUCTIVITY],
   authors: ['imoital'],
   actions: [
@@ -28,8 +28,7 @@ export const zenrows = createPiece({
       }),
       props: {
         url: {
-          description:
-            'A full URL or a path relative to https://api.zenrows.com/v1, e.g. /subscriptions/self/details. The API key is sent in the X-API-Key header.',
+          description: `A full URL or a path relative to ${ZENROWS_API_BASE_URL}, e.g. /subscriptions/self/details. The API key is sent in the X-API-Key header.`,
         },
       },
     }),
