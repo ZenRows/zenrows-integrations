@@ -318,6 +318,7 @@ for (const host of hosts()) {
 const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `${h}/README.md`);
 const snippetSources = [
   join(root, "shared", "README.md"),
+  join(root, "shared", "endpoints.yaml"),
   ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
   ...listFiles(platformsDir)
     .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))
@@ -337,7 +338,8 @@ for (const host of hosts().filter((h) => existsSync(join(platformsDir, h, "scrip
 for (const file of listFiles(sharedTextDir)) {
   const name = file.replace(/\.md$/, "");
   const text = readFileSync(join(sharedTextDir, file), "utf8");
-  if (!used.has(name)) errors.push(`shared/text/${file} isn't used by any skill or host`);
+  // A warning, not an error: a shared fact can land before the hosts that use it.
+  if (!used.has(name)) console.warn(`⚠️ shared/text/${file} isn't used by any skill or host yet`);
   // Backticks, *, links and headings would show up as is in a code string.
   // _ and [ ] don't count: parameter names (js_render) and [{...}] use them.
   if (/[`*]/.test(text) || /\]\(/.test(text) || /^#/.test(text.trim())) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);

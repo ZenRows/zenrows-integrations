@@ -47,6 +47,7 @@ function run(files, env = {}, reads = []) {
         writeFileSync(join(dir, path), content);
       }
     }
+    let out = "";
     for (const script of ["render", "validate"]) {
       const r = spawnSync("node", [join("scripts", `${script}.mjs`)], {
         cwd: dir,
@@ -54,10 +55,11 @@ function run(files, env = {}, reads = []) {
         env: { ...process.env, ...(existsSync(cachedSpec) ? { ZENROWS_OPENAPI: cachedSpec } : {}), ...env },
       });
       if (r.status !== 0) return { ok: false, out: `${r.stdout}${r.stderr}` };
+      out += `${r.stdout}${r.stderr}`;
     }
     const outs = [...Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => p.replace(/^platforms\//, "dist/")), ...reads];
     const rendered = new Map(outs.map((out) => [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined]));
-    return { ok: true, out: "", dist: (path) => rendered.get(path) };
+    return { ok: true, out, dist: (path) => rendered.get(path) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -66,6 +68,12 @@ function run(files, env = {}, reads = []) {
 const passes = (files, env) => () => {
   const r = run(files, env);
   assert.ok(r.ok, r.out);
+};
+// Passes, with a warning that says message.
+const warns = (files, message, env) => () => {
+  const r = run(files, env);
+  assert.ok(r.ok, r.out);
+  assert.ok(r.out.includes(message), `expected the warning "${message}" in:\n${r.out}`);
 };
 const fails = (files, message, env) => () => {
   const r = run(files, env);
@@ -190,6 +198,30 @@ test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesT
 test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /jobs summary}}, {{api:POST /jobs description}}]", '["Create a job", "Sends every URL at once."]'));
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
+// shared/endpoints.yaml: an endpoint that is a slice of one operation, for every host.
+const sliced = (yaml, token) => ({ ...usesToken(token), "shared/endpoints.yaml": yaml });
+test("a shared endpoint renders its slice, name and the spec's description", () => {
+  const r = run(sliced("slice:\n  operation: POST /jobs\n  name: Slice\n", "[{{api:slice summary}}, {{api:slice description}}, {{api:slice server}}]"), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), 'export const p = ["Slice", "Sends every URL at once.", "https://jobs.example.com/v1"];\n');
+});
+test("a shared endpoint's query is only its parameters", () => {
+  const r = run(sliced("slice:\n  operation: GET /\n  parameters: [url]\n", "{{api:slice query}}"), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), 'export const p = {"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."}},"required":["url"]};\n');
+});
+test("a shared endpoint with a parameter its operation doesn't take fails", fails(sliced("slice:\n  operation: GET /\n  parameters: [url, page]\n", "{{api:slice query}}"), 'shared/endpoints.yaml slice: GET / has no query parameter "page"', tokenSpec));
+test("a placeholder naming no shared endpoint fails", fails(usesToken("{{api:nothing query}}"), 'shared/endpoints.yaml has no endpoint "nothing"', tokenSpec));
+// shared/vars.yaml: values every host gets, under its own.
+test("a shared variable reaches every host, and a host can override it", () => {
+  const files = { ...piece, "shared/vars.yaml": "contact_email: team@example.com\n", "platforms/piece/src/index.ts": 'export const c = "{{contact_email}}";\n' };
+  const shared = run(files, {}, ["dist/piece/src/index.ts"]);
+  assert.ok(shared.ok, shared.out);
+  assert.equal(shared.dist("dist/piece/src/index.ts"), 'export const c = "team@example.com";\n');
+  const own = run({ ...files, "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\ncontact_email: piece@example.com\n" }, {}, ["dist/piece/src/index.ts"]);
+  assert.ok(own.ok, own.out);
+  assert.equal(own.dist("dist/piece/src/index.ts"), 'export const c = "piece@example.com";\n');
+});
 test("{{api:… example}} builds the example request from the spec's parameter and body examples", rendersTo("[{{api:GET / example}}, {{api:GET /jobs/{job_id} example}}, {{api:POST /jobs example}}]", '[{"queryParams":{"url":"https://example.com/"}}, {"pathParams":{"job_id":"J1"}}, {"body":{"urls":["https://a.example/"]}}]'));
 
 // A host's scripts/render.mjs builds files from the spec and its vars.yaml.
@@ -267,9 +299,9 @@ test("a snippet with a blank last line or CRLF renders clean", () => {
   }
 });
 test("a snippet with a {{…}} fails", fails(snippet("Ask {{host}} to sign in.\n"), "uses {{…}}; a snippet is a plain fact"));
-test("a snippet named only in a vars.yaml comment fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
+test("a snippet named only in a vars.yaml comment isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
 test("a snippet on two lines fails", fails(snippet("One fact.\nAnother fact.\n"), "has more than one line"));
-test("a snippet named only in a code host README fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
+test("a snippet named only in a code host README isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
-test("an unused snippet fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "isn't used by any skill or host"));
+test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));

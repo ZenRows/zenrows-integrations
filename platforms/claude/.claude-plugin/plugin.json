@@ -5,7 +5,7 @@
   "description": "{{< zenrows-description}}.",
   "author": {
     "name": "Zenrows",
-    "email": "integrations@zenrows.com",
+    "email": "{{contact_email}}",
     "url": "https://www.zenrows.com"
   },
   "homepage": "https://docs.zenrows.com",

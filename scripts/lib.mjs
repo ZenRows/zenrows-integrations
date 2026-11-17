@@ -62,6 +62,15 @@ function versions() {
   return JSON.parse(readFileSync(join(root, ".release-please-manifest.json"), "utf8"));
 }
 
+// shared/vars.yaml: values every host gets.
+function sharedVars() {
+  const file = join(root, "shared", "vars.yaml");
+  if (!existsSync(file)) return {};
+  const v = parseYaml(readFileSync(file, "utf8")) ?? {};
+  if (typeof v !== "object" || Array.isArray(v)) throw new Error("shared/vars.yaml must be a list of name: value lines");
+  return v;
+}
+
 export function vars(host) {
   const v = parseYaml(readFileSync(join(platformsDir, host, "vars.yaml"), "utf8")) ?? {};
   if (typeof v !== "object" || Array.isArray(v)) throw new Error(`platforms/${host}/vars.yaml must be a list of name: value lines`);
@@ -72,8 +81,9 @@ export function vars(host) {
   // A code host may not be released from here (yet), so it needs no
   // release-please entry; it then has no {{version}}.
   if (!version && !isCodeHost(v)) throw new Error(`.release-please-manifest.json has no "dist/${host}" entry`);
-  // {{openapi_url}}: the published API spec, the one {{api:…}} and api: read.
-  const values = { ...v, openapi_url: openapiUrl };
+  // shared/vars.yaml first, so the host's own values win; {{openapi_url}}: the
+  // published API spec, the one {{api:…}} and api: read.
+  const values = { ...sharedVars(), ...v, openapi_url: openapiUrl };
   return version ? { ...values, version } : values;
 }
 
@@ -176,7 +186,35 @@ function apiExample(spec, item, op) {
 // For summary, description and server: that string from the spec (server: the
 // operation's servers, else the path's, else the spec's). For example: the
 // example request (see apiExample).
+// shared/endpoints.yaml: endpoints that are a slice of one API operation.
+function sharedEndpoints() {
+  const file = join(root, "shared", "endpoints.yaml");
+  return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
+}
+
 export function apiValue(spec, operation, part, names, where) {
+  // A shared endpoint ("extract") is its operation, with its own query
+  // parameters, and its own name and description where it gives them.
+  if (!/\s/.test(operation)) {
+    const shared = sharedEndpoints()[operation];
+    if (!shared) throw new Error(`${where}: shared/endpoints.yaml has no endpoint "${operation}"`);
+    const own = `shared/endpoints.yaml ${operation}`;
+    const takes = Object.keys(apiValue(spec, shared.operation, "query", undefined, own).properties ?? {});
+    const unknown = (shared.parameters ?? []).find((p) => !takes.includes(p));
+    if (unknown) throw new Error(`${own}: ${shared.operation} has no query parameter "${unknown}"`);
+    if (part === "summary" && shared.name) return shared.name;
+    if (part === "description" && shared.description) {
+      return shared.description.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, own));
+    }
+    if (part === "query" && shared.parameters) return apiValue(spec, shared.operation, part, names ?? shared.parameters.join(","), where);
+    if (part === "example" && shared.parameters) {
+      const example = apiValue(spec, shared.operation, part, names, where);
+      const query = Object.fromEntries(Object.entries(example.queryParams ?? {}).filter(([k]) => shared.parameters.includes(k)));
+      const { queryParams, ...rest } = example;
+      return Object.keys(query).length ? { ...rest, queryParams: query } : rest;
+    }
+    return apiValue(spec, shared.operation, part, names, where);
+  }
   const [method, path] = operation.split(/\s+/);
   const item = spec.paths?.[path];
   const op = item?.[method.toLowerCase()];
@@ -305,8 +343,8 @@ export function sharedText(name, where) {
 // that part of an API operation as JSON Schema, or its summary, description or
 // server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
-  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server|example)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
-    JSON.stringify(apiValue(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
+  text = text.replace(/\{\{api:\s*(?:([A-Z]+)\s+(\S+)|([a-z][a-z0-9_-]*))\s+(query|path|body|summary|description|server|example)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, shared, part, names) =>
+    JSON.stringify(apiValue(apiSpecFor(where).spec, shared ?? `${method} ${path}`, part, names, where)),
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));

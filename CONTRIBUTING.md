@@ -9,6 +9,8 @@ skills/<skill>/SKILL.md      shared skills; {{var}} and {{> slot}} mark what dif
 shared/README.md             every plugin's README; {{> setup}} and {{>? more}} take the host's own sections
 shared/assets/               files every plugin host ships as they are (logo)
 shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
+shared/vars.yaml             values every host gets as {{name}} (contact_email); a host's vars.yaml can override one
+shared/endpoints.yaml        endpoints that are a slice of one API operation (fetch, extract), for {{api:…}}
 platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
@@ -36,7 +38,7 @@ Requires Node 22. Run `npm ci` once.
 
 ## Text that differs per host
 
-- **A word or phrase:** use a variable, for example `{{host}}`, and set it in `platforms/<host>/vars.yaml`.
+- **A word or phrase:** use a variable, for example `{{host}}`, and set it in `platforms/<host>/vars.yaml`. A value every host shares, such as `{{contact_email}}`, goes in `shared/vars.yaml` instead.
 - **A paragraph or a few lines:** use a slot, for example `{{> connect}}`, and write the host's text in `platforms/<host>/skills/<skill>/connect.md`. Everything outside the slot stays shared, so later fixes still reach the host.
 - **An optional paragraph:** `{{>? name}}` is a slot a host may leave out; without the file, its line goes. The README uses it for `readme/more.md`.
 - **The README:** every plugin's README is `shared/README.md`. A host writes only `readme/setup.md` (how to install and sign in) and, if it needs more, `readme/more.md`; its own `README.md` fails the render. Code hosts keep their own README.
@@ -49,7 +51,7 @@ Unknown variables, unknown skill names, missing slots, unused slot files, unknow
 
 ## Shared text
 
-A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text with no `{{…}}`. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one (backticks, `*`, a link or a heading), or on one nothing uses.
+A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text with no `{{…}}`. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one (backticks, `*`, a link or a heading), and warns about one nothing uses yet.
 
 ## Code hosts
 
@@ -72,6 +74,8 @@ A code host takes what it sends to the API from the published spec (`{{openapi_u
 | `{{api-sha256}}` | the sha256 of the spec |
 
 JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have, and on a summary, description or server it doesn't give.
+
+Where the spec has one operation for what hosts offer as several endpoints (`GET /` is both Fetch and Extract), `shared/endpoints.yaml` defines each one once: its operation, its query parameters, and its own name and description where the spec's don't fit. A placeholder names it instead of the operation, `{{api:extract query}}` or `{{api:extract summary}}`, and the render fails on a parameter its operation doesn't take.
 
 Where a host's code can't carry the placeholder, it lists what it sends in `vars.yaml` instead, operation by operation:
 

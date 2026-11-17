@@ -1,0 +1,17 @@
+# Endpoints that are a slice of one API operation, defined once for every host.
+# The spec has GET / for both Fetch and Extract; each takes some of its query
+# parameters. {{api:extract query}}, {{api:extract summary}} and the others use
+# these like an operation; name and description fall back to the spec's.
+fetch:
+  operation: GET /
+  parameters: [url, mode, js_render, js_instructions, premium_proxy, proxy_country, response_type, wait_for, wait, block_resources, json_response, outputs, session_id, original_status, allowed_status_codes]
+extract:
+  operation: GET /
+  name: Extract structured data from a page
+  description: >-
+    Return structured JSON from a page with no selectors to write: extract=auto (or native)
+    returns the site's own field names, standard returns a canonical schema (real estate only
+    for now). Or pass css_extractor to map your own keys to CSS selectors. Billed as the Fetch
+    request it runs: {{< extract-no-credits}}. A domain that is not prepared yet answers 403
+    REQS007: prepare it with POST /v1/extract/prepared-domains, then retry.
+  parameters: [url, extract, extract_fields, css_extractor, mode, js_render, premium_proxy, proxy_country]
