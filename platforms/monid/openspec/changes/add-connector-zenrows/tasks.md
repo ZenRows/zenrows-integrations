@@ -55,17 +55,20 @@
       401, and the input gate from both sides
 - [x] 5.5 Extract: the fields without the page, a body with no `parsed`,
       the digested 403 with its `reason`, and the input gate
-- [ ] 5.6 Run the two live tests with a key (`ZENROWS_API_KEY`); they are
-      `ignored` without one, so nothing has yet called the real API
-      through the connector
+- [x] 5.6 Run the two live tests with a key (`ZENROWS_API_KEY`): 18
+      passed, 0 failed, nothing ignored. The connector itself reached
+      api.zenrows.com, read the meter where lifecycle.start expects it,
+      settled one credit, and Extract returned `product` with no `html`.
+      They stay `ignored` without a key, so CI needs none
 
 ## 6. Open questions
 
 - [ ] 6.1 Does monid's hosted relay forward response headers? The billing
       design reads `X-Request-Credits` in `lifecycle.start`. It works
-      against `directTransport` and the replay harness, but
-      `TransportResponse.headers` is optional and there is an engine test
-      for a transport that omits them. If the hosted relay strips headers,
-      settlement falls back to the 25 estimate silently rather than
-      failing, which is the one failure mode this design cannot detect
-      from the outside.
+      against `directTransport` and the replay harness, and the live run
+      above went through `directTransport` too, so it does not answer
+      this. `TransportResponse.headers` is optional and there is an
+      engine test for a transport that omits them. If the hosted relay
+      strips headers, settlement falls back to the 25 estimate silently
+      rather than failing, which is the one failure mode this design
+      cannot detect from the outside.
