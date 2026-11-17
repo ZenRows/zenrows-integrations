@@ -160,14 +160,15 @@ const tokenSpecText = JSON.stringify({
         { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
         { $ref: "#/components/parameters/mode" },
       ],
-      get: {},
+      get: { operationId: "fetchPage", summary: "Fetch a page" },
     },
     "/jobs/{job_id}": {
       servers: [{ url: "https://async.example.com/v1" }],
-      get: { summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
+      get: { operationId: "getJob", summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
     },
     "/jobs": {
       post: {
+        operationId: "createJob",
         summary: "Create a job",
         description: "Sends every URL at once.",
         servers: [{ url: "https://jobs.example.com/v1" }],
@@ -243,6 +244,24 @@ test("a host's render script's files ship", () => {
 });
 test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
 test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));
+// apiEndpoints lists every operation in the spec as a host's endpoints, minus the excluded ones.
+const lister = (excluded) => `export default ({ apiEndpoints }) => ({ "ids.json": JSON.stringify(apiEndpoints(${JSON.stringify(excluded)}).map((e) => e.id)) });\n`;
+test("a render script lists the API's endpoints, without the excluded ones", () => {
+  const r = run(renders(lister(["POST /jobs"]), { "shared/endpoints.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/ids.json"), '["fetch_page","get_job"]');
+});
+test("apiEndpoints lists a shared endpoint instead of the operation it splits", () => {
+  const r = run(renders(lister([]), { "shared/endpoints.yaml": "a:\n  operation: GET /\n  parameters: [url]\nb:\n  operation: GET /\n  parameters: [mode]\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/ids.json"), '["a","b","get_job","create_job"]');
+});
+test("apiEndpoints excluding an operation the API doesn't have fails", fails(renders(lister(["GET /nope"])), 'excludes "GET /nope", which the API doesn\'t have', tokenSpec));
+test("a render script fills a template's variables and snippets", () => {
+  const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/note.txt"), "Piece: One credit.");
+});
 test("a snippet named only in a render-script host's vars.yaml values is used", passes(renders('export default ({ values, sharedText }) => ({ "note.txt": values.note.replace(/\\{\\{< ([a-z-]+)\\}\\}/, (_, name) => sharedText(name)) });\n', { "shared/text/cost.md": "One credit per request.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nnote: \"{{< cost}}\"\n" }), tokenSpec));
 test("a snippet a render script reads with sharedText(\"name\") is used", () => {
   const r = run(renders('export default ({ sharedText }) => ({ "note.txt": sharedText("cost") });\n', { "shared/text/cost.md": "One credit per request.\n" }), tokenSpec);

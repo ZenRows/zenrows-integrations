@@ -192,6 +192,53 @@ function sharedEndpoints() {
   return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
 }
 
+// Every operation in the spec except excluded ("METHOD /path"), as the endpoints a
+// host offers: an operation shared/endpoints.yaml splits (GET / into fetch and
+// extract) as those. Each is { key, id, operation, method, path, name,
+// description, server, input, example, security }: key is the shared name or the
+// operation, id the shared name or the operationId in snake_case, description
+// undefined where the spec has none, input the query, path and body schemas it
+// takes, and security its key schemes from the spec.
+const httpMethods = ["get", "post", "put", "patch", "delete"];
+export function apiEndpoints(spec, excluded, where) {
+  const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
+  for (const operation of excluded) {
+    if (!all.includes(operation)) throw new Error(`${where}: excludes "${operation}", which the API doesn't have`);
+  }
+  const shared = sharedEndpoints();
+  return all
+    .filter((operation) => !excluded.includes(operation))
+    .flatMap((operation) => {
+      const [method, path] = operation.split(" ");
+      const op = spec.paths[path][method.toLowerCase()];
+      const slices = Object.keys(shared).filter((name) => shared[name].operation === operation);
+      if (!slices.length && !op.operationId) throw new Error(`${where}: the spec's ${operation} has no operationId to name it by`);
+      const named = slices.length ? slices.map((name) => [name, name]) : [[operation, op.operationId.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()]];
+      return named.map(([key, id]) => {
+        const value = (part) => apiValue(spec, key, part, undefined, where);
+        const input = {};
+        for (const part of ["query", "path", "body"]) {
+          if (part === "body" && !op.requestBody) continue;
+          const schema = value(part);
+          if (part === "body" || Object.keys(schema.properties ?? {}).length) input[part] = schema;
+        }
+        return {
+          key,
+          id,
+          operation,
+          method,
+          path,
+          name: value("summary"),
+          description: shared[key]?.description || op.description ? value("description") : undefined,
+          server: value("server"),
+          input,
+          example: value("example"),
+          security: (op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => ({ name, ...spec.components?.securitySchemes?.[name] })),
+        };
+      });
+    });
+}
+
 export function apiValue(spec, operation, part, names, where) {
   // A shared endpoint ("extract") is its operation, with its own query
   // parameters, and its own name and description where it gives them.
@@ -449,6 +496,8 @@ export function renderHost(host) {
       spec: loadedSpec.spec,
       specSha256: loadedSpec.sha256,
       apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
+      apiEndpoints: (excluded = []) => apiEndpoints(loadedSpec.spec, excluded, where),
+      fill: (text) => fill(text, values, where),
       sharedText: (name) => sharedText(name, where),
     });
     for (const [path, content] of Object.entries(files ?? {})) {
