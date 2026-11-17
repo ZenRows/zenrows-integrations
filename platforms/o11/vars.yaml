@@ -16,8 +16,3 @@ upload:
 credit_price_micros: 500
 request_max_credits: 25
 request_max_micros: 12500
-
-# The API operations not offered on o11. Every other one is listed, with the price block
-# in scripts/o11.yaml for its billing kind in shared/billing.yaml; a new API operation fails
-# the render until it's in shared/billing.yaml or listed here.
-excluded: [ POST /, PUT /, GET /extract/prepared-domains, GET /extract/prepared-domains/allowance, POST /api/agent/signup, GET /api/agent/account, GET /subscriptions/self/details, GET /jobs, "POST /jobs/{job_id}/tasks", "POST /jobs/{job_id}/close", "POST /jobs/{job_id}/stop", "POST /jobs/{job_id}/pause", "POST /jobs/{job_id}/resume", "POST /jobs/{job_id}/rerun", "DELETE /jobs/{job_id}", "DELETE /jobs/{job_id}/runs/{run_id}", "GET /jobs/{job_id}/runs", "GET /jobs/{job_id}/runs/{run_id}", "GET /jobs/{job_id}/runs/{run_id}/results", "GET /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/content", "GET /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/history", "GET /jobs/{job_id}/tasks/{task_id}/history", "POST /jobs/{job_id}/runs/{run_id}/exports", "GET /jobs/{job_id}/runs/{run_id}/exports/{export_id}", "PUT /jobs/{job_id}/schedule", "POST /jobs/{job_id}/schedule/state", "GET /jobs/{job_id}/webhook", "PUT /jobs/{job_id}/webhook", "DELETE /jobs/{job_id}/webhook", POST /webhook/test, POST /job_inputs, GET /hmac/keys, POST /hmac/keys/rotate, DELETE /hmac/keys/rotate, POST /hmac/keys/rotate/finalize, GET /crawls ]

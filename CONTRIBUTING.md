@@ -11,7 +11,7 @@ shared/assets/               files every plugin host ships as they are (logo)
 shared/text/<name>.md        one fact in plain text, used by skills ({{< name}}) and code hosts ({{text:name}})
 shared/vars.yaml             values every host gets as {{name}} (contact_email); a host's vars.yaml can override one
 shared/endpoints.yaml        endpoints on top of the spec: a slice of one operation (fetch, extract), or text it lacks
-shared/billing.yaml          how each endpoint is billed: per_credit, after_run or free
+shared/billing.yaml          what we offer and how it's billed: per_credit, after_run, free or not_offered, for every API operation
 platforms/<host>/
   vars.yaml                  values for {{var}}
   skills/<skill>/<slot>.md   the host's text for a {{> slot}} in that skill
@@ -58,7 +58,7 @@ A fact that more than one place states (what an error code means, what a request
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo. A listing, such as `platforms/o11/`, is checked against the schema its first line names (`# yaml-language-server: $schema=<url>`), with no duplicate keys or YAML aliases, by `npm run validate`.
 
-A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, spec, specSha256, apiValue, apiEndpoints, fill, sharedText }` and returns `{ "<path in dist/<host>>": text }`. `values` is the host's `vars.yaml`; `apiValue` is what the `{{api:…}}` placeholders render; `apiEndpoints(excluded)` lists every API operation except the excluded ones, with its id, name, description, server, inputs, example, key schemes and billing kind from `shared/billing.yaml` (an operation `shared/endpoints.yaml` splits as those endpoints); `fill(text)` fills a template's placeholders, so the host's fixed parts can stay in a YAML template next to the script. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
+A code host whose output is better generated whole than written as a template, such as a marketplace listing, has a `scripts/render.mjs`. Its default export gets `{ host, values, spec, specSha256, apiValue, apiEndpoints, apiNotOffered, fill, sharedText }` and returns `{ "<path in dist/<host>>": text }`. `values` is the host's `vars.yaml`; `apiValue` is what the `{{api:…}}` placeholders render; `apiEndpoints()` lists the endpoints we offer (`shared/billing.yaml`), with their id, name, description, server, inputs, example, key schemes and billing kind (an operation `shared/endpoints.yaml` splits as those endpoints), and `apiNotOffered()` the operations we don't. Every API operation must be in `shared/billing.yaml`, so a new one fails the render until it's placed; `fill(text)` fills a template's placeholders, so the host's fixed parts can stay in a YAML template next to the script. The render runs it after the host's other files and fails if it throws or returns a path the host already has.
 
 ## Keeping hosts current with the API
 

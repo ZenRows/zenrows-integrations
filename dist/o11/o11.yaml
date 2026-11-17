@@ -1055,6 +1055,9 @@ listings:
         - method: GET
           path: /jobs
           reason: Not offered on o11.
+        - method: DELETE
+          path: /jobs/{job_id}
+          reason: Not offered on o11.
         - method: POST
           path: /jobs/{job_id}/tasks
           reason: Not offered on o11.
@@ -1073,36 +1076,6 @@ listings:
         - method: POST
           path: /jobs/{job_id}/rerun
           reason: Not offered on o11.
-        - method: DELETE
-          path: /jobs/{job_id}
-          reason: Not offered on o11.
-        - method: DELETE
-          path: /jobs/{job_id}/runs/{run_id}
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs/{run_id}
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs/{run_id}/results
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/content
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/history
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/tasks/{task_id}/history
-          reason: Not offered on o11.
-        - method: POST
-          path: /jobs/{job_id}/runs/{run_id}/exports
-          reason: Not offered on o11.
-        - method: GET
-          path: /jobs/{job_id}/runs/{run_id}/exports/{export_id}
-          reason: Not offered on o11.
         - method: PUT
           path: /jobs/{job_id}/schedule
           reason: Not offered on o11.
@@ -1118,11 +1091,26 @@ listings:
         - method: DELETE
           path: /jobs/{job_id}/webhook
           reason: Not offered on o11.
-        - method: POST
-          path: /webhook/test
+        - method: GET
+          path: /jobs/{job_id}/runs
           reason: Not offered on o11.
-        - method: POST
-          path: /job_inputs
+        - method: GET
+          path: /jobs/{job_id}/runs/{run_id}
+          reason: Not offered on o11.
+        - method: DELETE
+          path: /jobs/{job_id}/runs/{run_id}
+          reason: Not offered on o11.
+        - method: GET
+          path: /jobs/{job_id}/runs/{run_id}/results
+          reason: Not offered on o11.
+        - method: GET
+          path: /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/content
+          reason: Not offered on o11.
+        - method: GET
+          path: /jobs/{job_id}/tasks/{task_id}/history
+          reason: Not offered on o11.
+        - method: GET
+          path: /jobs/{job_id}/runs/{run_id}/tasks/{task_id}/history
           reason: Not offered on o11.
         - method: GET
           path: /hmac/keys
@@ -1135,6 +1123,18 @@ listings:
           reason: Not offered on o11.
         - method: POST
           path: /hmac/keys/rotate/finalize
+          reason: Not offered on o11.
+        - method: POST
+          path: /webhook/test
+          reason: Not offered on o11.
+        - method: POST
+          path: /job_inputs
+          reason: Not offered on o11.
+        - method: POST
+          path: /jobs/{job_id}/runs/{run_id}/exports
+          reason: Not offered on o11.
+        - method: GET
+          path: /jobs/{job_id}/runs/{run_id}/exports/{export_id}
           reason: Not offered on o11.
         - method: GET
           path: /crawls

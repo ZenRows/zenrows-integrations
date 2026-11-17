@@ -6,20 +6,17 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse, stringify } from "yaml";
 
-const where = "platforms/o11/vars.yaml";
 const inputKeys = { query: "queryParams", path: "pathParams", body: "body" };
 
-export default function render({ values, fill, apiEndpoints }) {
+export default function render({ values, fill, apiEndpoints, apiNotOffered }) {
   const text = fill(readFileSync(join(import.meta.dirname, "o11.yaml"), "utf8"));
   const { prices, excludedReason, ...listing } = parse(text);
   const api = listing.listings[0];
 
-  // vars.yaml lists the excluded operations; each other endpoint gets the price
-  // block for its kind in shared/billing.yaml.
-  const excluded = values.excluded ?? [];
-  const endpoints = apiEndpoints(excluded);
+  // The endpoints we offer, and what we don't, are shared (shared/billing.yaml); each
+  // endpoint gets the price block for its billing kind.
+  const endpoints = apiEndpoints();
   const priceOf = (e) => {
-    if (!e.billing) throw new Error(`${where}: ${e.key} has no billing kind in shared/billing.yaml; add it there, or exclude it`);
     if (!prices[e.billing]) throw new Error(`platforms/o11/scripts/o11.yaml: prices has no block for ${e.billing}`);
     return prices[e.billing];
   };
@@ -43,7 +40,7 @@ export default function render({ values, fill, apiEndpoints }) {
     };
   });
   api.coverage.included = api.endpoints.map((e) => ({ endpointId: e.id, sources: [values.openapi_url] }));
-  api.coverage.excluded = excluded.map((operation) => {
+  api.coverage.excluded = apiNotOffered().map((operation) => {
     const [method, path] = operation.split(" ");
     return { method, path, reason: excludedReason };
   });

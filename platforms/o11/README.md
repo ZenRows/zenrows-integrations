@@ -7,8 +7,8 @@ It's a code host, and the listing is generated. Edit these, never `dist/o11/`:
 | File | What's in it |
 |---|---|
 | `scripts/o11.yaml` | the listing's fixed parts, as YAML: provider, base URL and key, coverage, and the three price blocks (`per_credit`, `unresolved`, `free`) with their text |
-| `vars.yaml` | which endpoints get which price block, and the excluded operations grouped by reason |
-| `scripts/render.mjs` | adds one endpoint per API operation that isn't excluded, with every field from the spec (id, name, description, base URL, key, parameters, example), and its price block |
+| `shared/billing.yaml` | which endpoints we offer (to every host, not only o11) and how each is billed; every other API operation is under `not_offered`, which the listing's `coverage.excluded` comes from |
+| `scripts/render.mjs` | adds one endpoint per offered API endpoint, with every field from the spec (id, name, description, base URL, key, parameters, example), and the price block for its billing kind |
 
 `GET /` is listed as the shared Fetch and Extract endpoints (`shared/endpoints.yaml`). Where the spec has no description, the listing uses its summary. The contact email comes from `shared/vars.yaml`, and the pricing facts in the price blocks from `shared/text/`. The listing has no `fixtures` (sample calls): they're optional in o11's format, and the spec doesn't pair requests with responses.
 
@@ -31,4 +31,4 @@ o11 reviews every version, and the live one keeps running until the new one is a
 
 ## Keeping it current
 
-The listing follows the spec on its own: a new parameter, a reworded description or a new base URL changes it at the next render. A new API operation is listed automatically, and the render fails until `vars.yaml` puts it in one of `per_credit`, `unresolved` or `free`, or excludes it with a reason. When prices change, update the `shared/text/` facts, the price blocks in `scripts/o11.yaml`, the numbers in `vars.yaml` and `observed_at`. `npm run validate` checks the listing against o11's schema.
+The listing follows the spec on its own: a new parameter, a reworded description or a new base URL changes it at the next render. A new API operation fails the render until it's placed in `shared/billing.yaml`, as offered (with its billing kind) or `not_offered`. When prices change, update the `shared/text/` facts, the price blocks in `scripts/o11.yaml`, the numbers in `vars.yaml` and `observed_at`. `npm run validate` checks the listing against o11's schema.
