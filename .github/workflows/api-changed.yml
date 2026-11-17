@@ -2,8 +2,8 @@ name: API changed
 
 # Runs when the docs repo publishes a new API spec (it sends a repository_dispatch
 # with the file's sha256), or by hand. Waits for www.zenrows.com/openapi.json to
-# carry that spec, then runs npm run validate, which checks every host's api:
-# and {{api:…}} placeholders against it. A failure opens (or updates) the issue "API
+# carry that spec, then runs npm run validate, which checks every host's
+# {{api:…}} placeholders against it. A failure opens (or updates) the issue "API
 # change: hosts to update" and posts to #proj-integrations; a clean run closes
 # the issue, and if the new spec changes what the {{api:…}} placeholders render, opens
 # a pull request with the re-rendered files.
@@ -89,7 +89,7 @@ jobs:
           existing=$(gh issue list --search "\"$ISSUE_TITLE\" in:title" --state open --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -1)
           # Only a host out of step with the spec is the hosts' problem; anything
           # else (the spec didn't download, a broken render) is this run's.
-          problems=$(grep -E '^❌ .*(vars\.yaml api:|the API has no operation|has no (query|path) parameter|has no JSON body)' validate.log || true)
+          problems=$(grep -E '^❌ .*(the API has no operation|has no (query|path) parameter|has no JSON body)' validate.log || true)
 
           if [ "$FAILED" = "true" ] && [ -z "$problems" ]; then
             echo "::error::validate failed for a reason other than the API spec; see the log above."
