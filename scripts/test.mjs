@@ -211,6 +211,7 @@ test("a host's render script's files ship", () => {
 });
 test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
 test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));
+test("a snippet named only in a render-script host's vars.yaml values is used", passes(renders('export default ({ values, sharedText }) => ({ "note.txt": values.note.replace(/\\{\\{< ([a-z-]+)\\}\\}/, (_, name) => sharedText(name)) });\n', { "shared/text/cost.md": "One credit per request.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nnote: \"{{< cost}}\"\n" }), tokenSpec));
 
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {

@@ -324,9 +324,15 @@ const snippetSources = [
     .map((f) => join(platformsDir, f)),
 ];
 const used = new Set();
+const snippetNames = (text) => [...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]);
 for (const file of snippetSources) {
   if (!textFile.test(file)) continue;
-  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
+  for (const name of snippetNames(readFileSync(file, "utf8"))) used.add(name);
+}
+// A host with its own scripts/render.mjs renders text from its vars.yaml values
+// (not its comments), so a snippet named there is used.
+for (const host of hosts().filter((h) => existsSync(join(platformsDir, h, "scripts", "render.mjs")))) {
+  for (const name of snippetNames(JSON.stringify(vars(host)))) used.add(name);
 }
 for (const file of listFiles(sharedTextDir)) {
   const name = file.replace(/\.md$/, "");
