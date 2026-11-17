@@ -3,6 +3,7 @@
 // snippet, …), runs npm run render and npm run validate there, and checks the
 // first failure, or that both pass. Add a case whenever a new rule is added.
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -26,7 +27,10 @@ const piece = {
 // Runs render then validate in a copy of the repo with `files` written over it
 // (null deletes). Returns { ok, out, dist }: out is the failing step's output,
 // dist(path) reads a rendered file.
-function run(files, reads = []) {
+// The API spec validate reads: the last download if there is one, so the tests
+// don't need the network; a case can name its own file in env.ZENROWS_OPENAPI.
+const cachedSpec = join(root, ".cache", "openapi.json");
+function run(files, env = {}, reads = []) {
   const dir = mkdtempSync(join(tmpdir(), "zenrows-integrations-test-"));
   try {
     for (const path of copied) {
@@ -43,24 +47,36 @@ function run(files, reads = []) {
         writeFileSync(join(dir, path), content);
       }
     }
+    let out = "";
     for (const script of ["render", "validate"]) {
-      const r = spawnSync("node", [join("scripts", `${script}.mjs`)], { cwd: dir, encoding: "utf8" });
+      const r = spawnSync("node", [join("scripts", `${script}.mjs`)], {
+        cwd: dir,
+        encoding: "utf8",
+        env: { ...process.env, ...(existsSync(cachedSpec) ? { ZENROWS_OPENAPI: cachedSpec } : {}), ...env },
+      });
       if (r.status !== 0) return { ok: false, out: `${r.stdout}${r.stderr}` };
+      out += `${r.stdout}${r.stderr}`;
     }
     const outs = [...Object.keys(files).filter((p) => p.startsWith("platforms/")).map((p) => p.replace(/^platforms\//, "dist/")), ...reads];
     const rendered = new Map(outs.map((out) => [out, existsSync(join(dir, out)) ? readFileSync(join(dir, out), "utf8") : undefined]));
-    return { ok: true, out: "", dist: (path) => rendered.get(path) };
+    return { ok: true, out, dist: (path) => rendered.get(path) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-const passes = (files) => () => {
-  const r = run(files);
+const passes = (files, env) => () => {
+  const r = run(files, env);
   assert.ok(r.ok, r.out);
 };
-const fails = (files, message) => () => {
-  const r = run(files);
+// Passes, with a warning that says message.
+const warns = (files, message, env) => () => {
+  const r = run(files, env);
+  assert.ok(r.ok, r.out);
+  assert.ok(r.out.includes(message), `expected the warning "${message}" in:\n${r.out}`);
+};
+const fails = (files, message, env) => () => {
+  const r = run(files, env);
   assert.ok(!r.ok, "expected a failure, but render and validate passed");
   assert.ok(r.out.includes(message), `expected "${message}" in:\n${r.out}`);
 };
@@ -118,6 +134,150 @@ test("an unknown kind fails", () => {
 });
 test("a vars.yaml that isn't name: value lines fails", fails({ ...piece, "platforms/piece/vars.yaml": "- host_full: Piece\n" }, "platforms/piece/vars.yaml must be a list of name: value lines"));
 
+// api: in vars.yaml, checked against a small spec stub instead of the published one.
+const stubSpec = {
+  "openapi-stub.json": JSON.stringify({
+    openapi: "3.1.0",
+    paths: { "/": { parameters: [{ $ref: "#/components/parameters/mode" }, { name: "url", in: "query" }], get: {} } },
+    components: { parameters: { mode: { name: "mode", in: "query" } } },
+  }),
+};
+const withSpec = { ZENROWS_OPENAPI: "openapi-stub.json" };
+const sends = (api, code) => ({ ...piece, ...stubSpec, "platforms/piece/vars.yaml": `host_full: Piece\nkind: code\napi:\n  ${api}\n`, "platforms/piece/src/index.ts": `${code}\n` });
+test("a host's api: passes when the API takes each parameter and the host sends it", passes(sends('GET /: [url, mode]', 'export const q = { url: "https://example.com", mode: "auto" };'), withSpec));
+test("an api: operation the API doesn't have fails", fails(sends('GET /nope: []', 'export const q = {};'), 'the API has no operation "GET /nope"', withSpec));
+test("an api: parameter the operation doesn't take fails", fails(sends('GET /: [foo]', 'export const q = { foo: 1 };'), 'GET / doesn\'t take "foo"', withSpec));
+test("an api: parameter sent as a JavaScript shorthand property passes", passes(sends('GET /: [url, mode]', 'export const q = ({ url, mode }) => ({ url, mode });'), withSpec));
+test("an api: operation whose value isn't a list fails", fails(sends('GET /: url', 'export const q = { url: "x" };'), 'GET / must list parameter names', withSpec));
+test("an api: parameter the host never sends fails", fails(sends('GET /: [url, mode]', 'export const q = { mode: "auto" };'), 'declares "url" for GET /, but no file in dist/piece sends it', withSpec));
+
+// {{api:…}} renders part of an operation from the spec as JSON Schema; {{api-sha256}} the spec's hash.
+const tokenSpecText = JSON.stringify({
+  openapi: "3.1.0",
+  paths: {
+    "/": {
+      parameters: [
+        { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
+        { $ref: "#/components/parameters/mode" },
+      ],
+      get: { operationId: "fetchPage", summary: "Fetch a page" },
+    },
+    "/jobs/{job_id}": {
+      servers: [{ url: "https://async.example.com/v1" }],
+      get: { operationId: "getJob", summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
+    },
+    "/jobs": {
+      post: {
+        operationId: "createJob",
+        summary: "Create a job",
+        description: "Sends every URL at once.",
+        servers: [{ url: "https://jobs.example.com/v1" }],
+        requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" }, examples: { two: { value: { urls: ["https://a.example/"] } } } } } },
+      },
+    },
+  },
+  servers: [{ url: "https://api.example.com/v1" }],
+  components: {
+    parameters: { mode: { name: "mode", in: "query", schema: { type: "string", enum: ["auto"] } } },
+    schemas: { Job: { type: "object", properties: { urls: { type: "array", items: { $ref: "#/components/schemas/Url" } } } }, Url: { type: "string" } },
+  },
+});
+const usesToken = (token) => ({ ...piece, "openapi-tokens.json": tokenSpecText, "platforms/piece/src/index.ts": `export const p = ${token};\n` });
+const tokenSpec = { ZENROWS_OPENAPI: "openapi-tokens.json" };
+const rendersTo = (token, expected) => () => {
+  const r = run(usesToken(token), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), `export const p = ${expected};\n`);
+};
+test("{{api:…}} renders the query parameters it names", rendersTo("{{api:GET / query url}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."}},"required":["url"]}'));
+test("{{api:…}} without names renders the whole part, $refs resolved", rendersTo("{{api:GET / query}}", '{"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."},"mode":{"type":"string","enum":["auto"]}},"required":["url"]}'));
+test("{{api:…}} renders path parameters", rendersTo("{{api:GET /jobs/{job_id} path}}", '{"type":"object","properties":{"job_id":{"type":"string","examples":["J1"]}},"required":["job_id"]}'));
+test("{{api:…}} renders a JSON body with its $refs inlined", rendersTo("{{api:POST /jobs body}}", '{"type":"object","properties":{"urls":{"type":"array","items":{"type":"string"}}}}'));
+test("{{api-sha256}} is the sha256 of the spec", rendersTo('"{{api-sha256}}"', JSON.stringify(createHash("sha256").update(tokenSpecText).digest("hex"))));
+test("{{api:…}} for an operation the API doesn't have fails", fails(usesToken("{{api:GET /nope query}}"), 'the API has no operation "GET /nope"', tokenSpec));
+test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesToken("{{api:GET / query url,page}}"), 'GET / has no query parameter "page"', tokenSpec));
+test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /jobs summary}}, {{api:POST /jobs description}}]", '["Create a job", "Sends every URL at once."]'));
+test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
+test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
+// shared/endpoints.yaml: an endpoint that is a slice of one operation, for every host.
+const sliced = (yaml, token) => ({ ...usesToken(token), "shared/endpoints.yaml": yaml });
+test("a shared endpoint renders its slice, name and the spec's description", () => {
+  const r = run(sliced("slice:\n  operation: POST /jobs\n  name: Slice\n", "[{{api:slice summary}}, {{api:slice description}}, {{api:slice server}}]"), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), 'export const p = ["Slice", "Sends every URL at once.", "https://jobs.example.com/v1"];\n');
+});
+test("a shared endpoint's query is only its parameters", () => {
+  const r = run(sliced("slice:\n  operation: GET /\n  parameters: [url]\n", "{{api:slice query}}"), tokenSpec, ["dist/piece/src/index.ts"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/src/index.ts"), 'export const p = {"type":"object","properties":{"url":{"type":"string","format":"uri","description":"The page."}},"required":["url"]};\n');
+});
+test("a shared endpoint with a parameter its operation doesn't take fails", fails(sliced("slice:\n  operation: GET /\n  parameters: [url, page]\n", "{{api:slice query}}"), 'shared/endpoints.yaml slice: GET / has no query parameter "page"', tokenSpec));
+test("a placeholder naming no shared endpoint fails", fails(usesToken("{{api:nothing query}}"), 'shared/endpoints.yaml has no endpoint "nothing"', tokenSpec));
+// shared/vars.yaml: values every host gets, under its own.
+test("a shared variable reaches every host, and a host can override it", () => {
+  const files = { ...piece, "shared/vars.yaml": "contact_email: team@example.com\n", "platforms/piece/src/index.ts": 'export const c = "{{contact_email}}";\n' };
+  const shared = run(files, {}, ["dist/piece/src/index.ts"]);
+  assert.ok(shared.ok, shared.out);
+  assert.equal(shared.dist("dist/piece/src/index.ts"), 'export const c = "team@example.com";\n');
+  const own = run({ ...files, "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\ncontact_email: piece@example.com\n" }, {}, ["dist/piece/src/index.ts"]);
+  assert.ok(own.ok, own.out);
+  assert.equal(own.dist("dist/piece/src/index.ts"), 'export const c = "piece@example.com";\n');
+});
+test("{{api:… example}} builds the example request from the spec's parameter and body examples", rendersTo("[{{api:GET / example}}, {{api:GET /jobs/{job_id} example}}, {{api:POST /jobs example}}]", '[{"queryParams":{"url":"https://example.com/"}}, {"pathParams":{"job_id":"J1"}}, {"body":{"urls":["https://a.example/"]}}]'));
+
+// A host's scripts/render.mjs builds files from the spec and its vars.yaml.
+const renders = (script, extra = {}) => ({
+  ...piece,
+  "openapi-tokens.json": tokenSpecText,
+  "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nlisting_name: Piece listing\n",
+  "platforms/piece/scripts/render.mjs": script,
+  ...extra,
+});
+const generator = `export default ({ values, apiValue, specSha256 }) => ({
+  "listing.json": JSON.stringify({ name: values.listing_name, required: apiValue("GET /", "query").required, sha: specSha256.length }) + "\\n",
+});
+`;
+test("a host's render script's files ship", () => {
+  const r = run(renders(generator), tokenSpec, ["dist/piece/listing.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/listing.json"), '{"name":"Piece listing","required":["url"],"sha":64}\n');
+});
+test("a host's render script that throws fails the render", fails(renders('export default () => { throw new Error("no fixture for batch_get"); };\n'), "no fixture for batch_get", tokenSpec));
+test("a host's render script returning a file the host already has fails", fails(renders('export default () => ({ "src/index.ts": "x" });\n'), "platforms/piece/scripts/render.mjs returns src/index.ts, which platforms/piece/ already has", tokenSpec));
+// apiEndpoints lists every operation in the spec as a host's endpoints, minus the excluded ones.
+const lister = (excluded) => `export default ({ apiEndpoints }) => ({ "ids.json": JSON.stringify(apiEndpoints(${JSON.stringify(excluded)}).map((e) => e.id)) });\n`;
+test("a render script lists the API's endpoints, without the excluded ones", () => {
+  const r = run(renders(lister(["POST /jobs"]), { "shared/endpoints.yaml": "{}\n", "shared/billing.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/ids.json"), '["fetch_page","get_job"]');
+});
+test("apiEndpoints lists a shared endpoint instead of the operation it splits", () => {
+  const r = run(renders(lister([]), { "shared/endpoints.yaml": "a:\n  operation: GET /\n  parameters: [url]\nb:\n  operation: GET /\n  parameters: [mode]\n", "shared/billing.yaml": "{}\n" }), tokenSpec, ["dist/piece/ids.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/ids.json"), '["a","b","get_job","create_job"]');
+});
+// shared/billing.yaml gives each endpoint apiEndpoints lists its billing kind.
+const billed = (yaml) => renders('export default ({ apiEndpoints }) => ({ "billing.json": JSON.stringify(apiEndpoints([]).map((e) => [e.id, e.billing ?? null])) });\n', { "shared/endpoints.yaml": "{}\n", "shared/billing.yaml": yaml });
+test("apiEndpoints gives each endpoint its kind from shared/billing.yaml", () => {
+  const r = run(billed("per_credit: [GET /]\nfree: [\"GET /jobs/{job_id}\"]\n"), tokenSpec, ["dist/piece/billing.json"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/billing.json"), '[["fetch_page","per_credit"],["get_job","free"],["create_job",null]]');
+});
+test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(billed("free: [GET /nope]\n"), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
+test("shared/billing.yaml with an endpoint in two kinds fails", fails(billed("free: [GET /]\nper_credit: [GET /]\n"), 'shared/billing.yaml: "GET /" is both free and per_credit', tokenSpec));
+test("apiEndpoints excluding an operation the API doesn't have fails", fails(renders(lister(["GET /nope"])), 'excludes "GET /nope", which the API doesn\'t have', tokenSpec));
+test("a render script fills a template's variables and snippets", () => {
+  const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/note.txt"), "Piece: One credit.");
+});
+test("a snippet named only in a render-script host's vars.yaml values is used", passes(renders('export default ({ values, sharedText }) => ({ "note.txt": values.note.replace(/\\{\\{< ([a-z-]+)\\}\\}/, (_, name) => sharedText(name)) });\n', { "shared/text/cost.md": "One credit per request.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\nnote: \"{{< cost}}\"\n" }), tokenSpec));
+test("a snippet a render script reads with sharedText(\"name\") is used", () => {
+  const r = run(renders('export default ({ sharedText }) => ({ "note.txt": sharedText("cost") });\n', { "shared/text/cost.md": "One credit per request.\n" }), tokenSpec);
+  assert.ok(r.ok, r.out);
+  assert.ok(!r.out.includes("cost.md isn't used"), r.out);
+});
+
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {
   // JSX, with a string, a number and a variable value, spaced or not.
@@ -139,14 +299,14 @@ test("a readme/ file shared/README.md has no slot for fails", fails({ "platforms
 test("the optional more slot is left out without its file and put in with it", () => {
   assert.ok(!copilotReadme().includes("{{"), "no slot token left in the rendered README");
   assert.ok(!copilotReadme().includes("For maintainers"));
-  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, ["dist/copilot/README.md"]);
+  const r = run({ "platforms/copilot/readme/more.md": "## For maintainers\n\nRelease notes live elsewhere.\n" }, {}, ["dist/copilot/README.md"]);
   assert.ok(r.ok, r.out);
   assert.match(r.dist("dist/copilot/README.md"), /## Setup\n[\s\S]*## For maintainers\n\nRelease notes live elsewhere\.\n\n## Privacy/);
 });
 
 // A host's scripts/ is its own tooling: never shipped, and its validate.mjs runs.
 test("a host's scripts/ isn't shipped", () => {
-  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, ["dist/copilot/scripts/tool.sh"]);
+  const r = run({ "platforms/copilot/scripts/tool.sh": "echo hi\n" }, {}, ["dist/copilot/scripts/tool.sh"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/copilot/scripts/tool.sh"), undefined);
 });
@@ -154,7 +314,7 @@ test("a host's own scripts/validate.mjs failing fails validate", fails({ "platfo
 
 // dist/<host>/CHANGELOG.md is release-please's: the render keeps it.
 test("the render keeps a host's CHANGELOG.md", () => {
-  const r = run({ "dist/copilot/CHANGELOG.md": "# Changelog\n\n## 0.2.0\n" }, ["dist/copilot/CHANGELOG.md"]);
+  const r = run({ "dist/copilot/CHANGELOG.md": "# Changelog\n\n## 0.2.0\n" }, {}, ["dist/copilot/CHANGELOG.md"]);
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/copilot/CHANGELOG.md"), "# Changelog\n\n## 0.2.0\n");
 });
@@ -172,9 +332,9 @@ test("a snippet with a blank last line or CRLF renders clean", () => {
   }
 });
 test("a snippet with a {{…}} fails", fails(snippet("Ask {{host}} to sign in.\n"), "uses {{…}}; a snippet is a plain fact"));
-test("a snippet named only in a vars.yaml comment fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
+test("a snippet named only in a vars.yaml comment isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
 test("a snippet on two lines fails", fails(snippet("One fact.\nAnother fact.\n"), "has more than one line"));
-test("a snippet named only in a code host README fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
+test("a snippet named only in a code host README isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
-test("an unused snippet fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "isn't used by any skill or host"));
+test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));

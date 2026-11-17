@@ -1,9 +1,9 @@
 // Shared by render.mjs, validate.mjs and override.mjs: where things live, how a
 // host's plugin is rendered, and how override hashes are computed.
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parse as parseYaml } from "yaml";
 
 export const root = fileURLToPath(new URL("..", import.meta.url));
@@ -16,7 +16,7 @@ export const sharedTextDir = join(root, "shared", "text");
 const sharedFiles = { LICENSE: "LICENSE" };
 const sharedDirs = { "shared/assets": "assets" };
 // In platforms/<host>/, these are inputs to the render or the host's own tooling
-// (scripts/validate.mjs, scripts/package.sh), not files of the plugin.
+// (scripts/validate.mjs, scripts/render.mjs, scripts/package.sh), not files of the plugin.
 // Everything else there (manifests, README, …) is copied into dist/<host>/.
 const reserved = ["vars.yaml", "overrides.lock", "skills/", "scripts/", "readme/"];
 // A plugin host's README.md is rendered from this template, with the host's
@@ -62,6 +62,15 @@ function versions() {
   return JSON.parse(readFileSync(join(root, ".release-please-manifest.json"), "utf8"));
 }
 
+// shared/vars.yaml: values every host gets.
+function sharedVars() {
+  const file = join(root, "shared", "vars.yaml");
+  if (!existsSync(file)) return {};
+  const v = parseYaml(readFileSync(file, "utf8")) ?? {};
+  if (typeof v !== "object" || Array.isArray(v)) throw new Error("shared/vars.yaml must be a list of name: value lines");
+  return v;
+}
+
 export function vars(host) {
   const v = parseYaml(readFileSync(join(platformsDir, host, "vars.yaml"), "utf8")) ?? {};
   if (typeof v !== "object" || Array.isArray(v)) throw new Error(`platforms/${host}/vars.yaml must be a list of name: value lines`);
@@ -72,7 +81,265 @@ export function vars(host) {
   // A code host may not be released from here (yet), so it needs no
   // release-please entry; it then has no {{version}}.
   if (!version && !isCodeHost(v)) throw new Error(`.release-please-manifest.json has no "dist/${host}" entry`);
-  return version ? { ...v, version } : v;
+  // shared/vars.yaml first, so the host's own values win; {{openapi_url}}: the
+  // published API spec, the one {{api:…}} and api: read.
+  const values = { ...sharedVars(), ...v, openapi_url: openapiUrl };
+  return version ? { ...values, version } : values;
+}
+
+// The published API spec, which validate checks each host's api: against.
+// ZENROWS_OPENAPI names a file to use instead (tests, a spec not published
+// yet). The last download is kept in .cache/openapi.json for when the network
+// is down.
+export const openapiUrl = "https://www.zenrows.com/openapi.json";
+const openapiCache = join(root, ".cache", "openapi.json");
+export async function openapi() {
+  return JSON.parse(await openapiText());
+}
+async function openapiText() {
+  if (process.env.ZENROWS_OPENAPI) return readFileSync(process.env.ZENROWS_OPENAPI, "utf8");
+  try {
+    const res = await fetch(openapiUrl, { signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    JSON.parse(text);
+    mkdirSync(dirname(openapiCache), { recursive: true });
+    writeFileSync(openapiCache, text);
+    return text;
+  } catch (e) {
+    if (!existsSync(openapiCache)) {
+      throw new Error(`couldn't download the API spec from ${openapiUrl} (${e.message}), and there's no copy in .cache/openapi.json yet`);
+    }
+    console.warn(`⚠️ couldn't download the API spec from ${openapiUrl} (${e.message}); using the copy in .cache/openapi.json`);
+    return readFileSync(openapiCache, "utf8");
+  }
+}
+
+// What the render needs before it starts: the API spec, when a file uses an
+// {{api:…}} placeholder or a host has its own scripts/render.mjs, and each such
+// script. The render itself is synchronous, so render and validate call this first.
+let loadedSpec;
+const hostRenderers = {};
+export async function prepareRender() {
+  for (const host of hosts()) {
+    const script = join(platformsDir, host, "scripts", "render.mjs");
+    if (existsSync(script)) hostRenderers[host] = (await import(pathToFileURL(script).href)).default;
+  }
+  const dirs = [platformsDir, skillsDir, join(root, "shared")];
+  const uses = dirs.some((dir) =>
+    listFiles(dir).some((f) => textFile.test(f) && readFileSync(join(dir, f), "utf8").includes("{{api")),
+  );
+  if (!uses && !Object.keys(hostRenderers).length) return;
+  const text = await openapiText();
+  loadedSpec = { spec: JSON.parse(text), sha256: sha256(text) };
+}
+
+// A $ref in the spec, followed to what it points at.
+function specRef(spec, node) {
+  while (node?.$ref) node = node.$ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], spec);
+  return node;
+}
+
+// node with every $ref replaced by a copy of its target, so the result stands
+// alone; a $ref that leads back to itself fails, since it can't be inlined.
+function inlineRefs(spec, node, seen = []) {
+  if (Array.isArray(node)) return node.map((n) => inlineRefs(spec, n, seen));
+  if (!node || typeof node !== "object") return node;
+  if (node.$ref) {
+    if (seen.includes(node.$ref)) throw new Error(`the API spec's ${node.$ref} refers to itself, so it can't be inlined`);
+    return inlineRefs(spec, specRef(spec, node), [...seen, node.$ref]);
+  }
+  return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, inlineRefs(spec, v, seen)]));
+}
+
+// An example value as the spec gives it: example, else the first of examples
+// (an OpenAPI Example object's value, or a JSON Schema examples array).
+function firstExample(node) {
+  if (node?.example !== undefined) return node.example;
+  const examples = node?.examples;
+  if (Array.isArray(examples)) return examples[0];
+  if (examples && typeof examples === "object") return Object.values(examples)[0]?.value;
+  return undefined;
+}
+
+// The spec's example request for an operation: its query and path parameters'
+// examples and its JSON body's, with the parts it has none for left out.
+function apiExample(spec, item, op) {
+  const out = {};
+  const params = [...(item.parameters ?? []), ...(op.parameters ?? [])].map((p) => specRef(spec, p));
+  for (const [part, key] of [["query", "queryParams"], ["path", "pathParams"]]) {
+    for (const p of params.filter((p) => p?.in === part)) {
+      const value = firstExample(p) ?? firstExample(specRef(spec, p.schema));
+      if (value !== undefined) (out[key] ??= {})[p.name] = value;
+    }
+  }
+  const body = op.requestBody?.content?.["application/json"];
+  const value = firstExample(body) ?? firstExample(specRef(spec, body?.schema));
+  if (value !== undefined) out.body = inlineRefs(spec, value);
+  return out;
+}
+
+// What {{api:<METHOD> <path> <part> [names]}} renders. For query, path and body:
+// a JSON Schema object for that part of the operation (query or path parameters,
+// or the JSON body), with each property's schema and description from the spec;
+// names (comma-separated) picks some, and without them it's all of the part.
+// For summary, description and server: that string from the spec (server: the
+// operation's servers, else the path's, else the spec's). For example: the
+// example request (see apiExample).
+// shared/endpoints.yaml: endpoints that are a slice of one API operation.
+function sharedEndpoints() {
+  const file = join(root, "shared", "endpoints.yaml");
+  return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
+}
+
+// Every operation in the spec except excluded ("METHOD /path"), as the endpoints a
+// host offers: an operation shared/endpoints.yaml splits (GET / into fetch and
+// extract) as those. Each is { key, id, operation, method, path, name,
+// description, server, input, example, security, billing }: key is the shared
+// name or the operation, id the shared name or the operationId in snake_case,
+// description undefined where the spec has none, input the query, path and body
+// schemas it takes, security its key schemes from the spec, and billing its kind
+// in shared/billing.yaml (undefined where it has none).
+const httpMethods = ["get", "post", "put", "patch", "delete"];
+// shared/billing.yaml as { endpoint: kind }. Every name must be an endpoint, and in
+// one kind only.
+function sharedBilling(spec, operations, shared) {
+  const file = join(root, "shared", "billing.yaml");
+  const kinds = existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
+  const byEndpoint = {};
+  for (const [kind, names] of Object.entries(kinds)) {
+    for (const name of names) {
+      if (!operations.includes(name) && !(name in shared)) throw new Error(`shared/billing.yaml: ${kind} names "${name}", which is neither an API operation nor a shared endpoint`);
+      if (byEndpoint[name]) throw new Error(`shared/billing.yaml: "${name}" is both ${byEndpoint[name]} and ${kind}`);
+      byEndpoint[name] = kind;
+    }
+  }
+  return byEndpoint;
+}
+
+export function apiEndpoints(spec, excluded, where) {
+  const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
+  for (const operation of excluded) {
+    if (!all.includes(operation)) throw new Error(`${where}: excludes "${operation}", which the API doesn't have`);
+  }
+  const shared = sharedEndpoints();
+  const billing = sharedBilling(spec, all, shared);
+  return all
+    .filter((operation) => !excluded.includes(operation))
+    .flatMap((operation) => {
+      const [method, path] = operation.split(" ");
+      const op = spec.paths[path][method.toLowerCase()];
+      const slices = Object.keys(shared).filter((name) => shared[name].operation === operation);
+      if (!slices.length && !op.operationId) throw new Error(`${where}: the spec's ${operation} has no operationId to name it by`);
+      const named = slices.length ? slices.map((name) => [name, name]) : [[operation, op.operationId.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase()]];
+      return named.map(([key, id]) => {
+        const value = (part) => apiValue(spec, key, part, undefined, where);
+        const input = {};
+        for (const part of ["query", "path", "body"]) {
+          if (part === "body" && !op.requestBody) continue;
+          const schema = value(part);
+          if (part === "body" || Object.keys(schema.properties ?? {}).length) input[part] = schema;
+        }
+        return {
+          key,
+          id,
+          operation,
+          method,
+          path,
+          name: value("summary"),
+          description: shared[key]?.description || op.description ? value("description") : undefined,
+          server: value("server"),
+          input,
+          example: value("example"),
+          security: (op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => ({ name, ...spec.components?.securitySchemes?.[name] })),
+          billing: billing[key],
+        };
+      });
+    });
+}
+
+export function apiValue(spec, operation, part, names, where) {
+  // A shared endpoint ("extract") is its operation, with its own query
+  // parameters, and its own name and description where it gives them.
+  if (!/\s/.test(operation)) {
+    const shared = sharedEndpoints()[operation];
+    if (!shared) throw new Error(`${where}: shared/endpoints.yaml has no endpoint "${operation}"`);
+    const own = `shared/endpoints.yaml ${operation}`;
+    const takes = Object.keys(apiValue(spec, shared.operation, "query", undefined, own).properties ?? {});
+    const unknown = (shared.parameters ?? []).find((p) => !takes.includes(p));
+    if (unknown) throw new Error(`${own}: ${shared.operation} has no query parameter "${unknown}"`);
+    if (part === "summary" && shared.name) return shared.name;
+    if (part === "description" && shared.description) {
+      return shared.description.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, own));
+    }
+    if (part === "query" && shared.parameters) return apiValue(spec, shared.operation, part, names ?? shared.parameters.join(","), where);
+    if (part === "example" && shared.parameters) {
+      const example = apiValue(spec, shared.operation, part, names, where);
+      const query = Object.fromEntries(Object.entries(example.queryParams ?? {}).filter(([k]) => shared.parameters.includes(k)));
+      const { queryParams, ...rest } = example;
+      return Object.keys(query).length ? { ...rest, queryParams: query } : rest;
+    }
+    return apiValue(spec, shared.operation, part, names, where);
+  }
+  const [method, path] = operation.split(/\s+/);
+  const item = spec.paths?.[path];
+  const op = item?.[method.toLowerCase()];
+  if (!op) throw new Error(`${where}: the API has no operation "${operation}"`);
+  if (part === "example") {
+    if (names) throw new Error(`${where}: {{api:… example}} takes no names`);
+    return apiExample(spec, item, op);
+  }
+  if (["summary", "description", "server"].includes(part)) {
+    if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
+    const value = part === "server" ? (op.servers ?? item.servers ?? spec.servers)?.[0]?.url : op[part];
+    if (!value) throw new Error(`${where}: the API spec has no ${part} for ${operation}`);
+    return value;
+  }
+  let schema;
+  if (part === "body") {
+    const body = op.requestBody?.content?.["application/json"]?.schema;
+    if (!body) throw new Error(`${where}: ${operation} has no JSON body`);
+    schema = inlineRefs(spec, body);
+  } else {
+    const params = [...(item.parameters ?? []), ...(op.parameters ?? [])].map((p) => specRef(spec, p)).filter((p) => p?.in === part);
+    const required = params.filter((p) => p.required).map((p) => p.name);
+    schema = {
+      type: "object",
+      properties: Object.fromEntries(
+        params.map((p) => [p.name, { ...inlineRefs(spec, p.schema ?? {}), ...(p.description ? { description: p.description } : {}) }]),
+      ),
+      ...(required.length ? { required } : {}),
+    };
+  }
+  if (!names) return schema;
+  const picked = names.split(",").map((n) => n.trim()).filter(Boolean);
+  for (const name of picked) {
+    if (!(name in (schema.properties ?? {}))) throw new Error(`${where}: ${operation} has no ${part} parameter "${name}"`);
+  }
+  const { required: all = [], ...rest } = schema;
+  const required = all.filter((n) => picked.includes(n));
+  return {
+    ...rest,
+    properties: Object.fromEntries(picked.map((n) => [n, schema.properties[n]])),
+    ...(required.length ? { required } : {}),
+  };
+}
+
+// The query parameters an operation ("GET /") takes: the path's and the
+// operation's own, with $refs resolved. undefined if the spec has no such operation.
+export function apiParameters(spec, operation) {
+  const [method, path] = operation.trim().split(/\s+/);
+  const item = spec.paths?.[path];
+  const op = method && item?.[method.toLowerCase()];
+  if (!op) return undefined;
+  const resolve = (p) => {
+    while (p?.$ref) p = p.$ref.replace(/^#\//, "").split("/").reduce((o, k) => o?.[k], spec);
+    return p;
+  };
+  return [...(item.parameters ?? []), ...(op.parameters ?? [])]
+    .map(resolve)
+    .filter((p) => p?.in === "query")
+    .map((p) => p.name);
 }
 
 // overrides.lock: "<shared path>: <sha256>" per line; # starts a comment.
@@ -138,8 +405,14 @@ export function sharedText(name, where) {
 
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
 // the host; {{< name}} inlines shared/text/<name>.md, and {{text:name}} inserts it
-// as a quoted string literal (JSON), for code.
+// as a quoted string literal (JSON), for code. {{api:GET / query url,mode}} is
+// that part of an API operation as JSON Schema, or its summary, description or
+// server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
+  text = text.replace(/\{\{api:\s*(?:([A-Z]+)\s+(\S+)|([a-z][a-z0-9_-]*))\s+(query|path|body|summary|description|server|example)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, shared, part, names) =>
+    JSON.stringify(apiValue(apiSpecFor(where).spec, shared ?? `${method} ${path}`, part, names, where)),
+  );
+  text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));
   return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
@@ -162,6 +435,11 @@ function fill(text, values, where) {
 }
 
 // Renders one host. Returns Map<path under dist/<host>, Buffer>.
+function apiSpecFor(where) {
+  if (!loadedSpec) throw new Error(`${where}: uses {{api…}}, but the API spec wasn't loaded (call prepareRender() before rendering)`);
+  return loadedSpec;
+}
+
 // Puts a host's slot files into text: {{> slot}} needs <dir>/<slot>.md; {{>? slot}}
 // is optional, and without the file its line (and one blank line after it) goes.
 // Records each slot file used in usedSlots.
@@ -226,11 +504,32 @@ export function renderHost(host) {
     out.set(file, renderFile(join(platform, file), values));
   }
 
+  // A host's own scripts/render.mjs builds files from the spec and its vars.yaml
+  // (for example a listing generated whole). It gets what the placeholders use
+  // and returns { "<path in dist/<host>>": string or Buffer }.
+  if (hostRenderers[host]) {
+    const where = `platforms/${host}/scripts/render.mjs`;
+    const files = hostRenderers[host]({
+      host,
+      values,
+      spec: loadedSpec.spec,
+      specSha256: loadedSpec.sha256,
+      apiValue: (operation, part, names) => apiValue(loadedSpec.spec, operation, part, names, where),
+      apiEndpoints: (excluded = []) => apiEndpoints(loadedSpec.spec, excluded, where),
+      fill: (text) => fill(text, values, where),
+      sharedText: (name) => sharedText(name, where),
+    });
+    for (const [path, content] of Object.entries(files ?? {})) {
+      if (out.has(path)) throw new Error(`${where} returns ${path}, which platforms/${host}/ already has`);
+      out.set(path, Buffer.isBuffer(content) ? content : Buffer.from(content));
+    }
+  }
+
   // A token the render didn't fill (a mistyped one, or in a file type outside
   // textFile) would otherwise ship as it is. Binary files (not valid UTF-8) are skipped.
   for (const [path, buf] of out) {
     const text = buf.toString("utf8");
-    const token = Buffer.from(text, "utf8").equals(buf) && text.match(leftoverToken);
+    const token = Buffer.from(text, "utf8").equals(buf) && (text.match(leftoverToken) ?? text.match(/\{\{\s*api[-:][^\n]*?\}\}/));
     if (token) {
       throw new Error(`${host}: ${path} still has an unrendered ${token[0]}`);
     }

@@ -1,0 +1,4 @@
+# Values every host gets as {{name}}, under its own vars.yaml (a host can set
+# one of these itself to override it).
+# Where users and partners reach us, in manifests, READMEs and listings.
+contact_email: "integrations@zenrows.com"
