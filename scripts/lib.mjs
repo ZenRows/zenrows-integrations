@@ -137,15 +137,23 @@ function inlineRefs(spec, node, seen = []) {
   return Object.fromEntries(Object.entries(node).map(([k, v]) => [k, inlineRefs(spec, v, seen)]));
 }
 
-// What {{api:<METHOD> <path> <part> [names]}} renders: a JSON Schema object for
-// that part of the operation (query or path parameters, or the JSON body), with
-// each property's schema and description from the spec. names (comma-separated)
-// picks some; without them, all of the part.
-export function apiSchema(spec, operation, part, names, where) {
+// What {{api:<METHOD> <path> <part> [names]}} renders. For query, path and body:
+// a JSON Schema object for that part of the operation (query or path parameters,
+// or the JSON body), with each property's schema and description from the spec;
+// names (comma-separated) picks some, and without them it's all of the part.
+// For summary, description and server: that string from the spec (server: the
+// operation's servers, else the path's, else the spec's).
+export function apiValue(spec, operation, part, names, where) {
   const [method, path] = operation.split(/\s+/);
   const item = spec.paths?.[path];
   const op = item?.[method.toLowerCase()];
   if (!op) throw new Error(`${where}: the API has no operation "${operation}"`);
+  if (["summary", "description", "server"].includes(part)) {
+    if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
+    const value = part === "server" ? (op.servers ?? item.servers ?? spec.servers)?.[0]?.url : op[part];
+    if (!value) throw new Error(`${where}: the API spec has no ${part} for ${operation}`);
+    return value;
+  }
   let schema;
   if (part === "body") {
     const body = op.requestBody?.content?.["application/json"]?.schema;
@@ -257,11 +265,11 @@ export function sharedText(name, where) {
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
 // the host; {{< name}} inlines shared/text/<name>.md, and {{text:name}} inserts it
 // as a quoted string literal (JSON), for code. {{api:GET / query url,mode}} is
-// that part of an API operation as JSON Schema (see apiSchema), and
-// {{api-sha256}} the sha256 of the spec it was read from.
+// that part of an API operation as JSON Schema, or its summary, description or
+// server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
 function fill(text, values, where) {
-  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
-    JSON.stringify(apiSchema(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
+  text = text.replace(/\{\{api:\s*([A-Z]+)\s+(\S+)\s+(query|path|body|summary|description|server)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, part, names) =>
+    JSON.stringify(apiValue(apiSpecFor(where).spec, `${method} ${path}`, part, names, where)),
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));

@@ -64,9 +64,11 @@ A code host takes what it sends to the API from the published spec (`{{openapi_u
 | `{{api:GET / query url,mode}}` | the named query parameters of `GET /` as one line of JSON Schema: each one's type, enum, default and description from the spec, and which are required. Without names, all of them. |
 | `{{api:GET /jobs/{job_id} path}}` | its path parameters |
 | `{{api:POST /jobs body}}` | its JSON body, with the spec's `$ref`s inlined |
+| `{{api:POST /jobs summary}}`, `{{api:POST /jobs description}}` | the operation's summary or description, as a JSON string |
+| `{{api:POST /jobs server}}` | its base URL: the operation's `servers`, else the path's, else the spec's |
 | `{{api-sha256}}` | the sha256 of the spec |
 
-JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have.
+JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have, and on a summary, description or server it doesn't give.
 
 Where a host's code can't carry the placeholder, it lists what it sends in `vars.yaml` instead, operation by operation:
 

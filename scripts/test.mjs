@@ -154,9 +154,20 @@ const tokenSpecText = JSON.stringify({
       ],
       get: {},
     },
-    "/jobs/{job_id}": { get: { parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] } },
-    "/jobs": { post: { requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } } } } },
+    "/jobs/{job_id}": {
+      servers: [{ url: "https://async.example.com/v1" }],
+      get: { summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] },
+    },
+    "/jobs": {
+      post: {
+        summary: "Create a job",
+        description: "Sends every URL at once.",
+        servers: [{ url: "https://jobs.example.com/v1" }],
+        requestBody: { content: { "application/json": { schema: { $ref: "#/components/schemas/Job" } } } },
+      },
+    },
   },
+  servers: [{ url: "https://api.example.com/v1" }],
   components: {
     parameters: { mode: { name: "mode", in: "query", schema: { type: "string", enum: ["auto"] } } },
     schemas: { Job: { type: "object", properties: { urls: { type: "array", items: { $ref: "#/components/schemas/Url" } } } }, Url: { type: "string" } },
@@ -176,6 +187,9 @@ test("{{api:…}} renders a JSON body with its $refs inlined", rendersTo("{{api:
 test("{{api-sha256}} is the sha256 of the spec", rendersTo('"{{api-sha256}}"', JSON.stringify(createHash("sha256").update(tokenSpecText).digest("hex"))));
 test("{{api:…}} for an operation the API doesn't have fails", fails(usesToken("{{api:GET /nope query}}"), 'the API has no operation "GET /nope"', tokenSpec));
 test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesToken("{{api:GET / query url,page}}"), 'GET / has no query parameter "page"', tokenSpec));
+test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /jobs summary}}, {{api:POST /jobs description}}]", '["Create a job", "Sends every URL at once."]'));
+test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /jobs server}}, {{api:GET /jobs/{job_id} server}}, {{api:GET / server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
+test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /jobs/{job_id} description}}"), "the API spec has no description for GET /jobs/{job_id}", tokenSpec));
 
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {
