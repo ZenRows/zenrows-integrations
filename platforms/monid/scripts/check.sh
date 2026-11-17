@@ -4,7 +4,8 @@
 # against their workspace packages.
 #
 #   bash platforms/monid/scripts/check.sh          clones monid at vars.yaml's upstream into .cache/monid
-#   bash platforms/monid/scripts/check.sh <dir>    uses an existing checkout instead (faster locally)
+#   bash platforms/monid/scripts/check.sh <dir>    uses an existing checkout instead (faster locally,
+#                                                  and leaves a submission-ready tree behind)
 #
 # Env:
 #   SCOPE=connectors/zenrows/   test only this path (the fast loop; the whole
@@ -47,6 +48,15 @@ connector="$monid/connectors/zenrows"
 rm -rf "$connector"
 mkdir -p "$connector"
 cp -R "$repo/dist/monid/connectors/zenrows/." "$connector"
+
+# The openspec change travels with the connector: it is what their reviewers
+# read. The gate does not need it, but a checkout passed in as $1 is the one
+# a pull request to monid is opened from, and leaving it out would mean
+# copying it by hand at the moment it matters.
+change="$monid/openspec/changes/add-connector-zenrows"
+rm -rf "$change"
+mkdir -p "$change"
+cp -R "$repo/dist/monid/openspec/changes/add-connector-zenrows/." "$change"
 
 # The two edits monid's repo needs to carry this connector. Both are
 # idempotent, so re-running against a checkout you keep is safe.
