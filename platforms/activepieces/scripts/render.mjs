@@ -33,9 +33,8 @@ export default function render({ apiEndpoints }) {
   const files = {};
   for (const e of endpoints) {
     // The key goes in the X-API-Key header where the operation takes it, else as apikey.
-    const inHeader = e.security.find((s) => s.in === "header" && s.name === "X-API-Key");
-    const inQuery = e.security.find((s) => s.in === "query" && s.name === "apikey");
-    if (!inHeader && !inQuery) throw new Error(`${where}: ${e.operation} takes the key neither in X-API-Key nor as apikey`);
+    const inHeader = e.keyIn.header === "X-API-Key";
+    if (!inHeader && e.keyIn.query !== "apikey") throw new Error(`${where}: ${e.operation} takes the key neither in X-API-Key nor as apikey`);
     const props = [];
     const operation = { method: e.method, server: e.server, path: e.path, key: inHeader ? "header" : "query" };
     for (const [part, schema] of Object.entries(e.input)) {
