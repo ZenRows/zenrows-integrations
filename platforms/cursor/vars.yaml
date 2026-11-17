@@ -1,0 +1,25 @@
+# Text that differs per host. Shared skills use these as {{name}}; {{version}}
+# comes from .release-please-manifest.json.
+# The name the skills use for the host, as in "Zenrows gives <host> live web data".
+host: "Cursor"
+# The full product name, as in "the Zenrows plugin in <host_full>".
+host_full: "Cursor"
+# What the host calls Zenrows once connected, as in "The <connection> signs in with OAuth"
+# (Claude: Zenrows connector).
+connection: "Zenrows MCP server"
+# Where the agent can write files, as in "if you can write files (for example in <this>)".
+write_files_example: "Cursor's agent"
+# Prefix for skill folder names (OpenClaw uses zenrows-).
+skill_prefix: ""
+# To give a skill a different name on this host, list it here, for example:
+# skill_names:
+#   scrape-webpage: zenrows-scrape
+# To leave a shared skill out on this host, list it here, for example:
+# skip_skills: [using-zenrows]
+# Published to this repo too on each release, for installs that name it (the
+# Cursor Marketplace reads it). See CONTRIBUTING.md.
+mirror: ZenRows/cursor-zenrows
+# Each release is submitted to the Cursor Marketplace by hand, which reviews every version.
+upload:
+  to: the Cursor Marketplace
+  url: https://cursor.com/marketplace/publish
