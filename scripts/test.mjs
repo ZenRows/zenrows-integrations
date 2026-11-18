@@ -292,6 +292,20 @@ test("a render script fills a template's variables and snippets", () => {
   assert.equal(r.dist("dist/piece/note.txt"), "Piece: One credit.");
 });
 
+// release-please rewrites each JSON file it bumps as JSON.stringify(…, null, 2), so
+// the render writes them that way too, and a release PR changes only the version.
+test("a JSON file release-please bumps renders in release-please's layout", () => {
+  const source = readFileSync(join(root, "platforms/copilot/plugin.json"), "utf8").replace(/"keywords": \[[^\]]*\]/, '"keywords": ["web-scraping", "mcp"]');
+  const r = run({ "platforms/copilot/plugin.json": source });
+  assert.ok(r.ok, r.out);
+  assert.ok(r.dist("dist/copilot/plugin.json").includes('"keywords": [\n    "web-scraping",\n    "mcp"\n  ]\n}\n'), r.dist("dist/copilot/plugin.json"));
+});
+test("a JSON file release-please doesn't bump keeps its layout", () => {
+  const r = run({ ...piece, "platforms/piece/data.json": '{ "tags": ["a", "b"] }\n' });
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/data.json"), '{ "tags": ["a", "b"] }\n');
+});
+
 // {{…}} that isn't one of this tool's tokens ships as written.
 const theirs = {
   // JSX, with a string, a number and a variable value, spaced or not.

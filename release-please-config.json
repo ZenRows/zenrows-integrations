@@ -111,6 +111,17 @@
         }
       ]
     },
+    "dist/cursor": {
+      "component": "cursor",
+      "package-name": "cursor",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": ".cursor-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
     "dist/o11": {
       "component": "o11",
       "package-name": "o11"
