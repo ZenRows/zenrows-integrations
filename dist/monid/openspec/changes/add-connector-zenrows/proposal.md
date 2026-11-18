@@ -66,20 +66,46 @@ and an `X-Request-Credits` header on every billable response.
 
 ## Non-goals
 
-- **Batch** (`POST /v1/jobs` and its job tree) is not ported. It is a job
-  lifecycle over many URLs with its own statuses, exports and webhooks, not
-  a second shape of the single-page fetch.
-- **Crawl** (`/v1/crawls`) is not ported for the same reason: one start URL
-  in, a job out.
-- **The hosted Browser** is not ported. It is a session, not a request:
-  a caller holds one open and drives it.
+Zenrows has three more surfaces. None is held back for being a job rather
+than a request: monid runs async work perfectly well, with `lifecycle.poll`,
+a `RUNNING` state and `timeouts.pollMs`, and their own cloro connector uses
+it. Each is out for its own reason, and two of those reasons are about what
+there is to bill from.
+
+- **Crawl** (`/v1/crawls`) reports no usage at all. The published response
+  is `crawl_id`, `status`, `url`, the `max_*` knobs, `discovery`,
+  `coverage`, `duplicates_removed`, `results` and timestamps;
+  `coverage` counts `pages_fetched`, `pages_failed` and `items_found`.
+  There is no credits, cost or spend field anywhere in it, confirmed in the
+  spec and against a completed crawl. `usage.consolidate` would have nothing
+  to read, so every crawl would settle on the estimate rather than on what
+  was charged. That is the silent-fallback case this connector is built to
+  avoid, and it would be the normal case rather than an edge.
+
+- **Batch** (`POST /v1/jobs` and its job tree) does report spend, at
+  `latest_run.stats.spend`, and a completed one-task run reads
+  `{credits: 1, cost: 0.000422}`. The spec disqualifies it as a claim: the
+  field is "Indicative ... **Not billing-grade**; your account statement is
+  authoritative. Use as a 'how much did this cost?' indicator, not for
+  reconciliation", and the run total is "Absent on runs whose tasks predate
+  this field (treat as zero)". Settling a caller's bill IS reconciliation,
+  and an absent meter read as zero is the free run this connector refuses
+  for Fetch. Batch belongs here once it has a meter meant to be billed from.
+
+- **The hosted Browser** is a session, not a request. A caller opens it and
+  drives it across many calls before closing it. There is no way to express
+  "hold this open and let the agent steer it" as one metered endpoint, so
+  this one does not fit the model rather than lacking a meter.
+
 - **`response_type=pdf` and the screenshot parameters** are not offered on
   `zenrows#scrape`. Both need `js_render` and answer with a binary body,
   which is not Json and would need an output contract of its own.
+
 - **No dollar conversion in the doc.** Zenrows reports `X-Request-Cost`
-  beside the credits, but dollars per credit vary by plan tier. The pool is
-  the credit a customer holds and tops up; the conversion is the broker
-  card's job.
+  beside the credits, but dollars per credit vary by plan tier: pay-as-you-go
+  is \$0.50 per 1,000 credits while the monthly plans work out lower, down to
+  about \$0.11. The pool is the credit a customer holds and tops up; the
+  conversion is the broker card's job.
 
 ## Impact
 
