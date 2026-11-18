@@ -24,7 +24,7 @@ scripts/                     render, validate, override, new-host, package, mirr
 
 ### Marketplace catalogs
 
-Some hosts install from a subfolder of this repo through a catalog file at the top of the repo, at a path the host chooses: Copilot reads `.github/plugin/marketplace.json`, Claude would read `.claude-plugin/marketplace.json`. Each catalog points at its host's `./dist/<host>`. Catalogs are normal files, not generated: edit them directly. release-please bumps their version on each release, so each one is listed in that host's `extra-files` in `release-please-config.json` (with a leading `/`), and `npm run validate` checks that it points at `./dist/<host>` with the host's current version.
+Some hosts install from a subfolder of this repo through a catalog file at the top of the repo, at a path the host chooses: Copilot reads `.github/plugin/marketplace.json`, Claude would read `.claude-plugin/marketplace.json`. Each catalog points at its host's `./dist/<host>`. Catalogs are normal files, not generated: edit them directly. release-please bumps their version on each release, so each one is listed in that host's `extra-files` in `release-please-config.json` (with a leading `/`), and `npm run validate` checks that it points at `./dist/<host>` with the host's current version. Inside `dist/<host>`, the render writes each JSON file listed in `extra-files` (a manifest such as `plugin.json`) as release-please rewrites it, two-space indented with one array item per line, so a release PR only changes the version; write the source in `platforms/<host>/` however you like.
 
 ## Editing
 

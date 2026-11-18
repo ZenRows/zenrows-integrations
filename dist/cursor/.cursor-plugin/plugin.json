@@ -22,7 +22,12 @@
     "zenrows"
   ],
   "category": "data-and-analytics",
-  "tags": ["web-scraping", "crawling", "browser-automation", "mcp"],
+  "tags": [
+    "web-scraping",
+    "crawling",
+    "browser-automation",
+    "mcp"
+  ],
   "logo": "assets/logo.png",
   "skills": "skills",
   "commands": "commands",
