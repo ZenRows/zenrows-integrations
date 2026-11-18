@@ -62,8 +62,9 @@ export const zFetchParams = z.strictObject({
             "to route through: send it with mode=auto, or with " +
             "premium_proxy. On its own, or beside js_render without " +
             "premium_proxy, the API answers 400 (REQS004). Geotargeting " +
-            "draws the Premium Proxies rate of 10 credits either way, " +
-            "mode=auto included.",
+            "costs at least the Premium Proxies rate of 10 credits; under " +
+            "mode=auto that is a floor rather than the price, because the " +
+            "request still escalates per page and can settle at 25.",
     ).optional(),
     session_id: z.number().int().describe(
         "Reuse the same exit IP across requests for up to 10 minutes. Any " +
