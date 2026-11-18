@@ -2,9 +2,11 @@ name: API changed
 
 # Runs when the docs repo publishes a new API spec (it sends a repository_dispatch
 # with the file's sha256), or by hand. Waits for www.zenrows.com/openapi.json to
-# carry that spec, then runs npm run validate, which checks every host's api:
-# against it. A failure opens (or updates) the issue "API change: hosts to
-# update" and posts to #proj-integrations; a clean run closes the issue.
+# carry that spec, then runs npm run validate, which checks every host's
+# {{api:…}} placeholders against it. A failure opens (or updates) the issue "API
+# change: hosts to update" and posts to #proj-integrations; a clean run closes
+# the issue, and if the new spec changes what the {{api:…}} placeholders render, opens
+# a pull request with the re-rendered files.
 
 on:
   repository_dispatch:
@@ -35,8 +37,9 @@ jobs:
     # The release environment holds the Slack webhook and deploys only from main.
     environment: release
     permissions:
-      contents: read
+      contents: write # the re-render branch
       issues: write
+      pull-requests: write
     env:
       EXPECTED_SHA256: ${{ github.event.client_payload.sha256 || inputs.sha256 }}
     steps:
@@ -86,7 +89,7 @@ jobs:
           existing=$(gh issue list --search "\"$ISSUE_TITLE\" in:title" --state open --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -1)
           # Only a host out of step with the spec is the hosts' problem; anything
           # else (the spec didn't download, a broken render) is this run's.
-          problems=$(grep '^❌ .*vars\.yaml api:' validate.log || true)
+          problems=$(grep -E '^❌ .*(the API has no operation|has no (query|path) parameter|has no JSON body)' validate.log || true)
 
           if [ "$FAILED" = "true" ] && [ -z "$problems" ]; then
             echo "::error::validate failed for a reason other than the API spec; see the log above."
@@ -119,3 +122,34 @@ jobs:
             curl -fsS -X POST -H 'Content-type: application/json' --data "$payload" "$WEBHOOK" >/dev/null
           fi
           exit 1
+
+      # The hosts are valid, but {{api:…}} placeholders may render differently now (a
+      # new enum value, a reworded description). One pull request per spec, so
+      # it's never force-pushed; an older one still open is closed.
+      - name: Open a pull request with the re-rendered files
+        if: steps.validate.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          npm run -s render
+          if git diff --quiet; then
+            echo "The new spec doesn't change any rendered file."
+            exit 0
+          fi
+          sha=$(sha256sum .cache/openapi.json | cut -c1-12)
+          branch="chore/follow-api-spec-$sha"
+          if gh pr list --head "$branch" --state all --json number --jq '.[0].number' | grep -q .; then
+            echo "A pull request for this spec already exists."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -qam "chore(render): follow the API spec ($sha)"
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$branch"
+          url=$(gh pr create --head "$branch" --title "chore(render): follow the API spec ($sha)" \
+            --body "The published API spec changed what the {{api:…}} placeholders render. This is \`npm run render\` against it. Check the diff, then merge; CI doesn't start on its own for a pull request opened by GitHub Actions, so re-run it from here first.")
+          for old in $(gh pr list --state open --json number,headRefName --jq ".[] | select((.headRefName | startswith(\"chore/follow-api-spec-\")) and .headRefName != \"$branch\") | .number"); do
+            gh pr close "$old" --delete-branch --comment "Replaced by $url."
+          done

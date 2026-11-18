@@ -4,11 +4,12 @@
 // render.
 import { mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { distDir, hosts, isCodeHost, listFiles, renderHost, root, vars } from "./lib.mjs";
+import { distDir, hosts, isCodeHost, listFiles, prepareRender, renderHost, root, vars } from "./lib.mjs";
 
 const check = process.argv.includes("--check");
 const only = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 
+await prepareRender();
 const expected = new Map();
 for (const host of only.length ? only : hosts()) {
   for (const [file, buf] of renderHost(host)) expected.set(`dist/${host}/${file}`, buf);

@@ -29,6 +29,14 @@ jobs:
           path: .cache/schemas
           key: schemas-${{ hashFiles('platforms/**/*.json', '.github/plugin/*.json') }}
           restore-keys: schemas-
+      # The API spec that {{api:…}} tokens and api: are checked against. render and
+      # validate download it every run and fall back to the last copy when
+      # zenrows.com doesn't answer, so the cache restores the newest copy and saves this run's.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/openapi.json
+          key: openapi-${{ github.run_id }}
+          restore-keys: openapi-
       # dist/ must match a fresh render: it's generated, never edited by hand.
       - run: npm run render -- --check
       # Frontmatter, skill references, manifests against their JSON Schemas, and overrides.lock.
