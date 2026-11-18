@@ -31,7 +31,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 
 ## Requirements
 
-A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register).
+A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register?utm_source=github&utm_medium=readme&utm_campaign=zenrows-integrations).
 
 ## Privacy
 
@@ -39,7 +39,7 @@ The plugins send the URLs and options you ask your agent to fetch to Zenrows, wh
 
 ## Support
 
-- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
+- Documentation: [docs.zenrows.com](https://docs.zenrows.com?utm_source=github&utm_medium=readme&utm_campaign=zenrows-integrations)
 - Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
 
 ## Repository structure
