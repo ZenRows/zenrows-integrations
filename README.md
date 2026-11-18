@@ -12,6 +12,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 | Activepieces | [platforms/activepieces/README.md](platforms/activepieces/README.md) |
 | ChatGPT and Codex | [dist/openai/README.md](dist/openai/README.md) |
 | Claude | [dist/claude/README.md](dist/claude/README.md) |
+| Cursor | [dist/cursor/README.md](dist/cursor/README.md) |
 | GitHub Copilot | [dist/copilot/README.md](dist/copilot/README.md) |
 <!-- hosts:end -->
 
@@ -31,7 +32,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 
 ## Requirements
 
-A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register).
+A Zenrows account. Requests use credits on your Zenrows plan. You can [sign up here](https://app.zenrows.com/register?utm_source=github&utm_medium=readme&utm_campaign=zenrows-integrations).
 
 ## Privacy
 
@@ -39,7 +40,7 @@ The plugins send the URLs and options you ask your agent to fetch to Zenrows, wh
 
 ## Support
 
-- Documentation: [docs.zenrows.com](https://docs.zenrows.com)
+- Documentation: [docs.zenrows.com](https://docs.zenrows.com?utm_source=github&utm_medium=readme&utm_campaign=zenrows-integrations)
 - Contact: [integrations@zenrows.com](mailto:integrations@zenrows.com)
 
 ## Repository structure

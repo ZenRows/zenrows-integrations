@@ -518,6 +518,11 @@ export function renderHost(host) {
       throw new Error(`${host}: ${path} still has an unrendered ${token[0]}`);
     }
   }
+  // release-please rewrites each JSON file it bumps as JSON.stringify(…, null, 2);
+  // render them the same way, so a release PR changes only the version.
+  for (const path of versionedJson(host)) {
+    if (out.has(path)) out.set(path, Buffer.from(`${JSON.stringify(JSON.parse(out.get(path).toString("utf8")), null, 2)}\n`));
+  }
   return out;
 }
 
@@ -527,7 +532,7 @@ export function renderHost(host) {
 // the extra-files with a leading "/" in release-please-config.json.
 // Returns [{ host, file }] with file relative to the repo root.
 export function catalogs() {
-  const config = JSON.parse(readFileSync(join(root, "release-please-config.json"), "utf8"));
+  const config = releaseConfig();
   const found = new Map();
   for (const [pkg, settings] of Object.entries(config.packages ?? {})) {
     const host = pkg.replace(/^dist\//, "");
@@ -539,10 +544,19 @@ export function catalogs() {
   return [...found.values()];
 }
 
+// The JSON files release-please bumps inside dist/<host> (its extra-files without
+// a leading "/"), as paths in dist/<host>.
+function versionedJson(host) {
+  return (releaseConfig().packages?.[`dist/${host}`]?.["extra-files"] ?? [])
+    .map((extra) => (typeof extra === "string" ? extra : extra.path))
+    .filter((path) => !path.startsWith("/") && path.endsWith(".json"));
+}
+const releaseConfig = () => JSON.parse(readFileSync(join(root, "release-please-config.json"), "utf8"));
+
 // A host with mirror: <owner/repo> in vars.yaml is also published to that repo,
-// whose root is dist/<host>/ plus the host's marketplace catalogs (see
-// catalogs()) at the same paths, listing only this host with source "./" (the
-// mirror's root), and a banner under README.md's title pointing back here.
+// whose root is dist/<host>/ plus the host's marketplace catalogs, if it has
+// any (see catalogs()), at the same paths, listing only this host with source
+// "./" (the mirror's root), and a banner under README.md's title pointing back here.
 // The banner names the release tag, or for a sync with no tag, the commit.
 // Reads the committed files, which render --check and validate keep current.
 // Returns Map<path, Buffer>.

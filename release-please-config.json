@@ -110,6 +110,17 @@
           "jsonpath": "$.version"
         }
       ]
+    },
+    "dist/cursor": {
+      "component": "cursor",
+      "package-name": "cursor",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": ".cursor-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
     }
   }
 }
