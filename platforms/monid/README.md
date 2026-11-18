@@ -53,8 +53,9 @@ the one input that cannot be priced ahead, so it holds 25.
 - `mode=auto` cannot be combined with `js_render` or `premium_proxy`: 400 REQS004.
 - `proxy_country` needs `mode=auto` or `premium_proxy` behind it. On its own,
   or beside `js_render` without `premium_proxy`, it answers 400 REQS004.
-  Geotargeting draws the Premium Proxies rate of 10 credits either way,
-  `mode=auto` included.
+  Geotargeting costs at least the Premium Proxies rate of 10 credits. Under
+  `mode=auto` that is a floor, not the price: the request still escalates per
+  page and can settle at 25, which is why the hold for that pair is 25.
 - `response_type` beside `outputs` is a 400. `css_extractor` beside `outputs`
   is served, and the `css_extractor` fields win.
 
