@@ -63,7 +63,7 @@ listings:
                   - markdown
                   - plaintext
                   - pdf
-                description: "Convert the page before returning it: Markdown, plaintext or PDF. `pdf` requires `js_render=true`; without it the request answers 400 `REQS004`. `pdf` cannot be combined with `outputs`."
+                description: "Convert the page before returning it: Markdown, plaintext or PDF. `pdf` requires `js_render=true`; without it the request answers 400 `REQS004`. Any `response_type` together with `outputs` also answers 400 `REQS004`."
               wait_for:
                 type: string
                 description: CSS selector to wait for before returning. Requires js_render.
@@ -80,7 +80,7 @@ listings:
                 description: Return a JSON envelope that also carries the network requests (XHR/fetch) the page made. Requires `js_render=true` or `mode=auto`; without either the request answers 400 `REQS004`.
               outputs:
                 type: string
-                description: Comma-separated data types to pull out of the retrieved HTML (for example `emails,phone_numbers`).
+                description: Comma-separated data types to pull out of the retrieved HTML (for example `emails,phone_numbers`). Not allowed with `response_type` (400 `REQS004`); with `screenshot` the request answers 200 with no image and an empty result.
               session_id:
                 type: integer
                 description: Reuse the same IP across requests for up to 10 minutes. Any integer you choose identifies the session.
@@ -191,7 +191,7 @@ listings:
           details: "Metered from the X-Request-Credits response header: the credits the request used, times the per-credit price; failed requests use no credits."
       - id: list_extract_domains
         name: List the domains Extract serves
-        description: Every domain Extract can handle right now. A domain in this list is one you can send `extract=auto` to; a domain missing from it answers `REQS007`. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints.
+        description: "The domains Extract lists publicly as ready. A domain in this list works with `extract=auto`. The list is not complete: some prepared domains are not listed and still work, so a domain missing from it is not proof it answers `REQS007`. Send the request and branch on `REQS007`, or prepare the domain with `requestExtractDomain`. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints."
         method: GET
         path: /extract/domains
         input: {}
@@ -984,7 +984,7 @@ listings:
       sources:
         - kind: openapi
           reference: https://www.zenrows.com/openapi.json
-          sha256: 5baedbaa210d0707c2fc9886f31176f0b336f2f84e2aedee9b5d83353317ed3b
+          sha256: 1b065f76afb9018aac64f93e8a5c183cc37e7063e6eb7ae789ccaa609016a798
           observedAt: 2026-11-13T09:00:00Z
       included:
         - endpointId: fetch
