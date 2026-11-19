@@ -1,0 +1,12 @@
+# A code host: the Zenrows connector for Monid, rendered into dist/monid/
+# exactly as it sits in monid's connectors/zenrows.
+kind: code
+host: "Monid"
+host_full: "Monid"
+# The monid commit the connector is built and tested against (scripts/check.sh).
+# Moving it is its own PR, so CI shows whether their newer code breaks the
+# connector rather than it breaking silently on someone else's machine.
+upstream: "e9d4e79b7f82ae1d880fc49eea6c86c43e01da83"
+# The Deno the connector is checked with. check.sh uses this one from PATH when
+# it is there, and runs the pinned image otherwise.
+deno: "2.5.3"

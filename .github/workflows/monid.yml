@@ -1,0 +1,50 @@
+name: Monid connector
+
+# The connector lives in monid's tree, so the only gate that means anything
+# is theirs: check.sh clones monid at the commit vars.yaml pins, drops the
+# rendered connector in, applies the two edits their repo needs to carry it,
+# and runs their own deno task check and deno task test.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - platforms/monid/**
+      - dist/monid/**
+      - shared/text/**
+      - scripts/**
+      - .github/workflows/monid.yml
+  pull_request:
+    paths:
+      - platforms/monid/**
+      - dist/monid/**
+      - shared/text/**
+      - scripts/**
+      - .github/workflows/monid.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Type-check and test in monid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      # The Deno platforms/monid/vars.yaml pins. check.sh takes this one from
+      # PATH; without it, it falls back to the same version as a container image.
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: "2.5.3"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/deno
+          key: deno-monid-${{ hashFiles('platforms/monid/vars.yaml') }}
+          restore-keys: deno-monid-
+      # Their own gate, plus the formatting their review config asks for.
+      # Invoked through bash: the script is committed without the exec bit.
+      - run: FMT=1 bash platforms/monid/scripts/check.sh

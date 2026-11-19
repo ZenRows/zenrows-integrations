@@ -1,0 +1,1 @@
+Adaptive Stealth Mode starts from the cheapest configuration that can work and escalates to JavaScript rendering or Premium Proxies only when the page needs them, and only the configuration that succeeds is charged
