@@ -15,7 +15,13 @@
   "termsOfServiceUrl": "https://www.zenrows.com/legal/terms",
   "repository": "https://github.com/ZenRows/zenrows-integrations",
   "license": "MIT",
-  "keywords": ["web-scraping", "data-extraction", "browser-automation", "mcp", "zenrows"],
+  "keywords": [
+    "web-scraping",
+    "data-extraction",
+    "browser-automation",
+    "mcp",
+    "zenrows"
+  ],
   "icon": "./assets/logo.png",
   "mcpServers": "./.mcp.json"
 }
