@@ -6,9 +6,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
-import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
+import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
+await prepareRender();
+
 const report = [];
 
 // Skill names a text refers to: "use map", every name inside "(use …)", and
@@ -275,20 +277,24 @@ for (const skill of skillNames()) {
 const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `${h}/README.md`);
 const snippetSources = [
   join(root, "shared", "README.md"),
+  join(root, "shared", "endpoints.yaml"),
   ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
   ...listFiles(platformsDir)
     .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))
     .map((f) => join(platformsDir, f)),
 ];
 const used = new Set();
+// {{< name}} or {{text:name}}.
+const snippetNames = (text) => [...text.matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)].map((m) => m[2]);
 for (const file of snippetSources) {
   if (!textFile.test(file)) continue;
-  for (const [, , name] of readFileSync(file, "utf8").matchAll(/\{\{(<\s*|\s*text:)([a-z0-9-]+)\s*\}\}/g)) used.add(name);
+  for (const name of snippetNames(readFileSync(file, "utf8"))) used.add(name);
 }
 for (const file of listFiles(sharedTextDir)) {
   const name = file.replace(/\.md$/, "");
   const text = readFileSync(join(sharedTextDir, file), "utf8");
-  if (!used.has(name)) errors.push(`shared/text/${file} isn't used by any skill or host`);
+  // A warning, not an error: a shared fact can land before the hosts that use it.
+  if (!used.has(name)) console.warn(`⚠️ shared/text/${file} isn't used by any skill or host yet`);
   // Backticks, *, links and headings would show up as is in a code string.
   // _ and [ ] don't count: parameter names (js_render) and [{...}] use them.
   if (/[`*]/.test(text) || /\]\(/.test(text) || /^#/.test(text.trim())) errors.push(`shared/text/${file} has markdown; keep snippets plain text so code can use them`);
