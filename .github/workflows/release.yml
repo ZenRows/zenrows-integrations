@@ -17,13 +17,23 @@ jobs:
     concurrency:
       group: ${{ github.workflow }}-release-pr
       cancel-in-progress: false
-    permissions:
-      contents: write
-      pull-requests: write
+    # The PR bot opens and updates the release PRs. Events made with
+    # GITHUB_TOKEN start no workflows, so release PRs it opened got no CI.
+    permissions: {}
     steps:
+      - name: Token for the PR bot
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_APP_PRIVATE_KEY }}
+          permission-contents: write # pushes the release-please--branches--main--* branches
+          permission-pull-requests: write
+          permission-issues: write # the autorelease labels go through the issues API
+
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           skip-github-release: true
@@ -44,10 +54,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # Only for the PR bot's login (<slug>[bot]), so it is not written here.
+      - name: Token for the PR bot
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_APP_PRIVATE_KEY }}
+          permission-pull-requests: read
+
       - id: detect
         env:
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
+          PR_BOT: ${{ steps.app-token.outputs.app-slug }}[bot]
         run: |
           set -euo pipefail
           manifest=.release-please-manifest.json
@@ -56,10 +76,13 @@ jobs:
           # This push must merge a release PR that release-please opened and
           # change the manifest. Branch name alone is not enough: anyone with
           # write access can name a branch. "tagged" keeps a full re-run working.
+          # The PR bot opens release PRs; github-actions[bot] opened the ones
+          # from before it did, which release-please keeps updating. Drop
+          # github-actions[bot] once none of those is left open.
           pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '
             [.[] | select(.merged_at != null
                           and (.head.ref | startswith("release-please--branches--main"))
-                          and .user.login == "github-actions[bot]"
+                          and (.user.login == env.PR_BOT or .user.login == "github-actions[bot]")
                           and ([.labels[].name] | any(. == "autorelease: pending" or . == "autorelease: tagged")))][0].number // empty')
           [ -n "$pr" ] || no_release "this push does not merge a release PR"
           if git diff --quiet "$BEFORE" "$GITHUB_SHA" -- "$manifest"; then no_release "the manifest did not change"; fi
