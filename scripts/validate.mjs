@@ -4,6 +4,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
+import Ajv from "ajv";
 import Ajv2020 from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
 import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
@@ -96,12 +97,13 @@ async function loadSchemas() {
 }
 
 const schemas = await loadSchemas();
-const ajv = new Ajv2020({ allErrors: true, strict: false });
+// A schema names its own draft; Ajv takes 2020-12 and draft-07 (turbo.json's) in separate classes.
+const ajv = { draft07: new Ajv({ allErrors: true, strict: false }), latest: new Ajv2020({ allErrors: true, strict: false }) };
 const validators = new Map();
 function schemaErrors(url, json) {
   const schema = schemas.get(url);
   if (schema instanceof Error) return [`can't be checked against its schema: ${schema.message}`];
-  if (!validators.has(url)) validators.set(url, ajv.compile(schema));
+  if (!validators.has(url)) validators.set(url, ajv[/draft-07/.test(schema.$schema ?? "") ? "draft07" : "latest"].compile(schema));
   const check = validators.get(url);
   return check(json) ? [] : check.errors.map((e) => `${e.instancePath || "/"} ${e.message}`);
 }
