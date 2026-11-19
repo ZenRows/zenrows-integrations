@@ -383,3 +383,10 @@ test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts"
 
 // A JSON file is checked against the schema it declares, whichever draft that schema is written in.
 test("a JSON file against a draft-07 schema is checked", fails({ ...piece, "platforms/piece/turbo.json": '{ "$schema": "https://v2-9-16.turborepo.dev/schema.json", "tasks": "build" }\n' }, "piece: turbo.json /tasks must be object"));
+
+// The Mastra host exposes or excludes every parameter of its tools' slices, so a new one forces a decision.
+test("a parameter the Mastra tools neither expose nor exclude fails", () => {
+  const endpoints = readFileSync(join(root, "shared/endpoints.yaml"), "utf8").replace(/^(  parameters: \[url, mode, js_render, )/m, "$1custom_headers, ");
+  assert.ok(endpoints.includes("custom_headers"), "the fetch slice gained custom_headers");
+  fails({ "shared/endpoints.yaml": endpoints }, "the scrape tool neither exposes nor excludes custom_headers from shared/endpoints.yaml's fetch")();
+});

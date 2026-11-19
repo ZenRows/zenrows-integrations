@@ -1,0 +1,12 @@
+# A code host: the @mastra/zenrows package and its docs page, rendered into
+# dist/mastra/ exactly as they sit in the mastra-ai/mastra monorepo.
+kind: code
+host: "Mastra"
+host_full: "Mastra"
+# The mastra commit the package is built and tested against (scripts/check.sh).
+# Moving it is its own PR, so CI shows whether their newer code breaks the
+# package rather than it breaking silently on someone else's machine.
+upstream: "7ae1b0da5bab10c421e95c5ec6398bbdd5019822"
+# The Node image check.sh runs their toolchain in. Their root package.json
+# takes ^22.19.0 || >=24.11.0, and pnpm comes from its packageManager field.
+node: "24.11.1-bookworm-slim"
