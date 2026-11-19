@@ -19,7 +19,7 @@ export const zFetchParams = z.strictObject({
         "Adaptive Stealth Mode. `auto` starts from the cheapest viable configuration and escalates to JavaScript rendering or premium proxies only when the target requires it. You are billed for the configuration that succeeds. It manages `js_render` and `premium_proxy` itself, so setting either alongside it answers 400 `REQS004`; `proxy_country` is allowed.",
     ).optional(),
     js_render: z.boolean().describe(
-        "Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). It is the cheaper half of the two escalations: a plain request draws 1 credit, JavaScript rendering 5, Premium Proxies 10, and the two together 25.",
+        "Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.",
     ).optional(),
     js_instructions: z.string().describe(
         "JSON array of browser instructions (click, fill, scroll, wait) executed on the page before the content is returned. Requires `js_render=true` or `mode=auto`; without either the request answers 400 `REQS004`.",
@@ -28,7 +28,7 @@ export const zFetchParams = z.strictObject({
         "Forward the headers you send on this request, such as cookies or a referer, to the target site.",
     ).optional(),
     premium_proxy: z.boolean().describe(
-        "Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). It is the dearer half of the two escalations: a plain request draws 1 credit, Premium Proxies 10, JavaScript rendering 5, and the two together 25.",
+        "Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.",
     ).optional(),
     proxy_country: z.string().describe(
         "Two-letter country code for the exit IP. Requires `premium_proxy=true` or `mode=auto`, which then routes through premium proxies, so the request costs at least 10 credits. Alone, or with only `js_render`, the request answers 400 `REQS004`.",
