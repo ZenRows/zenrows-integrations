@@ -105,8 +105,6 @@ What only a person can decide is marked `TODO(new-host)`, and `npm run validate`
 
 Commit messages and PR titles follow Conventional Commits. `fix`, `feat` and `perf` need a scope, for example `fix(crawl): …`. The commit-hygiene check rejects trailers, issue tracker keys and AI attribution.
 
-To open a PR as `claude[bot]` instead of yourself, push the branch and run `gh workflow run open-pr-as-claude.yml --ref main -f branch=<branch> -f title="…" -F body=@pr-body.md`. It opens a draft assigned to you, which you can then approve, because you are not its author.
-
 A merged PR's title becomes an entry in its host's `CHANGELOG.md`, so for `feat`, `fix` and `perf` write what changes for someone using the plugin, not how the repo changed, for example `feat(crawl): the crawl skill runs one server-side Crawl job instead of a scrape loop, so include and exclude patterns work`. A PR with several such changes can list them, one title per line, between `BEGIN_COMMIT_OVERRIDE` and `END_COMMIT_OVERRIDE` at the end of its description; each line becomes its own entry. The same block fixes an entry after the merge: release-please reads it on the next push to main.
 
 Each host is its own release-please package (`dist/<host>`), with its own version and tag (`copilot-v0.1.2`). A merge that changes `dist/<host>/` opens or updates that host's release PR; merging the release PR tags it and creates the GitHub release. The release PR also adds the version's entry to `dist/<host>/CHANGELOG.md`, from the `feat`, `fix`, `perf` and `revert` commits since the last release, so the changelog ships with the plugin and its mirror. The render keeps that file as it is.
