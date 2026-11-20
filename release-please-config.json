@@ -58,6 +58,27 @@
     }
   ],
   "packages": {
+    "dist/openclaw": {
+      "component": "openclaw",
+      "package-name": "openclaw",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "openclaw.plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": ".claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
     "dist/copilot": {
       "component": "copilot",
       "package-name": "copilot",
