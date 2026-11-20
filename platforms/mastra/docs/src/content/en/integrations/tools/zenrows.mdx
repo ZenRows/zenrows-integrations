@@ -7,7 +7,7 @@ packages:
 
 # ZenRows
 
-The `@mastra/zenrows` package exposes [ZenRows](https://www.zenrows.com) Fetch and Extract as Mastra-compatible tools. ZenRows handles proxies, JavaScript rendering and anti-bot protection, so the tools read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input and output schema.
+The `@mastra/zenrows` package exposes [ZenRows](https://www.zenrows.com) Fetch and Extract as Mastra-compatible tools. ZenRows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input and output schema.
 
 The scrape tool returns a page's content. The extract tool returns the structured fields ZenRows parsed out of a page, such as a product's name and price, with no selectors to write.
 
@@ -42,7 +42,7 @@ export const scrapeTool = createZenrowsScrapeTool()
 export const extractTool = createZenrowsExtractTool({ apiKey: 'your-zenrows-api-key' })
 ```
 
-The API key isn't read until a tool executes, so a missing key fails at execution time with a configuration error.
+A tool reads the API key when it executes, not when you create it. A missing key fails at execution time with a configuration error.
 
 ## Configuration
 
@@ -59,13 +59,15 @@ All factories accept `ZenrowsClientOptions`:
   {
     name: 'baseUrl',
     type: 'string',
-    description: 'Override the ZenRows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then `https://api.zenrows.com/v1`.',
+    description:
+      'Override the ZenRows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then `https://api.zenrows.com/v1`.',
     isOptional: true,
   },
   {
     name: 'timeout',
     type: 'number',
-    description: 'Timeout in milliseconds for one request. ZenRows can take up to 3 minutes on a hard page, and a request cut short on your side can still be charged.',
+    description:
+      'Timeout in milliseconds for one request. ZenRows can take up to 3 minutes on a hard page, and a request cut short on your side can still be charged.',
     isOptional: true,
     defaultValue: '180000',
   },
@@ -106,15 +108,55 @@ const scrapeTool = createZenrowsScrapeTool()
     isOptional: true,
     defaultValue: "'markdown'",
   },
-  { name: 'mode', type: "'auto'", description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.', isOptional: true },
+  {
+    name: 'mode',
+    type: "'auto'",
+    description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.',
+    isOptional: true,
+  },
   { name: 'js_render', type: 'boolean', description: 'Render the page in a headless browser first.', isOptional: true },
-  { name: 'premium_proxy', type: 'boolean', description: 'Route the request through residential IPs.', isOptional: true },
-  { name: 'proxy_country', type: 'string', description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.', isOptional: true },
-  { name: 'wait_for', type: 'string', description: 'CSS selector to wait for before returning. Needs `js_render`.', isOptional: true },
-  { name: 'wait', type: 'number', description: 'Milliseconds to wait after load. Needs `js_render`.', isOptional: true },
-  { name: 'js_instructions', type: 'string', description: 'JSON array of browser actions (click, fill, scroll, wait) to run first. Needs `js_render` or `mode`.', isOptional: true },
-  { name: 'css_extractor', type: 'string', description: 'JSON object mapping output keys to CSS selectors.', isOptional: true },
-  { name: 'block_resources', type: 'string', description: 'Comma-separated resource types to block, such as `image,media,font`.', isOptional: true },
+  {
+    name: 'premium_proxy',
+    type: 'boolean',
+    description: 'Route the request through residential IPs.',
+    isOptional: true,
+  },
+  {
+    name: 'proxy_country',
+    type: 'string',
+    description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.',
+    isOptional: true,
+  },
+  {
+    name: 'wait_for',
+    type: 'string',
+    description: 'CSS selector to wait for before returning. Needs `js_render`.',
+    isOptional: true,
+  },
+  {
+    name: 'wait',
+    type: 'number',
+    description: 'Milliseconds to wait after load. Needs `js_render`.',
+    isOptional: true,
+  },
+  {
+    name: 'js_instructions',
+    type: 'string',
+    description: 'JSON array of browser actions (click, fill, scroll, wait) to run first. Needs `js_render` or `mode`.',
+    isOptional: true,
+  },
+  {
+    name: 'css_extractor',
+    type: 'string',
+    description: 'JSON object mapping output keys to CSS selectors.',
+    isOptional: true,
+  },
+  {
+    name: 'block_resources',
+    type: 'string',
+    description: 'Comma-separated resource types to block, such as `image,media,font`.',
+    isOptional: true,
+  },
 ]}
 />
 
@@ -123,7 +165,11 @@ const scrapeTool = createZenrowsScrapeTool()
 <PropertiesTable
   content={[
   { name: 'url', type: 'string', description: 'The input URL.' },
-  { name: 'content', type: 'string', description: 'The page as Markdown, plaintext or HTML, or the `css_extractor` fields as JSON text.' },
+  {
+    name: 'content',
+    type: 'string',
+    description: 'The page as Markdown, plaintext or HTML, or the `css_extractor` fields as JSON text.',
+  },
   { name: 'credits', type: 'number | null', description: 'Credits the request used.' },
 ]}
 />
@@ -143,11 +189,32 @@ const extractTool = createZenrowsExtractTool()
 <PropertiesTable
   content={[
   { name: 'url', type: 'string', description: 'The page to extract. Only `http` and `https` URLs are accepted.' },
-  { name: 'extract_fields', type: 'string', description: 'Comma-separated fields to return, dot-notated inside a group, such as `products.name,products.price`. Omit it to receive every field.', isOptional: true },
-  { name: 'mode', type: "'auto'", description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.', isOptional: true },
+  {
+    name: 'extract_fields',
+    type: 'string',
+    description:
+      'Comma-separated fields to return, dot-notated inside a group, such as `products.name,products.price`. Omit it to receive every field.',
+    isOptional: true,
+  },
+  {
+    name: 'mode',
+    type: "'auto'",
+    description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.',
+    isOptional: true,
+  },
   { name: 'js_render', type: 'boolean', description: 'Render the page in a headless browser first.', isOptional: true },
-  { name: 'premium_proxy', type: 'boolean', description: 'Route the request through residential IPs.', isOptional: true },
-  { name: 'proxy_country', type: 'string', description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.', isOptional: true },
+  {
+    name: 'premium_proxy',
+    type: 'boolean',
+    description: 'Route the request through residential IPs.',
+    isOptional: true,
+  },
+  {
+    name: 'proxy_country',
+    type: 'string',
+    description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.',
+    isOptional: true,
+  },
 ]}
 />
 
@@ -157,7 +224,11 @@ const extractTool = createZenrowsExtractTool()
   content={[
   { name: 'url', type: 'string', description: 'The input URL.' },
   { name: 'data', type: 'unknown', description: 'The extracted fields, parsed from JSON.' },
-  { name: 'credits', type: 'number | null', description: 'Credits the request used. {{< extract-no-credits }}.' },
+  {
+    name: 'credits',
+    type: 'number | null',
+    description: 'Credits the request used. {{< extract-no-credits }}.',
+  },
 ]}
 />
 
