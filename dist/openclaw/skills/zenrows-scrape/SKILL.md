@@ -11,7 +11,7 @@ The user's instructions take precedence over this skill. If they conflict, follo
 
 1. Identify the target URL from the user's message.
 2. Call `scrape(url, response_type='markdown')`. Do not read local plugin or MCP config files first.
-3. By default Zenrows adds JavaScript rendering or premium proxies only when the page needs them, so the same call works for static pages and single-page apps. Do not set `js_render` or `premium_proxy` yourself.
+3. Adaptive Stealth Mode starts from the cheapest configuration that can work and escalates to JavaScript rendering or Premium Proxies only when the page needs them, and only the configuration that succeeds is charged. It is on by default, so the same call works for static pages and single-page apps. Do not set `js_render` or `premium_proxy` yourself.
 4. Summarize or extract the requested information from the returned markdown.
-5. If the content is larger than needed, re-scrape with `css_extractor` targeting only the relevant section. Drop `response_type='markdown'` when you do, since the two are alternatives, not additive.
+5. If the content is larger than needed, re-scrape with `css_extractor` targeting only the relevant section. Drop `response_type='markdown'` when you do, since css_extractor and response_type are alternatives rather than additive, and a request carrying both answers with the css_extractor fields.
 6. For geo-restricted pages, add `proxy_country` with the target country's ISO 3166 code.
