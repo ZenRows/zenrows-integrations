@@ -984,7 +984,7 @@ listings:
       sources:
         - kind: openapi
           reference: https://www.zenrows.com/openapi.json
-          sha256: 1b065f76afb9018aac64f93e8a5c183cc37e7063e6eb7ae789ccaa609016a798
+          sha256: d7104d63f95e142b0d92249e70b8ada638c3706ab975a2af8c2c5cf24719efcd
           observedAt: 2026-11-13T09:00:00Z
       included:
         - endpointId: fetch

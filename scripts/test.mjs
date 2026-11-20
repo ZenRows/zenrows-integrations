@@ -155,6 +155,7 @@ const tokenSpecText = JSON.stringify({
       servers: [{ url: "https://async.example.com/v1" }],
       get: { operationId: "getJob", summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
     },
+    "/stub-site": { servers: [{ url: "https://zenrows.com" }], get: { operationId: "askSite", summary: "The website's own endpoint" } },
     "/stub-jobs": {
       post: {
         operationId: "createJob",
@@ -272,6 +273,7 @@ test("an API operation shared/billing.yaml doesn't place fails", () => {
   billing.not_offered = billing.not_offered.filter((op) => op !== "POST /stub-jobs");
   fails(renders('export default ({ apiEndpoints }) => ({ "x.json": JSON.stringify(apiEndpoints().length) });\n', { "shared/billing.yaml": JSON.stringify(billing) }), 'shared/billing.yaml: the API\'s "POST /stub-jobs" is in none of', tokenSpec)();
 });
+test("shared/billing.yaml naming one of the website's own endpoints fails", fails(offered({ not_offered: ["GET /stub-site"] }), 'shared/billing.yaml: not_offered names "GET /stub-site", which is neither an API operation nor a shared endpoint', tokenSpec));
 test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(offered({ free: ["GET /nope"] }), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
 test("shared/billing.yaml with an endpoint in two kinds fails", fails(offered({ free: ["GET /stub"], per_credit: ["GET /stub"] }), 'shared/billing.yaml: "GET /stub" is both', tokenSpec));
 test("apiEndpoints says where each endpoint takes the key", () => {

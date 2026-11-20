@@ -9,7 +9,7 @@ observed_at: "2026-11-13T09:00:00Z"
 upload:
   to: o11.ai
   url: https://go.o11.ai/sellers
-# The public rate in micro-USD per credit ($0.50 per 1,000 credits), and the most
+# The agent pay-as-you-go rate in micro-USD per credit ($0.50 per 1,000 credits, docs.zenrows.com/first-steps/agentic-payments), and the most
 # credits one Fetch or Extract request can use (JS rendering and premium proxies).
 # Change them with the credit-price and credit-weights snippets in shared/text/.
 credit_price_micros: 500

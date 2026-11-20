@@ -13,8 +13,8 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 | Claude | [dist/claude/README.md](dist/claude/README.md) |
 | Cursor | [dist/cursor/README.md](dist/cursor/README.md) |
 | GitHub Copilot | [dist/copilot/README.md](dist/copilot/README.md) |
-| o11.ai | [platforms/o11/README.md](platforms/o11/README.md) |
 | Monid | [platforms/monid/README.md](platforms/monid/README.md) |
+| o11.ai | [platforms/o11/README.md](platforms/o11/README.md) |
 <!-- hosts:end -->
 
 ## Skills
