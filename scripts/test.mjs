@@ -286,6 +286,65 @@ test("apiNotOffered lists what shared/billing.yaml doesn't offer", () => {
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/piece/not.json"), '["GET /stub","GET /stub/{job_id}","POST /stub-jobs"]');
 });
+// Activepieces writes one action per offered endpoint (platforms/activepieces/scripts/render.mjs).
+// The stub /stub-types operation has one parameter of each type.
+const typesSpec = JSON.parse(tokenSpecText);
+typesSpec.paths["/stub-types"] = {
+  get: {
+    operationId: "getTypes",
+    summary: "Read the types",
+    security: [{ apiKeyHeader: [] }],
+    parameters: [
+      { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
+      { name: "download", in: "query", schema: { type: "boolean" } },
+      { name: "status", in: "query", schema: { type: "string", enum: ["all", "failed"] } },
+      { name: "filter", in: "query", schema: { type: "object" } },
+      { name: "cursor", in: "query", schema: { type: "string" } },
+    ],
+  },
+};
+const actionFile = (name) => `dist/activepieces/src/lib/actions/${name}.ts`;
+const actionFiles = ["generated", "get-job", "create-job", "get-types", "fetch-page", "fetch", "extract"].map(actionFile);
+const actions = (kinds) => {
+  const billing = parseYaml(billingWith(kinds));
+  if (!Object.values(kinds).flat().includes("GET /stub-types")) billing.not_offered.push("GET /stub-types");
+  return run({ "openapi-tokens.json": JSON.stringify(typesSpec), "shared/billing.yaml": JSON.stringify(billing) }, tokenSpec, actionFiles);
+};
+test("Activepieces gets an action per offered endpoint, and none for the rest", () => {
+  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] });
+  assert.ok(r.ok, r.out);
+  const list = r.dist(actionFile("generated"));
+  assert.ok(list.includes("import { getJobAction } from './get-job';\nimport { createJobAction } from './create-job';\n"), list);
+  assert.ok(list.includes("getJobAction, createJobAction"), list);
+  const job = r.dist(actionFile("get-job"));
+  const create = r.dist(actionFile("create-job"));
+  assert.ok(job.includes("import { createAction, Property } from '@activepieces/pieces-framework';"), job);
+  assert.ok(job.includes('export const getJobAction = createAction({\n  auth: zenrowsAuth,\n  name: "get_job",\n  displayName: "Read A Job",'), job);
+  assert.ok(job.includes('job_id: Property.ShortText({ displayName: "Job ID", required: true }),'), job);
+  assert.ok(job.includes('operation: {"method":"GET","server":"https://async.example.com/v1","path":"/stub/{job_id}","key":"query"}'), job);
+  assert.ok(create.includes('urls: Property.Json({ displayName: "URLs", required: false }),'), create);
+  assert.ok(create.includes('operation: {"method":"POST","server":"https://jobs.example.com/v1","path":"/stub-jobs","key":"query","body":["urls"]}'), create);
+  assert.equal(r.dist(actionFile("fetch-page")), undefined, "GET /stub isn't offered, so it has no action");
+  assert.ok(!r.dist(actionFile("fetch")) && !list.includes("fetchAction"), "Fetch is hand-written (Scrape URL)");
+  assert.ok(r.dist(actionFile("extract")).includes('name: "extract",'), "Extract, the shared slice of GET /, is generated");
+});
+test("Activepieces maps each parameter type to its prop, and sends the key in X-API-Key where it can", () => {
+  const r = actions({ free: ["GET /stub-types"] });
+  assert.ok(r.ok, r.out);
+  const ts = r.dist(actionFile("get-types"));
+  for (const line of [
+    'limit: Property.Number({ displayName: "Limit", required: false, defaultValue: 10 }),',
+    'download: Property.Checkbox({ displayName: "Download", required: false }),',
+    'status: Property.StaticDropdown({ displayName: "Status", required: false, options: { disabled: false, options: [{ label: "all", value: "all" }, { label: "failed", value: "failed" }] } }),',
+    'filter: Property.Json({ displayName: "Filter", required: false }),',
+    'cursor: Property.ShortText({ displayName: "Cursor", required: false }),',
+    '"path":"/stub-types","key":"header","query":["limit","download","status","filter","cursor"]}',
+  ]) assert.ok(ts.includes(line), `expected ${line} in:\n${ts}`);
+});
+test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
+  "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
+  "shared/billing.yaml": billingWith({ free: ["GET /stub-types"] }),
+}, "platforms/activepieces/scripts/render.mjs: GET /stub-types takes the key neither in X-API-Key nor as apikey", tokenSpec));
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);

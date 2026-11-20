@@ -1,0 +1,35 @@
+import { createCustomApiCallAction } from '@activepieces/pieces-common';
+import { createPiece, PieceCategory } from '@activepieces/pieces-framework';
+import { generatedActions } from './lib/actions/generated';
+import { scrapeUrlAction } from './lib/actions/scrape-url';
+import { zenrowsAuth } from './lib/auth';
+import { ZENROWS_API_BASE_URL } from './lib/common/client';
+
+export const zenrows = createPiece({
+  displayName: 'ZenRows',
+  description:
+    {{text:zenrows-description}} + '.',
+  auth: zenrowsAuth,
+  minimumSupportedRelease: '0.88.2',
+  // Served from this repo until Activepieces hosts it on their CDN.
+  logoUrl: '{{logo_url}}',
+  categories: [PieceCategory.ARTIFICIAL_INTELLIGENCE, PieceCategory.PRODUCTIVITY],
+  authors: ['imoital'],
+  actions: [
+    scrapeUrlAction,
+    ...generatedActions,
+    createCustomApiCallAction({
+      baseUrl: () => ZENROWS_API_BASE_URL,
+      auth: zenrowsAuth,
+      authMapping: async (auth) => ({
+        'X-API-Key': auth.secret_text,
+      }),
+      props: {
+        url: {
+          description: `A full URL or a path relative to ${ZENROWS_API_BASE_URL}, e.g. /subscriptions/self/details. The API key is sent in the X-API-Key header.`,
+        },
+      },
+    }),
+  ],
+  triggers: [],
+});

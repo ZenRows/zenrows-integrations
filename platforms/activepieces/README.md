@@ -1,0 +1,33 @@
+# Zenrows piece for Activepieces
+
+The Zenrows [piece](https://www.activepieces.com/docs/build-pieces/building-pieces/overview) for Activepieces: Scrape URL, an action for every other endpoint we offer, and a custom API call.
+
+## Actions
+
+Scrape URL is written by hand, in `src/lib/actions/scrape-url.ts`: its Output Format sets several parameters at once, a screenshot is saved as a file, custom headers go out as real headers, and it returns the cost and final URL from the response headers, none of which the spec describes. Every other endpoint we offer (`shared/billing.yaml`) gets a generated action: `scripts/render.mjs` writes each into its own `src/lib/actions/<name>.ts` from the published API spec, and `src/lib/actions/generated.ts` lists them for `index.ts`. Each has the operation's summary in Title Case as the name, its description, and one field per parameter or body field (text, number, checkbox, dropdown for an enum, JSON for an object or list). They send the key in `X-API-Key` (as `apikey` where an endpoint takes only that) and go through the same client as Scrape URL, so errors read the same. A new endpoint in `shared/billing.yaml` becomes a new action at the next render. A custom API call covers the rest.
+
+This is a code host (`kind: code` in `vars.yaml`). `npm run render` writes `dist/activepieces/`, which is the piece exactly as it sits in the activepieces repo (`packages/pieces/community/zenrows`): package `@activepieces/piece-zenrows`, on their workspace packages. This README stays here and isn't part of the piece.
+
+## Shared wording
+
+Facts that the Zenrows skills state too come from `shared/text/` through `{{text:name}}`, which renders as a quoted string. Today that's the meaning of `AUTH004` and `AUTH014`, in `src/lib/common/client.ts`. The piece keeps its forms short and passes the rest through: the API validates option combinations and explains every error, so the piece doesn't repeat that. A wording fix in `shared/text/` reaches the skills and the piece in the same render.
+
+## Check it
+
+```
+npm run render
+platforms/activepieces/scripts/check.sh                          # clones activepieces at vars.yaml's upstream into .cache/
+platforms/activepieces/scripts/check.sh ~/path/to/activepieces   # or reuse a checkout you already have
+```
+
+It copies `dist/activepieces/` into the activepieces checkout, registers it in `tsconfig.base.json`, installs with their pinned bun, and runs their `lint`, `build` and `test` for this piece only. CI runs the same script (`.github/workflows/activepieces.yml`).
+
+`upstream` in `vars.yaml` pins the activepieces commit. Moving it is its own PR, so CI shows whether their newer code breaks the piece.
+
+## Try it live
+
+Run Activepieces locally with `AP_DEV_PIECES=zenrows` and use the piece in a flow, with your Zenrows API key in the connection.
+
+## How it ships
+
+Not yet. First as our own npm package; then as a PR to activepieces once they agree to take it (they close outside PRs that weren't discussed with them first; see their CONTRIBUTING.md). Both release steps come in later PRs.

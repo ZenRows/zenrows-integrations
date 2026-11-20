@@ -1,0 +1,167 @@
+import {
+  HttpError,
+  HttpHeaders,
+  HttpMethod,
+  HttpResponse,
+  httpClient,
+} from '@activepieces/pieces-common';
+
+// One API operation as the generated actions describe it (generated.ts): the
+// values go into the path, the query or the JSON body by name; empty ones are left out.
+type Operation = {
+  method: string;
+  server: string;
+  path: string;
+  key: 'header' | 'query';
+  query?: string[];
+  body?: string[];
+};
+
+async function callOperation({
+  apiKey,
+  operation,
+  values,
+}: {
+  apiKey: string;
+  operation: Operation;
+  values: Record<string, unknown>;
+}): Promise<unknown> {
+  const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
+  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
+  const queryParams: Record<string, string> = {};
+  for (const name of (operation.query ?? []).filter(given)) {
+    queryParams[name] = String(values[name]);
+  }
+  if (operation.key === 'query') {
+    queryParams['apikey'] = apiKey;
+  }
+  const body = operation.body
+    ? Object.fromEntries(operation.body.filter(given).map((name) => [name, values[name]]))
+    : undefined;
+  try {
+    const response = await httpClient.sendRequest({
+      method: operation.method as HttpMethod,
+      url: `${operation.server}${path}`,
+      queryParams,
+      headers: {
+        ...(operation.key === 'header' ? { 'X-API-Key': apiKey } : {}),
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...CLIENT_HEADERS,
+      },
+      body,
+      timeout: FETCH_TIMEOUT_MS,
+    });
+    return response.body;
+  } catch (error) {
+    throw toZenrowsError({ error });
+  }
+}
+
+// responseType: 'text' keeps a page as it is (a JSON page would otherwise come
+// back parsed), 'arraybuffer' is for a screenshot.
+async function fetchPage({
+  apiKey,
+  params,
+  forwardedHeaders,
+  responseType,
+}: {
+  apiKey: string;
+  params: FetchParams;
+  forwardedHeaders?: Record<string, string>;
+  responseType: 'text' | 'arraybuffer';
+}): Promise<HttpResponse> {
+  try {
+    return await httpClient.sendRequest({
+      method: HttpMethod.GET,
+      url: `${ZENROWS_API_BASE_URL}/`,
+      queryParams: { apikey: apiKey, ...params },
+      headers: forwardedHeaders ?? CLIENT_HEADERS,
+      timeout: FETCH_TIMEOUT_MS,
+      responseType,
+    });
+  } catch (error) {
+    throw toZenrowsError({ error });
+  }
+}
+
+// The API answers every failure with a code and a reason
+// (https://docs.zenrows.com/api-error-codes); the message keeps both, and adds
+// what to do next for the codes where Activepieces changes the answer.
+function toZenrowsError({ error }: { error: unknown }): unknown {
+  if (!(error instanceof HttpError)) {
+    return error;
+  }
+  const { status, body } = error.response;
+  const problem = parseProblem({ body });
+  if (!problem) {
+    return error;
+  }
+  const hint = ERROR_HINTS[problem.code];
+  return new Error(`ZenRows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
+}
+
+function parseProblem({ body }: { body: unknown }): { code: string; reason: string } | null {
+  if (typeof body === 'string') {
+    try {
+      return parseProblem({ body: JSON.parse(body) });
+    } catch {
+      return null;
+    }
+  }
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return null;
+  }
+  const { code, detail, title } = body as Record<string, unknown>;
+  if (typeof code !== 'string') {
+    return null;
+  }
+  return {
+    code,
+    reason: typeof detail === 'string' ? detail : typeof title === 'string' ? title : 'Request failed',
+  };
+}
+
+function readHeader({ headers, name }: { headers: HttpHeaders | undefined; name: string }): string | null {
+  const value = headers?.[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+  return value ?? null;
+}
+
+const FETCH_TIMEOUT_MS = 180000;
+
+const CLIENT_HEADERS = { 'X-ZenRows-Client': 'activepieces' };
+
+const AUTH_HINT = 'Check the API key in your ZenRows connection.';
+
+// The facts below come from zenrows-integrations' shared/text/, the same
+// wording the Zenrows skills use; each hint adds what to do in Activepieces.
+function sentence(fact: string, next: string): string {
+  return `${fact.charAt(0).toUpperCase()}${fact.slice(1)}. ${next}`;
+}
+
+const ERROR_HINTS: Record<string, string> = {
+  AUTH001: AUTH_HINT,
+  AUTH002: AUTH_HINT,
+  AUTH003: AUTH_HINT,
+  AUTH004: sentence({{text:auth004}}, 'Top up or upgrade at https://app.zenrows.com.'),
+  AUTH014: sentence({{text:auth014}}, 'Raise the cap in the ZenRows dashboard.'),
+  REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
+};
+
+export const ZENROWS_API_BASE_URL = {{api:GET / server}};
+
+// The parameters the actions send, as the published API spec defines them
+// (rendered from it): a name the API doesn't take fails the build, and the
+// actions take each one's description from here.
+export const FETCH_PARAMS = {{api:GET / query url,mode,js_render,js_instructions,response_type,screenshot_fullpage,screenshot_format,custom_headers}} as const;
+export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, string>>;
+// The values the spec allows for a parameter with an enum, for example response_type.
+export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;
+
+export const zenrowsClient = {
+  callOperation,
+  fetchPage,
+  readHeader,
+};
