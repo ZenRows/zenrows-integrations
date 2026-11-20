@@ -5,7 +5,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
-import { parse as parseYaml } from "yaml";
+import addFormats from "ajv-formats";
+import { parse as parseYaml, parseDocument, visit } from "yaml";
 import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
@@ -55,9 +56,13 @@ for (const file of sources) {
   }
 }
 
-// JSON Schemas are downloaded from the URL a file declares in "$schema" and
-// cached in .cache/schemas/ (git-ignored), so a local run downloads each once.
-// Schema URLs are versioned (…/1.0.0/plugin.schema.json), so a cached copy stays valid.
+// JSON Schemas are downloaded from the URL a file declares in "$schema" on each
+// run, since a schema can gain optional fields under the same URL (o11's does),
+// and kept in .cache/schemas/ (git-ignored) for when the network is down.
+// A YAML file names its schema on its first line, the way editors read it:
+// # yaml-language-server: $schema=<url> (o11's listing does).
+const yamlSchema = (text) => text.match(/^# yaml-language-server: \$schema=(\S+)/)?.[1];
+
 async function loadSchemas() {
   const urls = new Set();
   for (const host of hosts()) {
@@ -65,6 +70,8 @@ async function loadSchemas() {
       .filter((c) => c.host === host && existsSync(join(root, c.file)))
       .map(({ file }) => [file, readFileSync(join(root, file))]);
     for (const [file, buf] of [...renderHost(host), ...tops]) {
+      const yamlUrl = /\.ya?ml$/.test(file) && yamlSchema(buf.toString("utf8"));
+      if (yamlUrl) urls.add(yamlUrl);
       if (!file.endsWith(".json")) continue;
       try {
         const url = JSON.parse(buf.toString("utf8")).$schema;
@@ -79,17 +86,19 @@ async function loadSchemas() {
     const { hostname, pathname } = new URL(url);
     const cached = join(root, ".cache", "schemas", hostname, pathname);
     try {
-      if (!existsSync(cached)) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        JSON.parse(text);
-        mkdirSync(dirname(cached), { recursive: true });
-        writeFileSync(cached, text);
-      }
-      loaded.set(url, JSON.parse(readFileSync(cached, "utf8")));
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      loaded.set(url, JSON.parse(text));
+      mkdirSync(dirname(cached), { recursive: true });
+      writeFileSync(cached, text);
     } catch (e) {
-      loaded.set(url, new Error(`couldn't download ${url} (${e.cause?.code ?? e.message})`));
+      if (existsSync(cached)) {
+        console.warn(`⚠️ couldn't download ${url} (${e.cause?.code ?? e.message}); using the copy in .cache/schemas`);
+        loaded.set(url, JSON.parse(readFileSync(cached, "utf8")));
+      } else {
+        loaded.set(url, new Error(`couldn't download ${url} (${e.cause?.code ?? e.message})`));
+      }
     }
   }
   return loaded;
@@ -97,6 +106,8 @@ async function loadSchemas() {
 
 const schemas = await loadSchemas();
 const ajv = new Ajv2020({ allErrors: true, strict: false });
+// Schemas use formats such as uri, email and date-time; without these Ajv skips them.
+addFormats(ajv);
 const validators = new Map();
 function schemaErrors(url, json) {
   const schema = schemas.get(url);
@@ -170,6 +181,20 @@ for (const host of hosts()) {
     }
   }
   if (!manifests.length && !isCodeHost(values)) errors.push(`${host}: no plugin.json in platforms/${host}/`);
+
+  // A YAML file that names its schema is checked against it, as plain data:
+  // listing sites reject duplicate keys and aliases.
+  for (const [file, buf] of [...files].filter(([f]) => /\.ya?ml$/.test(f))) {
+    const url = yamlSchema(buf.toString("utf8"));
+    if (!url) continue;
+    const doc = parseDocument(buf.toString("utf8"), { uniqueKeys: true });
+    for (const e of doc.errors) errors.push(`${host}: ${file}: ${e.message.split("\n")[0]}`);
+    if (doc.errors.length) continue;
+    let alias = false;
+    visit(doc, { Alias: () => ((alias = true), visit.BREAK) });
+    if (alias) errors.push(`${host}: ${file} uses a YAML alias; write the value out each time`);
+    for (const problem of schemaErrors(url, doc.toJS())) errors.push(`${host}: ${file} ${problem}`);
+  }
 
   // Marketplace catalogs at the top of the repo must point at this host's
   // dist/ folder, with this host's version.
