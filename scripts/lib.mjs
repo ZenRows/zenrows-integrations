@@ -30,7 +30,7 @@ const readmeTemplate = join(root, "shared", "README.md");
 // which ships as written. scripts/test.mjs lists both sides.
 export const leftoverToken = /\{\{\s*(?:[<>]\??\s*[a-z0-9_.-]+|(?:skill|text)\s*:\s*[a-z0-9_.-]+|[a-z_][a-z0-9_-]*)\s*\}\}/i;
 // {{vars}} are filled in files with these extensions; others are copied as bytes.
-export const textFile = /\.(json|md|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
+export const textFile = /\.(json|mdx?|mdc|ya?ml|txt|toml|[cm]?[jt]s)$/;
 
 // Errors here are for whoever edited a skill or platform file: print the
 // message, not a stack trace.
@@ -294,6 +294,19 @@ export function apiValue(spec, operation, part, names, where) {
     if (names) throw new Error(`${where}: {{api:… example}} takes no names`);
     return apiExample(spec, item, op);
   }
+  if (part === "responses") {
+    const all = Object.fromEntries(
+      Object.entries(op.responses ?? {})
+        .map(([status, response]) => [status, specRef(spec, response)?.description])
+        .filter(([, description]) => description),
+    );
+    if (!names) return all;
+    const picked = names.split(",").map((n) => n.trim()).filter(Boolean);
+    for (const status of picked) {
+      if (!(status in all)) throw new Error(`${where}: the API spec has no described ${status} response for ${operation}`);
+    }
+    return Object.fromEntries(picked.map((status) => [status, all[status]]));
+  }
   if (["summary", "description", "server"].includes(part)) {
     if (names) throw new Error(`${where}: {{api:… ${part}}} takes no names`);
     const value = part === "server" ? (op.servers ?? item.servers ?? spec.servers)?.[0]?.url : op[part];
@@ -394,10 +407,11 @@ export function sharedText(name, where) {
 // {{name}} is a variable from vars.yaml; {{skill:name}} is that skill's name on
 // the host; {{< name}} inlines shared/text/<name>.md, and {{text:name}} inserts it
 // as a quoted string literal (JSON), for code. {{api:GET / query url,mode}} is
-// that part of an API operation as JSON Schema, or its summary, description or
-// server (see apiValue), and {{api-sha256}} the sha256 of the spec it was read from.
+// that part of an API operation as JSON Schema, or its summary, description,
+// server, example or responses (see apiValue), and {{api-sha256}} the sha256 of
+// the spec it was read from.
 function fill(text, values, where) {
-  text = text.replace(/\{\{api:\s*(?:([A-Z]+)\s+(\S+)|([a-z][a-z0-9_-]*))\s+(query|path|body|summary|description|server|example)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, shared, part, names) =>
+  text = text.replace(/\{\{api:\s*(?:([A-Z]+)\s+(\S+)|([a-z][a-z0-9_-]*))\s+(query|path|body|summary|description|server|example|responses)(?:\s+([\w,.-]+))?\s*\}\}/g, (_, method, path, shared, part, names) =>
     JSON.stringify(apiValue(apiSpecFor(where).spec, shared ?? `${method} ${path}`, part, names, where)),
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);

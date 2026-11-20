@@ -72,6 +72,7 @@ A code host takes what it sends to the API from the published spec (`{{openapi_u
 | `{{api:POST /jobs summary}}`, `{{api:POST /jobs description}}` | the operation's summary or description, as a JSON string |
 | `{{api:POST /jobs server}}` | its base URL: the operation's `servers`, else the path's, else the spec's |
 | `{{api:POST /crawls example}}` | its example request, `{ queryParams, pathParams, body }`, from the spec's parameter and body examples |
+| `{{api:GET / responses}}`, `{{api:GET / responses 400,403}}` | what each response status means, `{ "<status>": description }`, for the statuses the spec describes, or the ones named |
 | `{{api-sha256}}` | the sha256 of the spec |
 
 JSON is valid YAML, so the same placeholder works in a YAML listing (`queryParams: {{api:GET / query url,mode}}`) and in code (`const fetchParams = {{api:GET / query url,mode}};`). The render fails on an operation or parameter the spec doesn't have, and on a summary, description or server it doesn't give.

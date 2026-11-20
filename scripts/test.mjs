@@ -102,6 +102,11 @@ test("every form of this tool's tokens is caught", () => {
   }
 });
 test("a {{…}} in a file type the render doesn't fill fails", fails({ ...piece, "platforms/piece/setup.py": "name = \"{{host_full}}\"\n" }, "setup.py still has an unrendered {{host_full}}"));
+test("an MDX page is filled", () => {
+  const r = run({ ...piece, "platforms/piece/docs/page.mdx": "# {{host_full}}\n\n<Table content={[{ name: 'x' }]} />\n" }, {}, ["dist/piece/docs/page.mdx"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/docs/page.mdx"), "# Piece\n\n<Table content={[{ name: 'x' }]} />\n");
+});
 test("a mistyped snippet token fails on the way through the render", fails({
   ...piece,
   "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
@@ -149,7 +154,12 @@ const tokenSpecText = JSON.stringify({
         { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
         { $ref: "#/components/parameters/stubMode" },
       ],
-      get: { operationId: "fetchPage", summary: "Fetch a page", description: "Fetches a stub page." },
+      get: {
+        operationId: "fetchPage",
+        summary: "Fetch a page",
+        description: "Fetches a stub page.",
+        responses: { 200: { description: "The page." }, 404: { $ref: "#/components/responses/StubMissing" }, 500: {} },
+      },
     },
     "/stub/{job_id}": {
       servers: [{ url: "https://async.example.com/v1" }],
@@ -169,6 +179,7 @@ const tokenSpecText = JSON.stringify({
   components: {
     ...published.components,
     parameters: { ...published.components?.parameters, stubMode: { name: "mode", in: "query", schema: { type: "string", enum: ["auto"] } } },
+    responses: { ...published.components?.responses, StubMissing: { description: "No such page." } },
     schemas: {
       ...published.components?.schemas,
       StubJob: { type: "object", properties: { urls: { type: "array", items: { $ref: "#/components/schemas/StubUrl" } } } },
@@ -204,6 +215,9 @@ test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesT
 test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /stub-jobs summary}}, {{api:POST /stub-jobs description}}]", '["Create a job", "Sends every URL at once."]'));
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /stub-jobs server}}, {{api:GET /stub/{job_id} server}}, {{api:GET /stub server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /stub/{job_id} description}}"), "the API spec has no description for GET /stub/{job_id}", tokenSpec));
+test("{{api:… responses}} renders each described response's description, $refs followed", rendersTo("{{api:GET /stub responses}}", '{"200":"The page.","404":"No such page."}'));
+test("{{api:… responses}} renders only the statuses it names", rendersTo("{{api:GET /stub responses 404}}", '{"404":"No such page."}'));
+test("{{api:… responses}} naming a status the spec doesn't describe fails", fails(usesToken("{{api:GET /stub responses 500}}"), "the API spec has no described 500 response for GET /stub", tokenSpec));
 // shared/endpoints.yaml: an endpoint that is a slice of one operation, for every host.
 // The repo's own shared endpoints stay; the case adds one.
 const sliced = (yaml, token) => ({ ...usesToken(token), "shared/endpoints.yaml": readFileSync(join(root, "shared/endpoints.yaml"), "utf8") + yaml });
@@ -366,3 +380,13 @@ test("a snippet named only in a code host README isn't a use", warns({ ...piece,
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));
+
+// A JSON file is checked against the schema it declares, whichever draft that schema is written in.
+test("a JSON file against a draft-07 schema is checked", fails({ ...piece, "platforms/piece/turbo.json": '{ "$schema": "https://v2-9-16.turborepo.dev/schema.json", "tasks": "build" }\n' }, "piece: turbo.json /tasks must be object"));
+
+// The Mastra host exposes or excludes every parameter of its tools' slices, so a new one forces a decision.
+test("a parameter the Mastra tools neither expose nor exclude fails", () => {
+  const endpoints = readFileSync(join(root, "shared/endpoints.yaml"), "utf8").replace(/^(  parameters: \[url, mode, js_render, )/m, "$1custom_headers, ");
+  assert.ok(endpoints.includes("custom_headers"), "the fetch slice gained custom_headers");
+  fails({ "shared/endpoints.yaml": endpoints }, "the scrape tool neither exposes nor excludes custom_headers from shared/endpoints.yaml's fetch")();
+});

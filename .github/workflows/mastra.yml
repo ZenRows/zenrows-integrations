@@ -1,0 +1,41 @@
+name: Mastra package
+
+# The package lives in mastra's monorepo, so the only gate that means anything
+# is theirs: check.sh fetches mastra at the commit vars.yaml pins, drops the
+# rendered package in, adds the sidebar entry, and runs their install, build,
+# type-check, lint and vitest in their pinned toolchain.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - platforms/mastra/**
+      - dist/mastra/**
+      - shared/**
+      - scripts/**
+      - .github/workflows/mastra.yml
+  pull_request:
+    paths:
+      - platforms/mastra/**
+      - dist/mastra/**
+      - shared/**
+      - scripts/**
+      - .github/workflows/mastra.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Build and test in mastra
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: npm ci
+      # Their toolchain runs in the Node image platforms/mastra/vars.yaml pins,
+      # so the runner needs only Docker. Invoked through bash: the script is
+      # committed without the exec bit.
+      - run: bash platforms/mastra/scripts/check.sh
