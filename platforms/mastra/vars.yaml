@@ -7,6 +7,7 @@ host_full: "Mastra"
 # Moving it is its own PR, so CI shows whether their newer code breaks the
 # package rather than it breaking silently on someone else's machine.
 upstream: "7ae1b0da5bab10c421e95c5ec6398bbdd5019822"
-# The Node image check.sh runs their toolchain in. Their root package.json
-# takes ^22.19.0 || >=24.11.0, and pnpm comes from its packageManager field.
-node: "24.11.1-bookworm-slim"
+# The Node image check.sh runs their toolchain in: the Node their CI sets up
+# (.github/actions/setup-pnpm-node), and pnpm from their packageManager field.
+# Not -slim: the changeset and docs gates need git and curl.
+node: "24.22.1-bookworm"
