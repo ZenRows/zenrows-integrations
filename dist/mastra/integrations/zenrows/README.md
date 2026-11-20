@@ -24,7 +24,8 @@ export const researchAgent = new Agent({
   id: 'research-agent',
   name: 'Research Agent',
   model: 'anthropic/claude-sonnet-4-5',
-  instructions: 'Read pages with the scrape tool, and use the extract tool for the fields of a product or listing page.',
+  instructions:
+    'Read pages with the scrape tool, and use the extract tool for the fields of a product or listing page.',
   tools: { zenrowsScrape, zenrowsExtract },
 });
 ```

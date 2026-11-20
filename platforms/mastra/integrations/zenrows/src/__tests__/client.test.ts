@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { requestZenrows, ZenrowsError } from '../client.js';
-
-const responses: Record<string, string> = {{api:fetch responses}};
+import { RESPONSES } from '../spec.js';
 
 const fetchMock = vi.fn<typeof fetch>();
 const problem = (status: number, body: Record<string, unknown>) =>
@@ -124,27 +123,34 @@ describe('requestZenrows', () => {
     [402, 'AUTH004', 'Usage exceeded.'],
     [400, 'REQS004', 'mode=auto cannot be combined with js_render.'],
     [429, 'AUTH008', 'Too many concurrent requests.'],
-  ])('turns a %i %s into a ZenrowsError with the API detail and what the spec says the status means', async (status, code, detail) => {
-    fetchMock.mockResolvedValue(problem(status, { code, detail, status }));
+  ])(
+    'turns a %i %s into a ZenrowsError with the API detail and what the spec says the status means',
+    async (status, code, detail) => {
+      fetchMock.mockResolvedValue(problem(status, { code, detail, status }));
 
-    const error = await rejection(requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' }));
+      const error = await rejection(requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' }));
 
-    expect(error).toMatchObject({ status, code, detail });
-    expect(error.message).toContain(`${status} ${code}`);
-    expect(error.message).toContain(detail);
-    expect(error.message).toContain(responses[status]);
-  });
+      expect(error).toMatchObject({ status, code, detail });
+      expect(error.message).toContain(`${status} ${code}`);
+      expect(error.message).toContain(detail);
+      expect(error.message).toContain(RESPONSES[status]);
+    },
+  );
 
   it('carries the reason of a 403 REQS007', async () => {
     fetchMock.mockResolvedValue(
-      problem(403, { code: 'REQS007', reason: 'domain_not_prepared', detail: 'Extract has not been prepared for example.com yet.' }),
+      problem(403, {
+        code: 'REQS007',
+        reason: 'domain_not_prepared',
+        detail: 'Extract has not been prepared for example.com yet.',
+      }),
     );
 
     const error = await rejection(requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' }));
 
     expect(error).toMatchObject({ status: 403, code: 'REQS007', reason: 'domain_not_prepared' });
     expect(error.message).toContain('403 REQS007 (domain_not_prepared)');
-    expect(error.message).toContain(responses['403']);
+    expect(error.message).toContain(RESPONSES['403']);
   });
 
   it('keeps the body of an error that is not JSON', async () => {

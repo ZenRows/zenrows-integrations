@@ -1,9 +1,8 @@
-const DEFAULT_BASE_URL: string = {{api:fetch server}};
+import { DEFAULT_BASE_URL, RESPONSES } from './spec.js';
+
 // ZenRows asks clients for at least 180 s: a request can take up to 3 minutes,
 // and one cut short on the client side still runs, and can still be charged.
 const DEFAULT_TIMEOUT = 180_000;
-// What the API spec says each response status of a fetch means, keyed by status.
-const RESPONSES: Record<string, string> = {{api:fetch responses}};
 
 export interface ZenrowsClientOptions {
   /** ZenRows API key. Falls back to the `ZENROWS_API_KEY` environment variable. */

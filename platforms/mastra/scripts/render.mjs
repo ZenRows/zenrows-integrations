@@ -58,28 +58,77 @@ const replaced = {
     },
 };
 
-const str = (value) => JSON.stringify(value);
+// The generated files are written the way oxfmt formats them under Mastra's
+// .oxfmtrc.json (single quotes, 120 columns), so they pass its check as they
+// are. check.sh's format gate catches a shape this does not cover.
+const width = 120;
+
+// A string literal as oxfmt quotes it: single quotes, unless the text holds
+// more single quotes than double ones.
+function quote(text) {
+    const singles = text.split("'").length - 1;
+    const doubles = text.split('"').length - 1;
+    const json = JSON.stringify(text);
+    if (doubles < singles) return json;
+    return `'${json.slice(1, -1).replaceAll('\\"', '"').replaceAll("'", "\\'")}'`;
+}
+
+// `<head> <value><end>` on one line when it fits, else the value on the next
+// line, one level deeper: how oxfmt breaks an assignment or a property.
+function assign(indent, head, value, end) {
+    const line = `${indent}${head} ${value}${end}`;
+    return line.length <= width ? `${line}\n` : `${indent}${head}\n${indent}  ${value}${end}\n`;
+}
+
+// A property whose value is a call chain on `z`: one line when it fits, else
+// one call per line, and the last call's argument on its own line if needed.
+function chain(name, calls) {
+    const line = `  ${name}: z${calls.map((call) => `.${call}`).join("")},`;
+    if (line.length <= width) return `${line}\n`;
+    const last = calls.at(-1);
+    const open = last.indexOf("(");
+    const lastLine = `    .${last},`;
+    const tail =
+        lastLine.length <= width
+            ? `${lastLine}\n`
+            : `    .${last.slice(0, open)}(\n      ${last.slice(open + 1, -1)},\n    ),\n`;
+    return `  ${name}: z\n${calls
+        .slice(0, -1)
+        .map((call) => `    .${call}\n`)
+        .join("")}${tail}`;
+}
 
 function zod(name, schema, required, note) {
-    let base;
+    const calls = [];
     if (schema.enum) {
-        base = schema.enum.length === 1 ? `z.literal(${str(schema.enum[0])})` : `z.enum([${schema.enum.map(str).join(", ")}])`;
+        calls.push(
+            schema.enum.length === 1 ? `literal(${quote(schema.enum[0])})` : `enum([${schema.enum.map(quote).join(", ")}])`,
+        );
     } else if (schema.format === "uri") {
         if (!schema.pattern) throw new Error(`${where}: ${name} is a uri with no pattern to pin the scheme`);
-        base = `z.string().url().regex(${new RegExp(schema.pattern)})`;
+        calls.push("string()", "url()", `regex(${new RegExp(schema.pattern)})`);
     } else if (schema.type === "boolean") {
-        base = "z.boolean()";
+        calls.push("boolean()");
     } else if (schema.type === "integer") {
-        base = `z.number().int()${schema.minimum !== undefined ? `.min(${schema.minimum})` : ""}`;
+        calls.push("number()", "int()");
+        if (schema.minimum !== undefined) calls.push(`min(${schema.minimum})`);
     } else if (schema.type === "string") {
-        base = `z.string()${schema.pattern ? `.regex(${new RegExp(schema.pattern)})` : ""}`;
+        calls.push("string()");
+        if (schema.pattern) calls.push(`regex(${new RegExp(schema.pattern)})`);
     } else {
         throw new Error(`${where}: ${name} has type ${schema.type}, which this generator does not map`);
     }
+    if (!required) calls.push("optional()");
     const description = [schema.description, note].filter(Boolean).join(" ");
     if (!description) throw new Error(`${where}: ${name} has no description in the spec`);
-    return `  ${name}: ${base}${required ? "" : ".optional()"}.describe(\n    ${str(description)},\n  ),\n`;
+    calls.push(`describe(${quote(description)})`);
+    return chain(name, calls);
 }
+
+const header = `// Generated from the ZenRows API spec (https://www.zenrows.com/openapi.json) by
+// platforms/mastra/scripts/render.mjs in ZenRows/zenrows-integrations.
+// Change the spec or that script rather than this file.
+`;
 
 export default function render({ apiEndpoints, fill }) {
     // fill() is not applied to what a host renderer returns, so the snippets
@@ -120,15 +169,32 @@ export default function render({ apiEndpoints, fill }) {
         return `export const ${id}InputSchema = z.object({\n${fields.join("")}});\n`;
     });
 
+    // The rest of what the package takes from the spec and shared/text/, as
+    // constants, so the hand-written files hold no placeholders and oxfmt
+    // formats them as they are written.
+    const parsed = (placeholder) => JSON.parse(fill(placeholder));
+    const constant = (name, placeholder) => assign("", `export const ${name} =`, quote(parsed(placeholder)), ";");
+    const responses = Object.entries(parsed("{{api:fetch responses}}"))
+        .map(([status, text]) => assign("  ", `${quote(status)}:`, quote(text), ","))
+        .join("");
+
     return {
-        "integrations/zenrows/src/schemas.ts": `// Generated from the ZenRows API spec (https://www.zenrows.com/openapi.json) by
-// platforms/mastra/scripts/render.mjs in ZenRows/zenrows-integrations.
-// Change the spec or that script rather than this file.
-import { z } from 'zod';
+        "integrations/zenrows/src/schemas.ts": `${header}import { z } from 'zod';
 
 ${schemas.join("\n")}
 export type ZenrowsScrapeInput = z.infer<typeof zenrowsScrapeInputSchema>;
 export type ZenrowsExtractInput = z.infer<typeof zenrowsExtractInputSchema>;
 `,
+        "integrations/zenrows/src/spec.ts": `${header}
+export const DEFAULT_BASE_URL: string = ${quote(parsed("{{api:fetch server}}"))};
+
+// What each response status of a fetch means, keyed by status.
+export const RESPONSES: Record<string, string> = {
+${responses}};
+
+${constant("FETCH_SUMMARY", "{{api:fetch summary}}")}${constant("EXTRACT_SUMMARY", "{{api:extract summary}}")}${constant(
+            "CREDIT_WEIGHTS",
+            "{{text:credit-weights}}",
+        )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}`,
     };
 }
