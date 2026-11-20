@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/ZenRows/zenrows-integrations/compare/cursor-v0.2.2...cursor-v0.3.0) (2026-11-20)
+
+
+### Features
+
+* **cursor:** `/zenrows-doctor` lists the Crawl tools, reports the plan's usage with `account_usage`, and tells a sign-in problem (401, `AUTH003`) apart from used-up credits (`AUTH004`, `AUTH014`), where reconnecting won't help. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **cursor:** `batch` saves results to `./.zenrows/` only when the agent can write files, and `proxy_country` works with the default settings. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **cursor:** `getting-started` checks that the plugin is enabled and that Settings, Tools and MCP lists `zenrows`, walks through Connect or "Needs login", and tells sign-in problems apart from used-up credits. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **cursor:** Every skill states that the user's instructions take precedence over it. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **cursor:** New `using-zenrows` skill: an overview of every Zenrows tool and its key parameters, which tool fits a task, safety rules and what each error code means. It replaces the always-on `rules/zenrows.mdc` rule, so the guidance loads only when a task needs live web data. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **cursor:** The plugin description and README say in full what Zenrows does, the README has Requirements, Setup, Privacy and Support sections, and the contact address is integrations@zenrows.com (was support@zenrows.com). ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **monid:** Zenrows connector for Monid, as a code host ([#20](https://github.com/ZenRows/zenrows-integrations/issues/20)) ([bd65d61](https://github.com/ZenRows/zenrows-integrations/commit/bd65d610be811762a87dbbf03043f40df75cb267))
+
+
+### Bug Fixes
+
+* **cursor:** Skills no longer pass `mode='auto'` to `scrape`, which has no `mode` parameter; Zenrows adds JavaScript rendering or premium proxies on its own when a page needs them. ([77f0979](https://github.com/ZenRows/zenrows-integrations/commit/77f0979efb103af984b8aa8e336bb32fa330b279))
+* **render:** write versioned JSON the way release-please rewrites it ([#26](https://github.com/ZenRows/zenrows-integrations/issues/26)) ([3a78cf1](https://github.com/ZenRows/zenrows-integrations/commit/3a78cf1f1b513dd0230e97edc5208893a6819229))
+
 ## [0.2.2] - 2026-10-27
 
 ### Fixed
