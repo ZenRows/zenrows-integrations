@@ -7,11 +7,17 @@ import { zenrowsClient } from '../common/client';
 export const requestExtractDomainAction = createAction({
   auth: zenrowsAuth,
   name: "request_extract_domain",
-  displayName: "Ask For A Domain To Be Prepared For Extract",
-  description: "Submit a domain for preparation, within a monthly allowance. The submission is accepted immediately and works through discovery, preparation and verification, typically in minutes: poll `getExtractDomainStatus` instead of blocking. Send `example_urls` when you can; they replace discovery. One URL works, but up to 5 related URLs work better: Extract compares the pages of one type against each other, so it can check the fields it found and fill in fields one page is missing. Send at least 3 pages of your main page type; other types can share the rest of the 5 (for example 3 product pages and 2 search result pages). Submitting a domain that is already prepared returns its current record rather than starting again, so it does not add new kinds of page. Send an `Idempotency-Key` header to make a retry safe. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints.",
+  classification: "WRITE",
+  displayName: "Request Extract Domain",
+  description: "Ask Zenrows to prepare a domain for Extract. Preparation usually takes minutes.",
+  audience: 'both',
+  aiMetadata: {
+    description: "Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe.",
+    idempotent: false,
+  },
   props: {
     domain: Property.ShortText({ displayName: "Domain", description: "The domain to prepare, without scheme.", required: true }),
-    example_urls: Property.Json({ displayName: "Example URLs", description: "1 to 5 URLs on that domain. One works; at least 3 pages of your main page type work better, and other types can share the rest of the 5. When present, they replace discovery.", required: false }),
+    example_urls: Property.Array({ displayName: "Example URLs", description: "1 to 5 page URLs on the domain. At least 3 pages of your main page type (for example product pages) work best; other page types can fill the rest.", required: false }),
   },
   async run({ auth, propsValue, files }) {
     return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/extract/prepared-domains","key":"header","body":["domain","example_urls"]}, values: propsValue, files });

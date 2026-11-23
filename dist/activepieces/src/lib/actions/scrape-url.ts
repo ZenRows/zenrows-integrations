@@ -95,6 +95,7 @@ export const scrapeUrlAction = createAction({
       : null;
 
     const requestCost = zenrowsClient.readHeader({ headers: response.headers, name: 'X-Request-Cost' });
+    const requestCredits = zenrowsClient.readHeader({ headers: response.headers, name: 'X-Request-Credits' });
 
     return {
       url: propsValue.url,
@@ -102,6 +103,7 @@ export const scrapeUrlAction = createAction({
       content: isScreenshot ? null : String(response.body),
       screenshot_url: screenshotUrl,
       final_url: zenrowsClient.readHeader({ headers: response.headers, name: 'Zr-Final-Url' }),
+      request_credits: requestCredits === null ? null : Number(requestCredits),
       request_cost: requestCost === null ? null : Number(requestCost),
       request_id: zenrowsClient.readHeader({ headers: response.headers, name: 'X-Request-Id' }),
     };
@@ -139,7 +141,8 @@ function scrapeOutputSchema(): OutputSchema {
       { key: 'content', label: 'Content' },
       { key: 'screenshot_url', label: 'Screenshot', format: 'image' },
       { key: 'final_url', label: 'Final URL', format: 'url' },
-      { key: 'request_cost', label: 'Request Cost', format: 'number' },
+      { key: 'request_credits', label: 'Credits Used', format: 'number' },
+      { key: 'request_cost', label: 'Request Cost (USD)', format: 'number' },
       { key: 'request_id', label: 'Request ID' },
     ],
   };

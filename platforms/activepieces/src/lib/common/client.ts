@@ -18,6 +18,8 @@ type Operation = {
   body?: string[];
   // The spec says it can answer with a file (a PDF, an image): read it as bytes.
   binary?: boolean;
+  // The spec says it answers with NDJSON: one JSON value per line, returned as a list.
+  lines?: boolean;
 };
 
 // Where a generated action saves a file the API answers with (Activepieces' context.files).
@@ -59,26 +61,54 @@ async function callOperation({
       body,
       timeout: FETCH_TIMEOUT_MS,
       ...(operation.binary ? { responseType: 'arraybuffer' as const } : {}),
+      ...(operation.lines ? { responseType: 'text' as const } : {}),
     });
+    if (operation.lines) {
+      return readLines({ text: String(response.body ?? '') });
+    }
     return operation.binary ? await readBinary({ response, files }) : response.body;
   } catch (error) {
     throw toZenrowsError({ error });
   }
 }
 
-// A response read as bytes: JSON and text come back as such, a file is saved
-// with files.write and comes back as its URL.
+// A response read as bytes: JSON comes back parsed, text as text, and a file
+// is saved with files.write and comes back as its URL. The API labels some JSON
+// text/plain (an Extract result, for one), so text that parses as a JSON object
+// or list comes back parsed too.
 async function readBinary({ response, files }: { response: HttpResponse; files?: Files }): Promise<unknown> {
   const data = Buffer.from(response.body as ArrayBuffer);
   const contentType = readHeader({ headers: response.headers, name: 'Content-Type' }) ?? '';
   if (contentType.includes('json')) {
     return JSON.parse(data.toString('utf8'));
   }
+  if (contentType.startsWith('text/plain')) {
+    return parseJsonText({ text: data.toString('utf8') });
+  }
   if (contentType.startsWith('text/') || !files) {
     return data.toString('utf8');
   }
   const extension = contentType.split(';')[0].split('/')[1] || 'bin';
   return { file_url: await files.write({ fileName: `zenrows-${randomUUID()}.${extension}`, data }) };
+}
+
+function parseJsonText({ text }: { text: string }): unknown {
+  if (!/^\s*[[{]/.test(text)) {
+    return text;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+// NDJSON as a list, the same shape for no lines, one or many.
+function readLines({ text }: { text: string }): unknown[] {
+  return text
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line));
 }
 
 // responseType: 'text' keeps a page as it is (a JSON page would otherwise come

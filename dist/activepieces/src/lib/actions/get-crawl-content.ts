@@ -7,11 +7,17 @@ import { zenrowsClient } from '../common/client';
 export const getCrawlContentAction = createAction({
   auth: zenrowsAuth,
   name: "get_crawl_content",
-  displayName: "Read One Page's HTML",
-  description: "The HTML of one kept page, for a crawl started with `output_format`. Take the path from the result's `content_url`. Documented at https://docs.zenrows.com/crawl/endpoints#read-a-page.",
+  classification: "READ",
+  displayName: "Get Crawl Page",
+  description: "Get the HTML of one page a crawl fetched.",
+  audience: 'both',
+  aiMetadata: {
+    description: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Costs no credits; safe to retry.",
+    idempotent: true,
+  },
   props: {
-    download: Property.Checkbox({ displayName: "Download", description: "`true` returns the page as a file to save.", required: false, defaultValue: false }),
-    crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as returned when it started.", required: true }),
+    download: Property.Checkbox({ displayName: "Download", description: "Save the page as a file instead of returning its HTML.", required: false, defaultValue: false }),
+    crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as Start Crawl returned it (crawl_id).", required: true }),
     content_id: Property.ShortText({ displayName: "Content ID", description: "From the result's `content_url`.", required: true }),
   },
   async run({ auth, propsValue, files }) {

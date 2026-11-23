@@ -7,8 +7,14 @@ import { zenrowsClient } from '../common/client';
 export const getExtractDomainStatusAction = createAction({
   auth: zenrowsAuth,
   name: "get_extract_domain_status",
-  displayName: "Track A Domain's Preparation",
-  description: "How far a submission has got. Branch on `status` (`preparing`, `ready`, `failed`); `state` is the finer-grained step. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints.",
+  classification: "READ",
+  displayName: "Get Extract Domain Status",
+  description: "Check how far a domain's preparation for Extract has got.",
+  audience: 'both',
+  aiMetadata: {
+    description: "Reads the preparation status of a domain submitted with Request Extract Domain. Branch on status: preparing, ready or failed. Costs no credits; safe to retry.",
+    idempotent: true,
+  },
   props: {
     domain: Property.ShortText({ displayName: "Domain", description: "The domain, without scheme.", required: true }),
   },
