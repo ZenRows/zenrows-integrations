@@ -2,8 +2,8 @@ name: Mastra package
 
 # The package lives in mastra's monorepo, so the only gate that means anything
 # is theirs: check.sh fetches mastra at the commit vars.yaml pins, drops the
-# rendered package in, adds the sidebar entry, and runs their install, build,
-# type-check, lint and vitest in their pinned toolchain.
+# rendered package in, adds the sidebar entry, and runs the gates of their CI
+# (lint.yml, lint-docs.yml) in their pinned toolchain.
 
 on:
   push:
@@ -27,7 +27,7 @@ permissions:
 
 jobs:
   check:
-    name: Build and test in mastra
+    name: Mastra's CI gates
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
