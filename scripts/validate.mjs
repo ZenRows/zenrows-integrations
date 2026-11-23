@@ -5,7 +5,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
-import { parse as parseYaml } from "yaml";
+import addFormats from "ajv-formats";
+import { parse as parseYaml, parseDocument, visit } from "yaml";
 import { catalogs, hostSkillName, hostSkills, hosts, isCodeHost, listFiles, prepareRender, platformsDir, readLock, renderHost, root, sha256, sharedTextDir, skillNames, textFile, vars } from "./lib.mjs";
 
 const errors = [];
@@ -13,24 +14,16 @@ await prepareRender();
 
 const report = [];
 
-// Every name a skill has anywhere: shared names, each host's own skills, and
-// each host's name for them. A reference is only checked if it's one of these.
-const knownSkills = new Set(skillNames());
-for (const host of hosts()) {
-  const values = vars(host);
-  for (const { name } of hostSkills(host, values)) {
-    knownSkills.add(name);
-    knownSkills.add(hostSkillName(values, name));
-  }
-}
-
 // Skill names a text refers to: "use map", every name inside "(use …)", and
-// backticked names. One-word names count, so a plain "use map" is caught on a
-// host that ships map as zenrows-map.
-function skillReferences(text) {
+// backticked names. Only words in `names` count: the shared names, plus a
+// host's own names when checking that host. One-word names count, so a plain
+// "use map" is caught on a host that ships map as zenrows-map, while OpenClaw's
+// skill "zenrows" doesn't turn every `zenrows` server mention on other hosts
+// into a reference.
+function skillReferences(text, names) {
   const refs = new Set();
   const add = (s) => {
-    for (const [word] of s.matchAll(/(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?![\w-])/g)) if (knownSkills.has(word)) refs.add(word);
+    for (const [word] of s.matchAll(/(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?![\w-])/g)) if (names.has(word)) refs.add(word);
   };
   for (const [, word] of text.matchAll(/\buse (?:the )?`?([a-z][a-z0-9-]*)(?![\w-])/g)) add(word);
   for (const [, inner] of text.matchAll(/\(use ([^()]*)\)/g)) add(inner);
@@ -50,14 +43,18 @@ for (const file of sources) {
   const text = readFileSync(join(root, file), "utf8").replace(/\{\{\s*skill:[a-z0-9-]+\s*\}\}/g, "");
   const name = text.match(/^name: *([a-z][a-z0-9-]*) *$/m);
   if (name && shared.includes(name[1])) errors.push(`${file}: write name: {{skill:${name[1]}}}, not the plain name`);
-  for (const ref of skillReferences(text)) {
+  for (const ref of skillReferences(text, new Set(shared))) {
     if (shared.includes(ref)) errors.push(`${file}: refers to the skill "${ref}" by its plain name; write {{skill:${ref}}}`);
   }
 }
 
-// JSON Schemas are downloaded from the URL a file declares in "$schema" and
-// cached in .cache/schemas/ (git-ignored), so a local run downloads each once.
-// Schema URLs are versioned (…/1.0.0/plugin.schema.json), so a cached copy stays valid.
+// JSON Schemas are downloaded from the URL a file declares in "$schema" on each
+// run, since a schema can gain optional fields under the same URL (o11's does),
+// and kept in .cache/schemas/ (git-ignored) for when the network is down.
+// A YAML file names its schema on its first line, the way editors read it:
+// # yaml-language-server: $schema=<url> (o11's listing does).
+const yamlSchema = (text) => text.match(/^# yaml-language-server: \$schema=(\S+)/)?.[1];
+
 async function loadSchemas() {
   const urls = new Set();
   for (const host of hosts()) {
@@ -65,6 +62,8 @@ async function loadSchemas() {
       .filter((c) => c.host === host && existsSync(join(root, c.file)))
       .map(({ file }) => [file, readFileSync(join(root, file))]);
     for (const [file, buf] of [...renderHost(host), ...tops]) {
+      const yamlUrl = /\.ya?ml$/.test(file) && yamlSchema(buf.toString("utf8"));
+      if (yamlUrl) urls.add(yamlUrl);
       if (!file.endsWith(".json")) continue;
       try {
         const url = JSON.parse(buf.toString("utf8")).$schema;
@@ -79,17 +78,19 @@ async function loadSchemas() {
     const { hostname, pathname } = new URL(url);
     const cached = join(root, ".cache", "schemas", hostname, pathname);
     try {
-      if (!existsSync(cached)) {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
-        JSON.parse(text);
-        mkdirSync(dirname(cached), { recursive: true });
-        writeFileSync(cached, text);
-      }
-      loaded.set(url, JSON.parse(readFileSync(cached, "utf8")));
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      loaded.set(url, JSON.parse(text));
+      mkdirSync(dirname(cached), { recursive: true });
+      writeFileSync(cached, text);
     } catch (e) {
-      loaded.set(url, new Error(`couldn't download ${url} (${e.cause?.code ?? e.message})`));
+      if (existsSync(cached)) {
+        console.warn(`⚠️ couldn't download ${url} (${e.cause?.code ?? e.message}); using the copy in .cache/schemas`);
+        loaded.set(url, JSON.parse(readFileSync(cached, "utf8")));
+      } else {
+        loaded.set(url, new Error(`couldn't download ${url} (${e.cause?.code ?? e.message})`));
+      }
     }
   }
   return loaded;
@@ -97,6 +98,8 @@ async function loadSchemas() {
 
 const schemas = await loadSchemas();
 const ajv = new Ajv2020({ allErrors: true, strict: false });
+// Schemas use formats such as uri, email and date-time; without these Ajv skips them.
+addFormats(ajv);
 const validators = new Map();
 function schemaErrors(url, json) {
   const schema = schemas.get(url);
@@ -152,7 +155,7 @@ for (const host of hosts()) {
 
     // References to other skills ("use map", "(use map or crawl)", "the `map`
     // skill") must name a skill this host ships, under its name on this host.
-    for (const ref of skillReferences(text)) {
+    for (const ref of skillReferences(text, new Set([...shared, ...shipped]))) {
       if (!shipped.has(ref)) errors.push(`${host}: ${path} refers to skill "${ref}", which ${host} doesn't ship`);
     }
   }
@@ -170,6 +173,20 @@ for (const host of hosts()) {
     }
   }
   if (!manifests.length && !isCodeHost(values)) errors.push(`${host}: no plugin.json in platforms/${host}/`);
+
+  // A YAML file that names its schema is checked against it, as plain data:
+  // listing sites reject duplicate keys and aliases.
+  for (const [file, buf] of [...files].filter(([f]) => /\.ya?ml$/.test(f))) {
+    const url = yamlSchema(buf.toString("utf8"));
+    if (!url) continue;
+    const doc = parseDocument(buf.toString("utf8"), { uniqueKeys: true });
+    for (const e of doc.errors) errors.push(`${host}: ${file}: ${e.message.split("\n")[0]}`);
+    if (doc.errors.length) continue;
+    let alias = false;
+    visit(doc, { Alias: () => ((alias = true), visit.BREAK) });
+    if (alias) errors.push(`${host}: ${file} uses a YAML alias; write the value out each time`);
+    for (const problem of schemaErrors(url, doc.toJS())) errors.push(`${host}: ${file} ${problem}`);
+  }
 
   // Marketplace catalogs at the top of the repo must point at this host's
   // dist/ folder, with this host's version.
@@ -265,6 +282,17 @@ for (const host of hosts()) {
     .map((f) => readFileSync(join(platformsDir, host, "skills", f), "utf8").split("\n").filter(Boolean).length)
     .reduce((a, b) => a + b, 0);
   report.push(`${host}: ${Object.keys(lock).length} whole-file overrides, ${owned} skill lines of its own (slots and overrides)`);
+}
+
+// An optional slot ({{>? name}}) renders as nothing on a host without its file,
+// so a misspelt name would never show up. At least one host must fill it.
+for (const skill of skillNames()) {
+  const text = readFileSync(join(root, "skills", skill, "SKILL.md"), "utf8");
+  for (const [, slot] of text.matchAll(/\{\{>\?\s*([a-z0-9_-]+)\s*\}\}/g)) {
+    if (!hosts().some((host) => existsSync(join(platformsDir, host, "skills", skill, `${slot}.md`)))) {
+      errors.push(`skills/${skill}/SKILL.md: optional slot {{>? ${slot}}} has no platforms/<host>/skills/${skill}/${slot}.md on any host`);
+    }
+  }
 }
 
 // shared/text/ snippets are plain text, so they read the same in a skill and in

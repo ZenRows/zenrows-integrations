@@ -4,7 +4,7 @@
 // first failure, or that both pass. Add a case whenever a new rule is added.
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -155,6 +155,7 @@ const tokenSpecText = JSON.stringify({
       servers: [{ url: "https://async.example.com/v1" }],
       get: { operationId: "getJob", summary: "Read a job", parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string", examples: ["J1"] } }] },
     },
+    "/stub-site": { servers: [{ url: "https://zenrows.com" }], get: { operationId: "askSite", summary: "The website's own endpoint" } },
     "/stub-jobs": {
       post: {
         operationId: "createJob",
@@ -205,7 +206,7 @@ test("{{api:… summary}} and {{api:… description}} render the operation's tex
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /stub-jobs server}}, {{api:GET /stub/{job_id} server}}, {{api:GET /stub server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /stub/{job_id} description}}"), "the API spec has no description for GET /stub/{job_id}", tokenSpec));
 // shared/endpoints.yaml: an endpoint that is a slice of one operation, for every host.
-// The repo's own shared endpoints stay; the case adds one.
+// The repo's own shared endpoints stay (o11 uses them); the case adds one.
 const sliced = (yaml, token) => ({ ...usesToken(token), "shared/endpoints.yaml": readFileSync(join(root, "shared/endpoints.yaml"), "utf8") + yaml });
 test("a shared endpoint renders its slice, name and the spec's description", () => {
   const r = run(sliced("slice:\n  operation: POST /stub-jobs\n  name: Slice\n", "[{{api:slice summary}}, {{api:slice description}}, {{api:slice server}}]"), tokenSpec, ["dist/piece/src/index.ts"]);
@@ -272,6 +273,7 @@ test("an API operation shared/billing.yaml doesn't place fails", () => {
   billing.not_offered = billing.not_offered.filter((op) => op !== "POST /stub-jobs");
   fails(renders('export default ({ apiEndpoints }) => ({ "x.json": JSON.stringify(apiEndpoints().length) });\n', { "shared/billing.yaml": JSON.stringify(billing) }), 'shared/billing.yaml: the API\'s "POST /stub-jobs" is in none of', tokenSpec)();
 });
+test("shared/billing.yaml naming one of the website's own endpoints fails", fails(offered({ not_offered: ["GET /stub-site"] }), 'shared/billing.yaml: not_offered names "GET /stub-site", which is neither an API operation nor a shared endpoint', tokenSpec));
 test("shared/billing.yaml naming an endpoint that doesn't exist fails", fails(offered({ free: ["GET /nope"] }), 'shared/billing.yaml: free names "GET /nope", which is neither an API operation nor a shared endpoint', tokenSpec));
 test("shared/billing.yaml with an endpoint in two kinds fails", fails(offered({ free: ["GET /stub"], per_credit: ["GET /stub"] }), 'shared/billing.yaml: "GET /stub" is both', tokenSpec));
 test("apiEndpoints says where each endpoint takes the key", () => {
@@ -289,10 +291,13 @@ test("apiNotOffered lists what shared/billing.yaml doesn't offer", () => {
 // Activepieces writes one action per offered endpoint (platforms/activepieces/scripts/render.mjs).
 // The stub /stub-types operation has one parameter of each type.
 const typesSpec = JSON.parse(tokenSpecText);
+// o11 lists every offered endpoint too, and its schema needs a description.
+typesSpec.paths["/stub/{job_id}"].get.description = "Reads a job.";
 typesSpec.paths["/stub-types"] = {
   get: {
     operationId: "getTypes",
     summary: "Read the types",
+    description: "Reads the types.",
     security: [{ apiKeyHeader: [] }],
     parameters: [
       { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
@@ -405,6 +410,23 @@ test("the render keeps a host's CHANGELOG.md", () => {
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/copilot/CHANGELOG.md"), "# Changelog\n\n## 0.2.0\n");
 });
+
+// A YAML listing that names its schema on line 1 is checked against it, as
+// plain data: o11 rejects duplicate keys, aliases and unknown fields.
+// o11's generated listing, with each shared snippet written back as its
+// placeholder, so the copy is a valid listing that doesn't write a snippet out.
+const o11Listing = () => {
+  let text = readFileSync(join(root, "dist/o11/o11.yaml"), "utf8");
+  for (const file of readdirSync(join(root, "shared/text"))) {
+    text = text.replaceAll(readFileSync(join(root, "shared/text", file), "utf8").trim(), `{{< ${file.replace(/\.md$/, "")}}}`);
+  }
+  return text;
+};
+const listing = (extra) => ({ "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n", "platforms/piece/README.md": "# Piece\n", "platforms/piece/listing.yaml": o11Listing() + extra });
+test("a listing that matches its schema passes", passes(listing("")));
+test("a listing with a duplicate key fails", fails(listing("spec: 2026-11-01\n"), "piece: listing.yaml: Map keys must be unique"));
+test("a listing with a YAML alias fails", fails(listing("review: &r x\nnotes: *r\n"), "uses a YAML alias"));
+test("a listing with a field its schema doesn't allow fails", fails(listing("made_up_field: 1\n"), "must NOT have additional properties"));
 
 // Snippets: plain text, one line, used somewhere.
 const snippet = (text) => ({ ...piece, "shared/text/cost.md": text, "platforms/piece/src/index.ts": "export const cost = {{text:cost}};\n" });
