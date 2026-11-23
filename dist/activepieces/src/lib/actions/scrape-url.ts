@@ -90,7 +90,7 @@ export const scrapeUrlAction = createAction({
     const screenshotUrl = isScreenshot
       ? await context.files.write({
           fileName: `zenrows-screenshot-${randomUUID()}.png`,
-          data: Buffer.from(response.body),
+          data: pngOrThrow(Buffer.from(response.body)),
         })
       : null;
 
@@ -107,6 +107,20 @@ export const scrapeUrlAction = createAction({
     };
   },
 });
+
+// The API labels a screenshot text/plain, so the bytes decide: a body that is
+// not a PNG (a page sent back instead of the image) fails the step rather than
+// being saved as a broken .png.
+function pngOrThrow(data: Buffer): Buffer {
+  if (data.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    return data;
+  }
+  throw new Error(
+    `Zenrows answered the screenshot request without an image (${data.length} bytes starting "${data.subarray(0, 40).toString('utf8')}").`
+  );
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 // The headers the form holds as text, trimmed; other values are left out.
 function stringValues(value: Record<string, unknown> | null | undefined): Record<string, string> {
