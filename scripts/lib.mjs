@@ -217,15 +217,23 @@ function sharedBilling(spec, operations, shared) {
   return byEndpoint;
 }
 
+// The spec's operations as "METHOD /path", minus those served from the website
+// (shared/vars.yaml's website_server, e.g. its own /ask): they aren't part of the
+// API, so no host lists, offers or excludes them.
+function apiOperations(spec) {
+  const website = sharedVars().website_server;
+  return Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m] && (item[m].servers ?? item.servers ?? spec.servers)?.[0]?.url !== website).map((m) => `${m.toUpperCase()} ${path}`));
+}
+
 // The API operations shared/billing.yaml lists as not_offered.
 export function apiNotOffered(spec) {
-  const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
+  const all = apiOperations(spec);
   const billing = sharedBilling(spec, all, sharedEndpoints());
   return all.filter((operation) => billing[operation] === "not_offered");
 }
 
 export function apiEndpoints(spec, where) {
-  const all = Object.entries(spec.paths).flatMap(([path, item]) => httpMethods.filter((m) => item[m]).map((m) => `${m.toUpperCase()} ${path}`));
+  const all = apiOperations(spec);
   const shared = sharedEndpoints();
   const billing = sharedBilling(spec, all, shared);
   return all

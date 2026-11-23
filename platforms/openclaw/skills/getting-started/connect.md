@@ -1,0 +1,3 @@
+- Tools missing entirely: Zenrows is not connected yet. OpenClaw leaves an OAuth server out of the session until it is authorized. Tell the user how to connect it:
+  - Run `openclaw plugins inspect zenrows` and check that the plugin is installed and enabled.
+  - Run `openclaw mcp set zenrows '{"url":"https://mcp.zenrows.com/mcp","transport":"streamable-http","auth":"oauth"}'` and then `openclaw mcp login zenrows`, open the printed link, sign in to Zenrows and approve access, then start a new session. If the `mcp.servers` entry already exists, `openclaw mcp login zenrows` alone is enough.
