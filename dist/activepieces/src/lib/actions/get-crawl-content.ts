@@ -14,7 +14,7 @@ export const getCrawlContentAction = createAction({
     crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as returned when it started.", required: true }),
     content_id: Property.ShortText({ displayName: "Content ID", description: "From the result's `content_url`.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/contents/{content_id}","key":"header","query":["download"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/contents/{content_id}","key":"header","query":["download"]}, values: propsValue, files });
   },
 });

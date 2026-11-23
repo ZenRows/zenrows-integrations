@@ -12,7 +12,7 @@ export const getExtractDomainStatusAction = createAction({
   props: {
     domain: Property.ShortText({ displayName: "Domain", description: "The domain, without scheme.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/extract/prepared-domains/{domain}","key":"header"}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/extract/prepared-domains/{domain}","key":"header"}, values: propsValue, files });
   },
 });

@@ -12,7 +12,7 @@ export const cancelBatchJobAction = createAction({
   props: {
     job_id: Property.ShortText({ displayName: "Job ID", description: "Assigned by the server on submit.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/cancel","key":"header"}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/cancel","key":"header"}, values: propsValue, files });
   },
 });

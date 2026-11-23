@@ -190,7 +190,7 @@ function sharedEndpoints() {
 // The endpoints we offer (every one shared/billing.yaml gives a kind other than
 // not_offered): an operation shared/endpoints.yaml splits (GET / into fetch and
 // extract) as those. Each is { key, id, operation, method, path, name,
-// description, server, input, example, security, billing }: key is the shared
+// description, server, input, example, security, billing, responseTypes }: key is the shared
 // name or the operation, id the shared name or the operationId in snake_case,
 // description undefined where the spec has none, input the query, path and body
 // schemas it takes, security its key schemes from the spec, and billing its kind
@@ -266,6 +266,8 @@ export function apiEndpoints(spec, where) {
           // Where the operation takes the key: { header: "X-API-Key", query: "apikey" }, or one of them.
           keyIn: Object.fromEntries((op.security ?? spec.security ?? []).flatMap((s) => Object.keys(s)).map((name) => spec.components?.securitySchemes?.[name]).filter((s) => s?.type === "apiKey").map((s) => [s.in, s.name])),
           billing: billing[key],
+          // The content types of its success response, for example ["application/json"].
+          responseTypes: Object.keys(Object.entries(op.responses ?? {}).find(([code]) => code.startsWith("2"))?.[1]?.content ?? {}),
         };
       });
     });

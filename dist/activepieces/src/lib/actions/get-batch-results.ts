@@ -14,7 +14,7 @@ export const getBatchResultsAction = createAction({
     cursor: Property.ShortText({ displayName: "Cursor", description: "Opaque pagination token; echo `next_cursor`.", required: false }),
     job_id: Property.ShortText({ displayName: "Job ID", description: "Assigned by the server on submit.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/results","key":"header","query":["status","cursor"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/results","key":"header","query":["status","cursor"]}, values: propsValue, files });
   },
 });

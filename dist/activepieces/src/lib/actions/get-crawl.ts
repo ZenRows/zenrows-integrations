@@ -14,7 +14,7 @@ export const getCrawlAction = createAction({
     limit: Property.Number({ displayName: "Limit", description: "How many results to return.", required: false, defaultValue: 1000 }),
     crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as returned when it started.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}","key":"header","query":["cursor","limit"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}","key":"header","query":["cursor","limit"]}, values: propsValue, files });
   },
 });

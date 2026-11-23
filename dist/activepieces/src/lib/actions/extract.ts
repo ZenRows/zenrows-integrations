@@ -19,7 +19,7 @@ export const extractAction = createAction({
     premium_proxy: Property.Checkbox({ displayName: "Premium Proxy", description: "Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`).", required: false, defaultValue: false }),
     proxy_country: Property.ShortText({ displayName: "Proxy Country", description: "Two-letter country code for the exit IP. Requires `premium_proxy=true` or `mode=auto`, which then routes through premium proxies, so the request costs at least 10 credits. Alone, or with only `js_render`, the request answers 400 `REQS004`.", required: false }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/","key":"query","query":["url","extract","extract_fields","css_extractor","mode","js_render","premium_proxy","proxy_country"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/","key":"query","binary":true,"query":["url","extract","extract_fields","css_extractor","mode","js_render","premium_proxy","proxy_country"]}, values: propsValue, files });
   },
 });

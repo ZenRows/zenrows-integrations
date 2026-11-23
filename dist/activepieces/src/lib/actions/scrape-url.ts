@@ -11,7 +11,7 @@ const FORMAT_PARAMS: Record<OutputFormat, FetchParams> = {
   markdown: { response_type: 'markdown' satisfies FetchValue<'response_type'> },
   html: {},
   plaintext: { response_type: 'plaintext' satisfies FetchValue<'response_type'> },
-  screenshot: { js_render: 'true', screenshot_fullpage: 'true', screenshot_format: 'png' satisfies FetchValue<'screenshot_format'> },
+  screenshot: { js_render: 'true', screenshot: 'true', screenshot_fullpage: 'true', screenshot_format: 'png' satisfies FetchValue<'screenshot_format'> },
 };
 
 export const scrapeUrlAction = createAction({
@@ -25,7 +25,7 @@ export const scrapeUrlAction = createAction({
   outputSchema: scrapeOutputSchema(),
   aiMetadata: {
     description:
-      'Fetches one web page through ZenRows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data From A Page when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends ZenRows credits.',
+      'Fetches one web page through Zenrows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data From A Page when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends Zenrows credits: 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan; failed requests use no credits.',
     idempotent: true,
   },
   props: {
@@ -51,7 +51,7 @@ export const scrapeUrlAction = createAction({
     }),
     adaptive: Property.Checkbox({
       displayName: 'Adaptive Stealth Mode',
-      description: FETCH_PARAMS.properties.mode.description,
+      description: "Adaptive Stealth Mode starts from the cheapest configuration that can work and escalates to JavaScript rendering or Premium Proxies only when the page needs them, and only the configuration that succeeds is charged" + '.',
       required: false,
       defaultValue: true,
     }),

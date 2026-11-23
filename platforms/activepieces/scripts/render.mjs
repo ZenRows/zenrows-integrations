@@ -4,6 +4,7 @@
 // hand-written action (Scrape URL), so it's left out here. npm run render runs it.
 const handWritten = ["fetch"];
 
+// The description shown is the spec's first paragraph; the rest is for the API docs.
 // "create_batch_job" → "createBatchJobAction" in "create-batch-job.ts"; "Read a job" → "Read A Job"; "job_id" → "Job ID".
 const camel = (id) => id.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
 const file = (id) => id.replaceAll("_", "-");
@@ -37,6 +38,8 @@ export default function render({ apiEndpoints }) {
     if (!inHeader && e.keyIn.query !== "apikey") throw new Error(`${where}: ${e.operation} takes the key neither in X-API-Key nor as apikey`);
     const props = [];
     const operation = { method: e.method, server: e.server, path: e.path, key: inHeader ? "header" : "query" };
+    // A response that can be a file (anything but JSON or text) is read as bytes.
+    if (e.responseTypes.some((type) => !type.includes("json") && !type.startsWith("text/"))) operation.binary = true;
     for (const [part, schema] of Object.entries(e.input)) {
       if (schema.type !== "object" || !schema.properties) throw new Error(`${where}: ${e.operation}'s ${part} isn't an object with properties`);
       // Path parameters are filled into the path by name; the client needs the others' names.
@@ -55,10 +58,10 @@ export const ${camel(e.id)}Action = createAction({
   auth: zenrowsAuth,
   name: ${str(e.id)},
   displayName: ${str(titleCase(e.name))},
-  description: ${str(e.description ?? e.name)},
+  description: ${str((e.description ?? e.name).split(/\n\s*\n/)[0])},
   props: ${propsCode},
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: ${str(operation)}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: ${str(operation)}, values: propsValue, files });
   },
 });
 `;

@@ -54,6 +54,8 @@ Unknown variables, unknown skill names, missing slots, unused slot files, unknow
 
 A fact that more than one place states (what an error code means, what a request costs) lives once in `shared/text/<name>.md`, as one line of plain text with no `{{…}}`. A skill or a text file inlines it with `{{< name}}`; code uses `{{text:name}}`, which renders as a quoted string, and adds its own words around it. Snippets stay plain text so they read right in both, and `npm run validate` fails on markdown in one (backticks, `*`, a link or a heading), and warns about one nothing uses yet.
 
+The name is written "Zenrows". `npm run validate` fails on "ZenRows" anywhere a host or skill says it; only the GitHub org (`ZenRows/…`) and the `X-ZenRows-Client` header keep that spelling.
+
 ## Code hosts
 
 `kind: code` in `vars.yaml` makes a host whose output isn't a plugin but files for somewhere else: code for another project (a piece as it sits in that project's repo), or a listing a marketplace reads. A code host ships only its own files, with `{{…}}` filled in source files too: no shared skills, `LICENSE` or assets, and no `plugin.json`. Its `README.md` documents it here and isn't shipped or rendered; `npm run validate` requires one, and the render fails if the host has a `skills/` folder. It needs no release-please entry until it's released from this repo. A listing, such as `platforms/o11/`, is checked against the schema its first line names (`# yaml-language-server: $schema=<url>`), with no duplicate keys or YAML aliases, by `npm run validate`. If it's code, its `scripts/check.sh` can build and test `dist/<host>/` the way the target project does, run by its own workflow (`platforms/activepieces/` does).

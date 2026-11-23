@@ -18,7 +18,7 @@ export const startCrawlAction = createAction({
     exclude_patterns: Property.Json({ displayName: "Exclude Patterns", description: "Drop URLs that contain any of these texts, even when they match an include pattern.", required: false }),
     output_format: Property.StaticDropdown({ displayName: "Output Format", description: "`html` also returns the HTML of each kept page. Omit it to get URLs only.", required: false, options: { disabled: false, options: [{ label: "html", value: "html" }] } }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/crawls","key":"header","body":["url","depth","max_items","max_pages","include_patterns","exclude_patterns","output_format"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/crawls","key":"header","body":["url","depth","max_items","max_pages","include_patterns","exclude_patterns","output_format"]}, values: propsValue, files });
   },
 });

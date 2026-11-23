@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   HttpError,
   HttpHeaders,
@@ -15,16 +16,23 @@ type Operation = {
   key: 'header' | 'query';
   query?: string[];
   body?: string[];
+  // The spec says it can answer with a file (a PDF, an image): read it as bytes.
+  binary?: boolean;
 };
+
+// Where a generated action saves a file the API answers with (Activepieces' context.files).
+type Files = { write: (file: { fileName: string; data: Buffer }) => Promise<string> };
 
 async function callOperation({
   apiKey,
   operation,
   values,
+  files,
 }: {
   apiKey: string;
   operation: Operation;
   values: Record<string, unknown>;
+  files?: Files;
 }): Promise<unknown> {
   const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
   const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
@@ -50,11 +58,27 @@ async function callOperation({
       },
       body,
       timeout: FETCH_TIMEOUT_MS,
+      ...(operation.binary ? { responseType: 'arraybuffer' as const } : {}),
     });
-    return response.body;
+    return operation.binary ? await readBinary({ response, files }) : response.body;
   } catch (error) {
     throw toZenrowsError({ error });
   }
+}
+
+// A response read as bytes: JSON and text come back as such, a file is saved
+// with files.write and comes back as its URL.
+async function readBinary({ response, files }: { response: HttpResponse; files?: Files }): Promise<unknown> {
+  const data = Buffer.from(response.body as ArrayBuffer);
+  const contentType = readHeader({ headers: response.headers, name: 'Content-Type' }) ?? '';
+  if (contentType.includes('json')) {
+    return JSON.parse(data.toString('utf8'));
+  }
+  if (contentType.startsWith('text/') || !files) {
+    return data.toString('utf8');
+  }
+  const extension = contentType.split(';')[0].split('/')[1] || 'bin';
+  return { file_url: await files.write({ fileName: `zenrows-${randomUUID()}.${extension}`, data }) };
 }
 
 // responseType: 'text' keeps a page as it is (a JSON page would otherwise come
@@ -75,6 +99,8 @@ async function fetchPage({
       method: HttpMethod.GET,
       url: `${ZENROWS_API_BASE_URL}/`,
       queryParams: { apikey: apiKey, ...params },
+      // With custom_headers=true Zenrows passes every header on to the site, so
+      // the user's headers replace ours rather than carry X-ZenRows-Client there.
       headers: forwardedHeaders ?? CLIENT_HEADERS,
       timeout: FETCH_TIMEOUT_MS,
       responseType,
@@ -97,7 +123,7 @@ function toZenrowsError({ error }: { error: unknown }): unknown {
     return error;
   }
   const hint = ERROR_HINTS[problem.code];
-  return new Error(`ZenRows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
+  return new Error(`Zenrows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
 }
 
 function parseProblem({ body }: { body: unknown }): { code: string; reason: string } | null {
@@ -133,7 +159,7 @@ const FETCH_TIMEOUT_MS = 180000;
 
 const CLIENT_HEADERS = { 'X-ZenRows-Client': 'activepieces' };
 
-const AUTH_HINT = 'Check the API key in your ZenRows connection.';
+const AUTH_HINT = 'Check the API key in your Zenrows connection.';
 
 // The facts below come from zenrows-integrations' shared/text/, the same
 // wording the Zenrows skills use; each hint adds what to do in Activepieces.
@@ -146,8 +172,10 @@ const ERROR_HINTS: Record<string, string> = {
   AUTH002: AUTH_HINT,
   AUTH003: AUTH_HINT,
   AUTH004: sentence("the account's credit allowance is spent", 'Top up or upgrade at https://app.zenrows.com.'),
-  AUTH014: sentence("this API key reached its credit cap", 'Raise the cap in the ZenRows dashboard.'),
+  AUTH006: sentence("too many requests are running at once", 'Run fewer flows at once, or retry in a moment.'),
+  AUTH014: sentence("this API key reached its credit cap", 'Raise the cap in the Zenrows dashboard.'),
   REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
+  REQS007: sentence("the domain is prepared, but this page has nothing Extract extracts (a home or search page, for example)", 'Point Extract at a page with the data, such as a product page.'),
 };
 
 export const ZENROWS_API_BASE_URL = "https://api.zenrows.com/v1";
@@ -155,7 +183,7 @@ export const ZENROWS_API_BASE_URL = "https://api.zenrows.com/v1";
 // The parameters the actions send, as the published API spec defines them
 // (rendered from it): a name the API doesn't take fails the build, and the
 // actions take each one's description from here.
-export const FETCH_PARAMS = {"type":"object","properties":{"url":{"type":"string","format":"uri","pattern":"^https?://","examples":["https://www.scrapingcourse.com/ecommerce/"],"description":"The URL of the page to retrieve. Only `http` and `https` URLs are accepted."},"mode":{"type":"string","enum":["auto"],"description":"Adaptive Stealth Mode. `auto` starts from the cheapest viable configuration and escalates to JavaScript rendering or premium proxies only when the target requires it. You are billed for the configuration that succeeds. It manages `js_render` and `premium_proxy` itself, so setting either alongside it answers 400 `REQS004`; `proxy_country` is allowed."},"js_render":{"type":"boolean","default":false,"description":"Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`)."},"js_instructions":{"type":"string","description":"JSON array of browser instructions (click, fill, scroll, wait) executed on the page before the content is returned. Requires `js_render=true` or `mode=auto`; without either the request answers 400 `REQS004`."},"response_type":{"type":"string","enum":["markdown","plaintext","pdf"],"description":"Convert the page before returning it: Markdown, plaintext or PDF. `pdf` requires `js_render=true`; without it the request answers 400 `REQS004`. Any `response_type` together with `outputs` also answers 400 `REQS004`."},"screenshot_fullpage":{"type":"boolean","default":false,"description":"Return a full-page screenshot. Requires js_render."},"screenshot_format":{"type":"string","enum":["png","jpeg"],"default":"png","description":"Screenshot image format."},"custom_headers":{"type":"boolean","default":false,"description":"Forward your own request headers (cookies, referer) to the target."}},"required":["url"]} as const;
+export const FETCH_PARAMS = {"type":"object","properties":{"url":{"type":"string","format":"uri","pattern":"^https?://","examples":["https://www.scrapingcourse.com/ecommerce/"],"description":"The URL of the page to retrieve. Only `http` and `https` URLs are accepted."},"mode":{"type":"string","enum":["auto"],"description":"Adaptive Stealth Mode. `auto` starts from the cheapest viable configuration and escalates to JavaScript rendering or premium proxies only when the target requires it. You are billed for the configuration that succeeds. It manages `js_render` and `premium_proxy` itself, so setting either alongside it answers 400 `REQS004`; `proxy_country` is allowed."},"js_render":{"type":"boolean","default":false,"description":"Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`)."},"js_instructions":{"type":"string","description":"JSON array of browser instructions (click, fill, scroll, wait) executed on the page before the content is returned. Requires `js_render=true` or `mode=auto`; without either the request answers 400 `REQS004`."},"response_type":{"type":"string","enum":["markdown","plaintext","pdf"],"description":"Convert the page before returning it: Markdown, plaintext or PDF. `pdf` requires `js_render=true`; without it the request answers 400 `REQS004`. Any `response_type` together with `outputs` also answers 400 `REQS004`."},"screenshot":{"type":"boolean","default":false,"description":"Return an above-the-fold screenshot of the page. Requires `js_render=true` or `mode=auto`; without either the request answers 400 `REQS004`. Do not send it with `outputs`: the request answers 200 with no image and an empty `outputs` result."},"screenshot_fullpage":{"type":"boolean","default":false,"description":"Return a full-page screenshot. Requires js_render."},"screenshot_format":{"type":"string","enum":["png","jpeg"],"default":"png","description":"Screenshot image format."},"custom_headers":{"type":"boolean","default":false,"description":"Forward your own request headers (cookies, referer) to the target."}},"required":["url"]} as const;
 export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, string>>;
 // The values the spec allows for a parameter with an enum, for example response_type.
 export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;

@@ -12,7 +12,7 @@ export const stopCrawlAction = createAction({
   props: {
     crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as returned when it started.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/stop","key":"header"}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/stop","key":"header"}, values: propsValue, files });
   },
 });

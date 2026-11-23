@@ -10,7 +10,7 @@ export const listExtractDomainsAction = createAction({
   displayName: "List The Domains Extract Serves",
   description: "The domains Extract lists publicly as ready. A domain in this list works with `extract=auto`. The list is not complete: some prepared domains are not listed and still work, so a domain missing from it is not proof it answers `REQS007`. Send the request and branch on `REQS007`, or prepare the domain with `requestExtractDomain`. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints.",
   props: {},
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/extract/domains","key":"header"}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/extract/domains","key":"header"}, values: propsValue, files });
   },
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   HttpError,
   HttpHeaders,
@@ -15,16 +16,23 @@ type Operation = {
   key: 'header' | 'query';
   query?: string[];
   body?: string[];
+  // The spec says it can answer with a file (a PDF, an image): read it as bytes.
+  binary?: boolean;
 };
+
+// Where a generated action saves a file the API answers with (Activepieces' context.files).
+type Files = { write: (file: { fileName: string; data: Buffer }) => Promise<string> };
 
 async function callOperation({
   apiKey,
   operation,
   values,
+  files,
 }: {
   apiKey: string;
   operation: Operation;
   values: Record<string, unknown>;
+  files?: Files;
 }): Promise<unknown> {
   const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
   const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
@@ -50,11 +58,27 @@ async function callOperation({
       },
       body,
       timeout: FETCH_TIMEOUT_MS,
+      ...(operation.binary ? { responseType: 'arraybuffer' as const } : {}),
     });
-    return response.body;
+    return operation.binary ? await readBinary({ response, files }) : response.body;
   } catch (error) {
     throw toZenrowsError({ error });
   }
+}
+
+// A response read as bytes: JSON and text come back as such, a file is saved
+// with files.write and comes back as its URL.
+async function readBinary({ response, files }: { response: HttpResponse; files?: Files }): Promise<unknown> {
+  const data = Buffer.from(response.body as ArrayBuffer);
+  const contentType = readHeader({ headers: response.headers, name: 'Content-Type' }) ?? '';
+  if (contentType.includes('json')) {
+    return JSON.parse(data.toString('utf8'));
+  }
+  if (contentType.startsWith('text/') || !files) {
+    return data.toString('utf8');
+  }
+  const extension = contentType.split(';')[0].split('/')[1] || 'bin';
+  return { file_url: await files.write({ fileName: `zenrows-${randomUUID()}.${extension}`, data }) };
 }
 
 // responseType: 'text' keeps a page as it is (a JSON page would otherwise come
@@ -75,6 +99,8 @@ async function fetchPage({
       method: HttpMethod.GET,
       url: `${ZENROWS_API_BASE_URL}/`,
       queryParams: { apikey: apiKey, ...params },
+      // With custom_headers=true Zenrows passes every header on to the site, so
+      // the user's headers replace ours rather than carry X-ZenRows-Client there.
       headers: forwardedHeaders ?? CLIENT_HEADERS,
       timeout: FETCH_TIMEOUT_MS,
       responseType,
@@ -97,7 +123,7 @@ function toZenrowsError({ error }: { error: unknown }): unknown {
     return error;
   }
   const hint = ERROR_HINTS[problem.code];
-  return new Error(`ZenRows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
+  return new Error(`Zenrows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
 }
 
 function parseProblem({ body }: { body: unknown }): { code: string; reason: string } | null {
@@ -133,7 +159,7 @@ const FETCH_TIMEOUT_MS = 180000;
 
 const CLIENT_HEADERS = { 'X-ZenRows-Client': 'activepieces' };
 
-const AUTH_HINT = 'Check the API key in your ZenRows connection.';
+const AUTH_HINT = 'Check the API key in your Zenrows connection.';
 
 // The facts below come from zenrows-integrations' shared/text/, the same
 // wording the Zenrows skills use; each hint adds what to do in Activepieces.
@@ -146,8 +172,10 @@ const ERROR_HINTS: Record<string, string> = {
   AUTH002: AUTH_HINT,
   AUTH003: AUTH_HINT,
   AUTH004: sentence({{text:auth004}}, 'Top up or upgrade at https://app.zenrows.com.'),
-  AUTH014: sentence({{text:auth014}}, 'Raise the cap in the ZenRows dashboard.'),
+  AUTH006: sentence({{text:auth006}}, 'Run fewer flows at once, or retry in a moment.'),
+  AUTH014: sentence({{text:auth014}}, 'Raise the cap in the Zenrows dashboard.'),
   REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
+  REQS007: sentence({{text:reqs007-page-not-recognised}}, 'Point Extract at a page with the data, such as a product page.'),
 };
 
 export const ZENROWS_API_BASE_URL = {{api:GET / server}};
@@ -155,7 +183,7 @@ export const ZENROWS_API_BASE_URL = {{api:GET / server}};
 // The parameters the actions send, as the published API spec defines them
 // (rendered from it): a name the API doesn't take fails the build, and the
 // actions take each one's description from here.
-export const FETCH_PARAMS = {{api:GET / query url,mode,js_render,js_instructions,response_type,screenshot_fullpage,screenshot_format,custom_headers}} as const;
+export const FETCH_PARAMS = {{api:GET / query url,mode,js_render,js_instructions,response_type,screenshot,screenshot_fullpage,screenshot_format,custom_headers}} as const;
 export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, string>>;
 // The values the spec allows for a parameter with an enum, for example response_type.
 export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;

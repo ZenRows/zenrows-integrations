@@ -13,7 +13,7 @@ export const requestExtractDomainAction = createAction({
     domain: Property.ShortText({ displayName: "Domain", description: "The domain to prepare, without scheme.", required: true }),
     example_urls: Property.Json({ displayName: "Example URLs", description: "1 to 5 URLs on that domain. One works; at least 3 pages of your main page type work better, and other types can share the rest of the 5. When present, they replace discovery.", required: false }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/extract/prepared-domains","key":"header","body":["domain","example_urls"]}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"POST","server":"https://api.zenrows.com/v1","path":"/extract/prepared-domains","key":"header","body":["domain","example_urls"]}, values: propsValue, files });
   },
 });

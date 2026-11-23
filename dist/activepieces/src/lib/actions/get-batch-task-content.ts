@@ -13,7 +13,7 @@ export const getBatchTaskContentAction = createAction({
     job_id: Property.ShortText({ displayName: "Job ID", description: "Assigned by the server on submit.", required: true }),
     task_id: Property.ShortText({ displayName: "Task ID", description: "Server-assigned task id within a run. Use `external_id` for your own correlation id.", required: true }),
   },
-  async run({ auth, propsValue }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/tasks/{task_id}/content","key":"header"}, values: propsValue });
+  async run({ auth, propsValue, files }) {
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://async.api.zenrows.com/v1","path":"/jobs/{job_id}/tasks/{task_id}/content","key":"header","binary":true}, values: propsValue, files });
   },
 });

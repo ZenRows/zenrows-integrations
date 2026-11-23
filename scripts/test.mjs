@@ -292,12 +292,13 @@ test("apiNotOffered lists what shared/billing.yaml doesn't offer", () => {
 // The stub /stub-types operation has one parameter of each type.
 const typesSpec = JSON.parse(tokenSpecText);
 // o11 lists every offered endpoint too, and its schema needs a description.
-typesSpec.paths["/stub/{job_id}"].get.description = "Reads a job.";
+typesSpec.paths["/stub/{job_id}"].get.description = "Reads a job.\n\nThe rest is for the API docs.";
 typesSpec.paths["/stub-types"] = {
   get: {
     operationId: "getTypes",
     summary: "Read the types",
     description: "Reads the types.",
+    responses: { 200: { content: { "application/json": {}, "application/pdf": {} } } },
     security: [{ apiKeyHeader: [] }],
     parameters: [
       { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
@@ -326,6 +327,8 @@ test("Activepieces gets an action per offered endpoint, and none for the rest", 
   assert.ok(job.includes("import { createAction, Property } from '@activepieces/pieces-framework';"), job);
   assert.ok(job.includes('export const getJobAction = createAction({\n  auth: zenrowsAuth,\n  name: "get_job",\n  displayName: "Read A Job",'), job);
   assert.ok(job.includes('job_id: Property.ShortText({ displayName: "Job ID", required: true }),'), job);
+  assert.ok(job.includes('  description: "Reads a job.",\n'), "the description is the spec's first paragraph");
+  assert.ok(job.includes("async run({ auth, propsValue, files })") && job.includes("values: propsValue, files });"), job);
   assert.ok(job.includes('operation: {"method":"GET","server":"https://async.example.com/v1","path":"/stub/{job_id}","key":"query"}'), job);
   assert.ok(create.includes('urls: Property.Json({ displayName: "URLs", required: false }),'), create);
   assert.ok(create.includes('operation: {"method":"POST","server":"https://jobs.example.com/v1","path":"/stub-jobs","key":"query","body":["urls"]}'), create);
@@ -343,7 +346,7 @@ test("Activepieces maps each parameter type to its prop, and sends the key in X-
     'status: Property.StaticDropdown({ displayName: "Status", required: false, options: { disabled: false, options: [{ label: "all", value: "all" }, { label: "failed", value: "failed" }] } }),',
     'filter: Property.Json({ displayName: "Filter", required: false }),',
     'cursor: Property.ShortText({ displayName: "Cursor", required: false }),',
-    '"path":"/stub-types","key":"header","query":["limit","download","status","filter","cursor"]}',
+    '"path":"/stub-types","key":"header","binary":true,"query":["limit","download","status","filter","cursor"]}',
   ]) assert.ok(ts.includes(line), `expected ${line} in:\n${ts}`);
 });
 test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
@@ -444,6 +447,12 @@ test("a snippet with a {{…}} fails", fails(snippet("Ask {{host}} to sign in.\n
 test("a snippet named only in a vars.yaml comment isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
 test("a snippet on two lines fails", fails(snippet("One fact.\nAnother fact.\n"), "has more than one line"));
 test("a snippet named only in a code host README isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
+test('"ZenRows" in a host fails; the GitHub org and the client header pass', () => {
+  fails({ ...piece, "platforms/piece/src/index.ts": "export const name = \"ZenRows\";\n" }, 'platforms/piece/src/index.ts writes "ZenRows"; write Zenrows')();
+  fails({ ...piece, "platforms/piece/README.md": "# Piece for ZenRows\n" }, 'platforms/piece/README.md writes "ZenRows"')();
+  const r = run({ ...piece, "platforms/piece/src/index.ts": "export const repo = \"ZenRows/zenrows-integrations\";\nexport const h = { \"X-ZenRows-Client\": \"piece\" };\n" });
+  assert.ok(r.ok, r.out);
+});
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));

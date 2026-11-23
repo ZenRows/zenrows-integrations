@@ -5,7 +5,7 @@ export const zenrowsAuth = PieceAuth.SecretText({
   displayName: 'API Key',
   required: true,
   description: `
-**Get your ZenRows API key:**
+**Get your Zenrows API key:**
 
 1. Sign in at https://app.zenrows.com (or create a free account).
 2. Open the **Builder** or **Settings** page.
@@ -20,7 +20,8 @@ export const zenrowsAuth = PieceAuth.SecretText({
       });
       return { valid: true };
     } catch (e) {
-      return { valid: false, error: 'Invalid API key' };
+      // The API's own reason (an invalid key, a used-up plan, …), not always "Invalid API key".
+      return { valid: false, error: e instanceof Error ? e.message : 'Invalid API key' };
     }
   },
 });

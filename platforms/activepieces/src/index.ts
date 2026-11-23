@@ -6,7 +6,7 @@ import { zenrowsAuth } from './lib/auth';
 import { ZENROWS_API_BASE_URL } from './lib/common/client';
 
 export const zenrows = createPiece({
-  displayName: 'ZenRows',
+  displayName: 'Zenrows',
   description:
     {{text:zenrows-description}} + '.',
   auth: zenrowsAuth,
