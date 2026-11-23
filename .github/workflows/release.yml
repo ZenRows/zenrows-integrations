@@ -38,6 +38,7 @@ jobs:
       release: ${{ steps.detect.outputs.release }}
       packages: ${{ steps.detect.outputs.packages }}
       sha: ${{ steps.detect.outputs.sha }}
+      approval: ${{ steps.approval.outputs.approval }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,10 +86,53 @@ jobs:
             echo "sha=$GITHUB_SHA"
           } >>"$GITHUB_OUTPUT"
 
+      - if: steps.detect.outputs.release == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+      - if: steps.detect.outputs.release == 'true'
+        run: npm ci
+
+      # A host with approval: true in its vars.yaml releases only after a
+      # prod-approvers member approves the run (the release-approval environment).
+      - name: Check for hosts that need approval
+        id: approval
+        if: steps.detect.outputs.release == 'true'
+        env:
+          PACKAGES: ${{ steps.detect.outputs.packages }}
+        run: |
+          set -euo pipefail
+          hosts=$(node --input-type=module -e '
+            import { vars } from "./scripts/lib.mjs";
+            const packages = JSON.parse(process.env.PACKAGES);
+            console.log(packages.map((p) => p.component).filter((h) => vars(h).approval === true).join(" "));')
+          if [ -n "$hosts" ]; then
+            echo "Needs a prod-approvers approval: $hosts"
+            echo "approval=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "approval=false" >>"$GITHUB_OUTPUT"
+          fi
+
+  approve:
+    name: Approve the release
+    needs: detect
+    if: needs.detect.outputs.release == 'true' && needs.detect.outputs.approval == 'true'
+    runs-on: ubuntu-latest
+    # Required reviewers: the prod-approvers team. Holds no secrets.
+    environment: release-approval
+    permissions: {}
+    steps:
+      - run: echo "Approved."
+
   release:
     name: Tag and release
-    needs: detect
-    if: needs.detect.outputs.release == 'true'
+    needs: [detect, approve]
+    # approve is skipped when no released host needs approval; a rejected
+    # approval fails it, so nothing is tagged or published.
+    if: >-
+      !cancelled() && needs.detect.outputs.release == 'true'
+      && (needs.approve.result == 'success' || needs.approve.result == 'skipped')
     runs-on: ubuntu-latest
     # The release environment deploys only from main.
     environment: release
