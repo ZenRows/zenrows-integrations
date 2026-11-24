@@ -288,6 +288,122 @@ test("apiNotOffered lists what shared/billing.yaml doesn't offer", () => {
   assert.ok(r.ok, r.out);
   assert.equal(r.dist("dist/piece/not.json"), '["GET /stub","GET /stub/{job_id}","POST /stub-jobs"]');
 });
+// Activepieces writes one action per offered endpoint (platforms/activepieces/scripts/render.mjs).
+// The stub /stub-types operation has one parameter of each type.
+const typesSpec = JSON.parse(tokenSpecText);
+// o11 lists every offered endpoint too, and its schema needs a description.
+typesSpec.paths["/stub/{job_id}"].get.description = "Reads a job.\n\nThe rest is for the API docs.";
+typesSpec.paths["/stub-types"] = {
+  get: {
+    operationId: "getTypes",
+    summary: "Read the types",
+    description: "Reads the types.",
+    responses: { 200: { content: { "application/json": {}, "application/pdf": {} } } },
+    security: [{ apiKeyHeader: [] }],
+    parameters: [
+      { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
+      { name: "download", in: "query", schema: { type: "boolean" } },
+      { name: "status", in: "query", schema: { type: "string", enum: ["all", "failed"] } },
+      { name: "filter", in: "query", schema: { type: "object" } },
+      { name: "cursor", in: "query", schema: { type: "string" } },
+      { name: "tags", in: "query", schema: { type: "array", items: { type: "string" } } },
+      { name: "ids", in: "query", schema: { type: "array", items: { type: "integer" } } },
+      { name: "note", in: "query", schema: { type: "string", description: "One line,\nwrapped.\n- kept: a list item" } },
+    ],
+  },
+};
+typesSpec.paths["/stub-lines/{job_id}"] = {
+  get: { operationId: "getLines", summary: "Read the lines", description: "Reads the lines.", responses: { 200: { content: { "application/x-ndjson": {} } } }, security: [{ apiKeyHeader: [] }], parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] },
+  post: { operationId: "stopLines", summary: "Stop the lines", description: "Stops the lines.", responses: { 200: { content: { "application/json": {} } } }, security: [{ apiKeyHeader: [] }], parameters: [{ name: "job_id", in: "path", required: true, schema: { type: "string" } }] },
+};
+const actionFile = (name) => `dist/activepieces/src/lib/actions/${name}.ts`;
+const actionFiles = ["generated", "get-job", "create-job", "get-types", "get-lines", "stop-lines", "fetch-page", "fetch", "extract"].map(actionFile);
+// vars.yaml with its own action wording replaced (none by default), so the stub
+// endpoints read the spec.
+const apVars = (wording = "\n") => ({ "platforms/activepieces/vars.yaml": readFileSync(join(root, "platforms/activepieces/vars.yaml"), "utf8").replace(/\naction_props:[\s\S]*$/, wording) });
+const typesBilling = (kinds) => {
+  const billing = parseYaml(billingWith(kinds));
+  for (const op of ["GET /stub-types", "GET /stub-lines/{job_id}", "POST /stub-lines/{job_id}"]) {
+    if (!Object.values(kinds).flat().includes(op)) billing.not_offered.push(op);
+  }
+  return { "openapi-tokens.json": JSON.stringify(typesSpec), "shared/billing.yaml": JSON.stringify(billing) };
+};
+const actions = (kinds, wording) => run({ ...typesBilling(kinds), ...apVars(wording) }, tokenSpec, actionFiles);
+test("Activepieces gets an action per offered endpoint, and none for the rest", () => {
+  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] });
+  assert.ok(r.ok, r.out);
+  const list = r.dist(actionFile("generated"));
+  assert.ok(list.includes("import { getJobAction } from './get-job';\nimport { createJobAction } from './create-job';\n"), list);
+  assert.ok(list.includes("getJobAction, createJobAction"), list);
+  const job = r.dist(actionFile("get-job"));
+  const create = r.dist(actionFile("create-job"));
+  assert.ok(job.includes("import { createAction, Property } from '@activepieces/pieces-framework';"), job);
+  assert.ok(job.includes('export const getJobAction = createAction({\n  auth: zenrowsAuth,\n  name: "get_job",\n  classification: "READ",\n  displayName: "Read A Job",'), job);
+  assert.ok(job.includes("  audience: 'both',\n  aiMetadata: {\n    description: \"Reads a job.\",\n    idempotent: true,\n  },\n"), "with no wording in vars.yaml, the agent reads the spec's description");
+  assert.ok(job.includes('job_id: Property.ShortText({ displayName: "Job ID", required: true }),'), job);
+  assert.ok(job.includes('  description: "Reads a job.",\n'), "the description is the spec's first paragraph");
+  assert.ok(job.includes("async run({ auth, propsValue, files })") && job.includes("values: propsValue, files });"), job);
+  assert.ok(job.includes('operation: {"method":"GET","server":"https://async.example.com/v1","path":"/stub/{job_id}","key":"query"}'), job);
+  assert.ok(create.includes('urls: Property.Array({ displayName: "URLs", required: false }),'), create);
+  assert.ok(create.includes('classification: "WRITE",') && create.includes("idempotent: false,"), "a POST writes, and a retry isn't safe");
+  assert.ok(create.includes('operation: {"method":"POST","server":"https://jobs.example.com/v1","path":"/stub-jobs","key":"query","body":["urls"]}'), create);
+  assert.equal(r.dist(actionFile("fetch-page")), undefined, "GET /stub isn't offered, so it has no action");
+  assert.ok(!r.dist(actionFile("fetch")) && !list.includes("fetchAction"), "Fetch is hand-written (Scrape URL)");
+  assert.ok(r.dist(actionFile("extract")).includes('name: "extract",'), "Extract, the shared slice of GET /, is generated");
+});
+test("Activepieces maps each parameter type to its prop, and sends the key in X-API-Key where it can", () => {
+  const r = actions({ free: ["GET /stub-types"] });
+  assert.ok(r.ok, r.out);
+  const ts = r.dist(actionFile("get-types"));
+  for (const line of [
+    'limit: Property.Number({ displayName: "Limit", required: false, defaultValue: 10 }),',
+    'download: Property.Checkbox({ displayName: "Download", required: false }),',
+    'status: Property.StaticDropdown({ displayName: "Status", required: false, options: { disabled: false, options: [{ label: "All", value: "all" }, { label: "Failed", value: "failed" }] } }),',
+    'tags: Property.Array({ displayName: "Tags", required: false }),',
+    'ids: Property.Json({ displayName: "IDs", required: false }),',
+    'note: Property.ShortText({ displayName: "Note", description: "One line, wrapped.\\n- kept: a list item", required: false }),',
+    'filter: Property.Json({ displayName: "Filter", required: false }),',
+    'cursor: Property.ShortText({ displayName: "Cursor", required: false }),',
+    '"path":"/stub-types","key":"header","binary":true,"query":["limit","download","status","filter","cursor","tags","ids","note"]}',
+  ]) assert.ok(ts.includes(line), `expected ${line} in:\n${ts}`);
+});
+test("Activepieces reads NDJSON as a list, and a stop is destructive", () => {
+  const r = actions({ free: ["GET /stub-lines/{job_id}", "POST /stub-lines/{job_id}"] });
+  assert.ok(r.ok, r.out);
+  const lines = r.dist(actionFile("get-lines"));
+  assert.ok(lines.includes('"path":"/stub-lines/{job_id}","key":"header","lines":true}') && !lines.includes('"binary"'), lines);
+  const stop = r.dist(actionFile("stop-lines"));
+  assert.ok(stop.includes('classification: "DESTRUCTIVE",') && stop.includes("idempotent: false,"), stop);
+});
+test("vars.yaml's actions and action_props give an action its wording", () => {
+  const wording = `\naction_props:\n  job_id: "The job, from Create Job."\nactions:\n  get_job:\n    name: "Get Job"\n    description: "Read one job."\n    ai: "Reads a job by its ID. Safe to retry."\n    classification: SEARCH\n  create_job:\n    props:\n      urls: "The URLs to scrape."\n`;
+  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, wording);
+  assert.ok(r.ok, r.out);
+  const job = r.dist(actionFile("get-job"));
+  for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
+    assert.ok(job.includes(line), `expected ${line} in:\n${job}`);
+  }
+  assert.ok(r.dist(actionFile("create-job")).includes('urls: Property.Array({ displayName: "URLs", description: "The URLs to scrape.", required: false }),'));
+});
+test("vars.yaml's omit leaves an optional field out of the form and the request", () => {
+  const r = actions({ free: ["GET /stub-types"] }, `\nactions:\n  get_types:\n    omit: [download, filter]\n`);
+  assert.ok(r.ok, r.out);
+  const ts = r.dist(actionFile("get-types"));
+  assert.ok(!ts.includes("download:") && !ts.includes("filter:"), ts);
+  assert.ok(ts.includes('"query":["limit","status","cursor","tags","ids","note"]}'), ts);
+});
+test("omitting a required field fails the Activepieces render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(`\nactions:\n  get_job:\n    omit: [job_id]\n`),
+}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.omit drops "job_id", which GET /stub/{job_id} requires', tokenSpec));
+test("wording for a field an action doesn't take fails the Activepieces render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(`\nactions:\n  get_job:\n    props:\n      nope: "x"\n`),
+}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.props describes "nope", which GET /stub/{job_id} doesn\'t take', tokenSpec));
+test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
+  "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
+  "shared/billing.yaml": typesBilling({ free: ["GET /stub-types"] })["shared/billing.yaml"],
+}, "platforms/activepieces/scripts/render.mjs: GET /stub-types takes the key neither in X-API-Key nor as apikey", tokenSpec));
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);
@@ -382,6 +498,12 @@ test("a snippet with a {{…}} fails", fails(snippet("Ask {{host}} to sign in.\n
 test("a snippet named only in a vars.yaml comment isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/vars.yaml": "host_full: Piece\nkind: code\n# shared text goes in as {{< cost}}\n" }, "isn't used by any skill or host"));
 test("a snippet on two lines fails", fails(snippet("One fact.\nAnother fact.\n"), "has more than one line"));
 test("a snippet named only in a code host README isn't a use", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/README.md": "# Piece\n\nUses `{{< cost}}`.\n" }, "isn't used by any skill or host"));
+test('"ZenRows" in a host fails; the GitHub org and the client header pass', () => {
+  fails({ ...piece, "platforms/piece/src/index.ts": "export const name = \"ZenRows\";\n" }, 'platforms/piece/src/index.ts writes "ZenRows"; write Zenrows')();
+  fails({ ...piece, "platforms/piece/README.md": "# Piece for ZenRows\n" }, 'platforms/piece/README.md writes "ZenRows"')();
+  const r = run({ ...piece, "platforms/piece/src/index.ts": "export const repo = \"ZenRows/zenrows-integrations\";\nexport const h = { \"X-ZenRows-Client\": \"piece\" };\n" });
+  assert.ok(r.ok, r.out);
+});
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));
