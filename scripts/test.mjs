@@ -308,7 +308,7 @@ typesSpec.paths["/stub-types"] = {
       { name: "cursor", in: "query", schema: { type: "string" } },
       { name: "tags", in: "query", schema: { type: "array", items: { type: "string" } } },
       { name: "ids", in: "query", schema: { type: "array", items: { type: "integer" } } },
-      { name: "note", in: "query", schema: { type: "string", description: "One line,\nwrapped.\n- kept: a list item" } },
+      { name: "note", in: "query", schema: { type: "string", description: "One `line`,\nwrapped.\n- kept: a list item" } },
     ],
   },
 };

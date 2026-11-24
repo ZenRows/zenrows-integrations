@@ -37,7 +37,14 @@ async function callOperation({
   files?: Files;
 }): Promise<unknown> {
   const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
-  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
+  // An empty ID would turn /jobs/{job_id} into /jobs/, which lists every job
+  // and succeeds: a mapped value that came out empty fails the step instead.
+  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => {
+    if (!given(name)) {
+      throw new Error(`Zenrows: ${name} is empty. Check the value mapped into it.`);
+    }
+    return encodeURIComponent(String(values[name]));
+  });
   const queryParams: Record<string, string> = {};
   for (const name of (operation.query ?? []).filter(given)) {
     queryParams[name] = String(values[name]);

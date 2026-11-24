@@ -16,7 +16,7 @@ export const getCrawlAction = createAction({
     idempotent: true,
   },
   props: {
-    cursor: Property.ShortText({ displayName: "Cursor", description: "The `next_cursor` from the previous read. Omit it to start from the first result.", required: false }),
+    cursor: Property.ShortText({ displayName: "Cursor", description: "The next_cursor from the previous read. Omit it to start from the first result.", required: false }),
     limit: Property.Number({ displayName: "Limit", description: "How many results to return.", required: false, defaultValue: 1000 }),
     crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as Start Crawl returned it (crawl_id).", required: true }),
   },

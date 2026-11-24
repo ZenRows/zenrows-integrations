@@ -16,10 +16,10 @@ export const startCrawlAction = createAction({
     idempotent: false,
   },
   props: {
-    url: Property.ShortText({ displayName: "URL", description: "The start URL: a public `http` or `https` URL. The crawl starts on this exact URL and stays on its domain, subdomains included.", required: true }),
-    depth: Property.Number({ displayName: "Depth", description: "How many link steps to follow from the start URL. At `1`, the links on the start page. Omit it to follow links until `max_items` or `max_pages` stops the crawl.", required: false }),
+    url: Property.ShortText({ displayName: "URL", description: "The start URL: a public http or https URL. The crawl starts on this exact URL and stays on its domain, subdomains included.", required: true }),
+    depth: Property.Number({ displayName: "Depth", description: "How many link steps to follow from the start URL. At 1, the links on the start page. Omit it to follow links until max_items or max_pages stops the crawl.", required: false }),
     max_items: Property.Number({ displayName: "Max Items", description: "Stop after keeping this many URLs.", required: false, defaultValue: 100 }),
-    max_pages: Property.Number({ displayName: "Max Pages", description: "Stop after fetching this many pages. Caps what the crawl costs. If both limits are reached together, `stop_reason` is `max_pages`.", required: false, defaultValue: 100 }),
+    max_pages: Property.Number({ displayName: "Max Pages", description: "Stop after fetching this many pages. Caps what the crawl costs. If both limits are reached together, stop_reason is max_pages.", required: false, defaultValue: 100 }),
     include_patterns: Property.Array({ displayName: "Include Patterns", description: "Keep, and follow, only URLs that contain one of these texts, such as /product/.", required: false }),
     exclude_patterns: Property.Array({ displayName: "Exclude Patterns", description: "Drop URLs that contain any of these texts, even when they match an include pattern.", required: false }),
     output_format: Property.StaticDropdown({ displayName: "Output Format", description: "HTML also fetches and keeps the HTML of each page found. Leave it empty to get URLs only.", required: false, options: { disabled: false, options: [{ label: "HTML", value: "html" }] } }),

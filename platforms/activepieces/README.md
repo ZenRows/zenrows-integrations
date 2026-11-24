@@ -28,6 +28,14 @@ It copies `dist/activepieces/` into the activepieces checkout, registers it in `
 
 Run Activepieces locally with `AP_DEV_PIECES=zenrows` and use the piece in a flow, with your Zenrows API key in the connection.
 
+## Prepare the PR to activepieces
+
+```
+platforms/activepieces/scripts/check.sh --upstream <your-github-login> ~/path/to/your/activepieces-fork
+```
+
+It does what `check.sh` does, on the copy a PR to activepieces adds (`scripts/upstream.mjs`): the logo on their CDN (`https://cdn.activepieces.com/pieces/zenrows.png`; attach `shared/assets/logo.png` to the PR for a maintainer to upload), you in `authors`, and no code comments, which their `CLAUDE.md` asks for. The PR then changes only the piece's folder, three lines of `tsconfig.base.json` and the piece's own entries in `bun.lock`. Run it again on the same branch after every change here.
+
 ## How it ships
 
 Not yet. First as our own npm package; then as a PR to activepieces once they agree to take it (they close outside PRs that weren't discussed with them first; see their CONTRIBUTING.md). Both release steps come in later PRs.
