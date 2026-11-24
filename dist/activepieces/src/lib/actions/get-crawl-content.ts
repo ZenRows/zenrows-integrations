@@ -16,11 +16,10 @@ export const getCrawlContentAction = createAction({
     idempotent: true,
   },
   props: {
-    download: Property.Checkbox({ displayName: "Download", description: "Save the page as a file instead of returning its HTML.", required: false, defaultValue: false }),
     crawl_id: Property.ShortText({ displayName: "Crawl ID", description: "The crawl's ID, as Start Crawl returned it (crawl_id).", required: true }),
     content_id: Property.ShortText({ displayName: "Content ID", description: "From the result's `content_url`.", required: true }),
   },
   async run({ auth, propsValue, files }) {
-    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/contents/{content_id}","key":"header","query":["download"]}, values: propsValue, files });
+    return zenrowsClient.callOperation({ apiKey: auth.secret_text, operation: {"method":"GET","server":"https://api.zenrows.com/v1","path":"/crawls/{crawl_id}/contents/{content_id}","key":"header","query":[]}, values: propsValue, files });
   },
 });

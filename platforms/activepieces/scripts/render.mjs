@@ -62,14 +62,23 @@ export default function render({ apiEndpoints, values }) {
     // file (anything but JSON or text) is read as bytes.
     if (e.responseTypes.includes("application/x-ndjson")) operation.lines = true;
     else if (e.responseTypes.some((type) => !type.includes("json") && !type.startsWith("text/"))) operation.binary = true;
+    // omit drops an optional field that means nothing in Activepieces; it is never sent.
+    const omit = own.omit ?? [];
     for (const [part, schema] of Object.entries(e.input)) {
       if (schema.type !== "object" || !schema.properties) throw new Error(`${where}: ${e.operation}'s ${part} isn't an object with properties`);
+      for (const name of omit.filter((n) => n in schema.properties)) {
+        if (part === "path" || (schema.required ?? []).includes(name)) throw new Error(`${where}: vars.yaml actions.${e.id}.omit drops "${name}", which ${e.operation} requires`);
+      }
+      const fields = Object.entries(schema.properties).filter(([name]) => !omit.includes(name));
       // Path parameters are filled into the path by name; the client needs the others' names.
-      if (part !== "path") operation[part] = Object.keys(schema.properties);
-      for (const [name, field] of Object.entries(schema.properties)) {
+      if (part !== "path") operation[part] = fields.map(([name]) => name);
+      for (const [name, field] of fields) {
         if (props.some(([n]) => n === name)) throw new Error(`${where}: ${e.operation} has "${name}" in two places`);
         props.push([name, prop(name, field, (schema.required ?? []).includes(name), own.props?.[name] ?? sharedProps[name])]);
       }
+    }
+    for (const name of omit.filter((n) => !Object.values(e.input).some((schema) => n in schema.properties))) {
+      throw new Error(`${where}: vars.yaml actions.${e.id}.omit drops "${name}", which ${e.operation} doesn't take`);
     }
     for (const name of Object.keys(own.props ?? {})) {
       if (!props.some(([n]) => n === name)) throw new Error(`${where}: vars.yaml actions.${e.id}.props describes "${name}", which ${e.operation} doesn't take`);

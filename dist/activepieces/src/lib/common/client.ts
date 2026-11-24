@@ -152,11 +152,13 @@ function toZenrowsError({ error }: { error: unknown }): unknown {
   if (!problem) {
     return error;
   }
-  const hint = ERROR_HINTS[problem.code];
+  const hint = (problem.tag ? ERROR_HINTS[`${problem.code}:${problem.tag}`] : undefined) ?? ERROR_HINTS[problem.code];
   return new Error(`Zenrows error ${problem.code} (HTTP ${status}): ${problem.reason}${hint ? ` ${hint}` : ''}`);
 }
 
-function parseProblem({ body }: { body: unknown }): { code: string; reason: string } | null {
+// tag is the API's machine-readable reason, where it gives one: REQS007's
+// domain_not_prepared and page_not_recognised need different next steps.
+function parseProblem({ body }: { body: unknown }): { code: string; reason: string; tag?: string } | null {
   if (typeof body === 'string') {
     try {
       return parseProblem({ body: JSON.parse(body) });
@@ -167,13 +169,14 @@ function parseProblem({ body }: { body: unknown }): { code: string; reason: stri
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return null;
   }
-  const { code, detail, title } = body as Record<string, unknown>;
+  const { code, detail, title, reason } = body as Record<string, unknown>;
   if (typeof code !== 'string') {
     return null;
   }
   return {
     code,
     reason: typeof detail === 'string' ? detail : typeof title === 'string' ? title : 'Request failed',
+    ...(typeof reason === 'string' ? { tag: reason } : {}),
   };
 }
 
@@ -193,6 +196,8 @@ const AUTH_HINT = 'Check the API key in your Zenrows connection.';
 
 // The facts below come from zenrows-integrations' shared/text/, the same
 // wording the Zenrows skills use; each hint adds what to do in Activepieces.
+// A hint keyed "CODE:reason" applies only to that reason; REQS007 has no hint
+// of its own, because its reasons need opposite next steps.
 function sentence(fact: string, next: string): string {
   return `${fact.charAt(0).toUpperCase()}${fact.slice(1)}. ${next}`;
 }
@@ -205,7 +210,8 @@ const ERROR_HINTS: Record<string, string> = {
   AUTH006: sentence("too many requests are running at once", 'Run fewer flows at once, or retry in a moment.'),
   AUTH014: sentence("this API key reached its credit cap", 'Raise the cap in the Zenrows dashboard.'),
   REQS002: 'This page needs JS rendering or premium proxies: turn on Adaptive Stealth Mode.',
-  REQS007: sentence("the domain is prepared, but this page has nothing Extract extracts (a home or search page, for example)", 'Point Extract at a page with the data, such as a product page.'),
+  'REQS007:domain_not_prepared': 'Prepare the domain with Request Extract Domain, then retry once Get Extract Domain Status reports ready.',
+  'REQS007:page_not_recognised': sentence("the domain is prepared, but this page has nothing Extract extracts (a home or search page, for example)", 'Point Extract at a page with the data, such as a product page.'),
 };
 
 export const ZENROWS_API_BASE_URL = "https://api.zenrows.com/v1";

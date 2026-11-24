@@ -12,7 +12,8 @@ upstream: "6f4be340d7c4bef9fb6ff874ca72224e4933d3d2"
 # the piece has no action for, and say nothing to an agent choosing between
 # tools. Per action (by its name): name is the display name, description the
 # line under it, ai its aiMetadata description (when to pick it, what it costs,
-# whether a retry is safe), props a description for one of its fields.
+# whether a retry is safe), props a description for one of its fields, omit
+# the optional fields to leave out of the form (they are never sent).
 # action_props describes a field in every action that has it, unless the action
 # gives its own. Anything left out comes from the spec, so a new endpoint still
 # gets an action; classification is derived from the method unless set here.
@@ -92,8 +93,9 @@ actions:
     name: "Get Crawl Page"
     description: "Get the HTML of one page a crawl fetched."
     ai: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Costs no credits; safe to retry."
-    props:
-      download: "Save the page as a file instead of returning its HTML."
+    # download only asks the API to send the page as an attachment: the step
+    # returns the same HTML either way.
+    omit: [download]
   stop_crawl:
     name: "Stop Crawl"
     description: "Stop a running crawl. Pages already being fetched finish and are kept."

@@ -385,6 +385,17 @@ test("vars.yaml's actions and action_props give an action its wording", () => {
   }
   assert.ok(r.dist(actionFile("create-job")).includes('urls: Property.Array({ displayName: "URLs", description: "The URLs to scrape.", required: false }),'));
 });
+test("vars.yaml's omit leaves an optional field out of the form and the request", () => {
+  const r = actions({ free: ["GET /stub-types"] }, `\nactions:\n  get_types:\n    omit: [download, filter]\n`);
+  assert.ok(r.ok, r.out);
+  const ts = r.dist(actionFile("get-types"));
+  assert.ok(!ts.includes("download:") && !ts.includes("filter:"), ts);
+  assert.ok(ts.includes('"query":["limit","status","cursor","tags","ids","note"]}'), ts);
+});
+test("omitting a required field fails the Activepieces render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(`\nactions:\n  get_job:\n    omit: [job_id]\n`),
+}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.omit drops "job_id", which GET /stub/{job_id} requires', tokenSpec));
 test("wording for a field an action doesn't take fails the Activepieces render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
   ...apVars(`\nactions:\n  get_job:\n    props:\n      nope: "x"\n`),

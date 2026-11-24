@@ -25,7 +25,7 @@ export const scrapeUrlAction = createAction({
   outputSchema: scrapeOutputSchema(),
   aiMetadata: {
     description:
-      'Fetches one web page through Zenrows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data From A Page when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends Zenrows credits: {{< credit-weights}}; {{< failed-not-billed}}.',
+      'Fetches one web page through Zenrows and returns its content as Markdown, HTML, plain text or a full-page screenshot, getting past CAPTCHAs and anti-bot systems. Pick this when you have the exact URL and need the page content; use Extract Structured Data when you need specific fields as JSON. Read-only against the target, so retries are safe, but each call spends Zenrows credits: {{< credit-weights}}; {{< failed-not-billed}}.',
     idempotent: true,
   },
   props: {
@@ -57,7 +57,8 @@ export const scrapeUrlAction = createAction({
     }),
     js_instructions: Property.LongText({
       displayName: 'JavaScript Instructions',
-      description: FETCH_PARAMS.properties.js_instructions.description,
+      description:
+        'A JSON list of browser actions (click, fill, scroll, wait) to run on the page before its content is returned, for example [{"click": ".load-more"}, {"wait": 1000}]. They always run in a browser, so with Adaptive Stealth Mode off they turn on JS rendering (5 credits instead of 1).',
       required: false,
     }),
     custom_headers: Property.Object({
@@ -73,14 +74,17 @@ export const scrapeUrlAction = createAction({
     const forwardedHeaders = stringValues(propsValue.custom_headers);
     const forwardHeaders = Object.keys(forwardedHeaders).length > 0;
     const jsInstructions = propsValue.js_instructions?.trim();
+    const adaptive = propsValue.adaptive !== false && !isScreenshot;
 
     const response = await zenrowsClient.fetchPage({
       apiKey: context.auth.secret_text,
       params: {
         url: propsValue.url,
-        ...(propsValue.adaptive !== false && !isScreenshot ? { mode: 'auto' } : {}),
+        ...(adaptive ? { mode: 'auto' } : {}),
         ...FORMAT_PARAMS[outputFormat],
-        ...(jsInstructions ? { js_instructions: jsInstructions } : {}),
+        // Instructions run in a browser: without Adaptive Stealth Mode to pick
+        // one, they turn on JS rendering (the API refuses them otherwise).
+        ...(jsInstructions ? { js_instructions: jsInstructions, ...(adaptive ? {} : { js_render: 'true' }) } : {}),
         ...(forwardHeaders ? { custom_headers: 'true' } : {}),
       },
       forwardedHeaders: forwardHeaders ? forwardedHeaders : undefined,
