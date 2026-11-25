@@ -117,7 +117,7 @@ unit_test() {
   if [ -n "${LIVE:-}" ]; then
     pnpm --filter @mastra/zenrows exec vitest run --reporter verbose
   else
-    pnpm --filter @mastra/zenrows test
+    pnpm --filter @mastra/zenrows exec vitest run --project 'unit:*'
   fi
 }
 

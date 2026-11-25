@@ -151,7 +151,9 @@ The fetched checkout has their full history, as their CI checks it out
 `examples/`, which is most of the tree and no workspace package.
 
 The unit tests inject a `fetch` mock and never call the network. The live
-test (`src/__tests__/live.test.ts`) is skipped unless `ZENROWS_API_KEY` is set.
+test (`src/__tests__/live.e2e.test.ts`) is in its own `e2e:` vitest project, as
+Mastra keeps network calls out of `unit:` projects; it is skipped unless
+`ZENROWS_API_KEY` is set, and the test gate runs it only with `LIVE=1`.
 `LIVE=1` forwards `ZENROWS_API_KEY` and `ZENROWS_API_URL` into the container by
 name, so the key never reaches a command line, and gives the container the
 host's network, so `ZENROWS_API_URL=http://localhost:8080/v1/` reaches a local
