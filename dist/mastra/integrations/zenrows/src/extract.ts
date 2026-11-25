@@ -4,7 +4,13 @@ import { z } from 'zod';
 import { requestZenrows } from './client.js';
 import type { ZenrowsClientOptions } from './client.js';
 import { zenrowsExtractInputSchema } from './schemas.js';
-import { CREDIT_WEIGHTS, EXTRACT_NO_CREDITS, EXTRACT_SUMMARY } from './spec.js';
+import {
+  CREDIT_WEIGHTS,
+  EXTRACT_NO_CREDITS,
+  EXTRACT_SUMMARY,
+  GET_EXTRACT_DOMAIN_STATUS_TOOL,
+  REQUEST_EXTRACT_DOMAIN_TOOL,
+} from './spec.js';
 
 const outputSchema = z.object({
   url: z.string(),
@@ -21,7 +27,11 @@ export function createZenrowsExtractTool(options: ZenrowsClientOptions = {}) {
       EXTRACT_NO_CREDITS +
       ', which costs ' +
       CREDIT_WEIGHTS +
-      '.',
+      '. A domain Zenrows has not prepared for Extract yet fails with REQS007: prepare it with ' +
+      REQUEST_EXTRACT_DOMAIN_TOOL +
+      ' and retry once ' +
+      GET_EXTRACT_DOMAIN_STATUS_TOOL +
+      ' reports it ready (both from createZenrowsAllTools()).',
     inputSchema: zenrowsExtractInputSchema,
     outputSchema,
     execute: async params => {

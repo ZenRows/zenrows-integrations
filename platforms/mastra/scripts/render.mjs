@@ -332,6 +332,17 @@ export default function render({ apiEndpoints, fill }) {
     // formats them as they are written.
     const parsed = (placeholder) => JSON.parse(fill(placeholder));
     const constant = (name, placeholder) => assign("", `export const ${name} =`, quote(parsed(placeholder)), ";");
+    // Tool IDs the hand-written tools name, read the way {{tool:<id>}} reads, so
+    // a renamed tool can't leave a stale ID in their descriptions.
+    const toolId = (name, id) => {
+        const endpoint = endpoints.find((e) => e.id === id);
+        if (!endpoint) throw new Error(`${where}: the API spec has no endpoint we offer by id ${id}, which the hand-written tools name`);
+        return assign("", `export const ${name} =`, quote(names.tool(endpoint)), ";");
+    };
+    const toolIds = [
+        toolId("REQUEST_EXTRACT_DOMAIN_TOOL", "request_extract_domain"),
+        toolId("GET_EXTRACT_DOMAIN_STATUS_TOOL", "get_extract_domain_status"),
+    ].join("");
     const responses = Object.entries(parsed("{{api:fetch responses}}"))
         .map(([status, text]) => assign("  ", `${quote(status)}:`, quote(text), ","))
         .join("");
@@ -379,6 +390,6 @@ ${responses}};
 ${constant("FETCH_SUMMARY", "{{api:fetch summary}}")}${constant("EXTRACT_SUMMARY", "{{api:extract summary}}")}${constant(
             "CREDIT_WEIGHTS",
             "{{text:credit-weights}}",
-        )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}${constant("REQUEST_TIMEOUT", "{{text:request-timeout}}")}`,
+        )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}${constant("REQUEST_TIMEOUT", "{{text:request-timeout}}")}${toolIds}`,
     };
 }

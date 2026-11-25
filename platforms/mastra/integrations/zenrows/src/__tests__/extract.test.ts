@@ -19,6 +19,7 @@ describe('createZenrowsExtractTool', () => {
     const tool = createZenrowsExtractTool();
     expect(tool.id).toBe('zenrows-extract');
     expect(tool.description).toContain('zenrows-scrape');
+    expect(tool.description).toContain('zenrows-request-extract-domain');
   });
 
   it('pins extract=auto and passes the fields and fetch options', async () => {

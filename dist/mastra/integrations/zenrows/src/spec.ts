@@ -27,3 +27,5 @@ export const CREDIT_WEIGHTS =
 export const EXTRACT_NO_CREDITS = 'Extract adds no credits on top of the request it runs';
 export const REQUEST_TIMEOUT =
   'a request can take up to 3 minutes, so wait at least 180 seconds for it, and a request cut short on the client side still runs and can still be charged';
+export const REQUEST_EXTRACT_DOMAIN_TOOL = 'zenrows-request-extract-domain';
+export const GET_EXTRACT_DOMAIN_STATUS_TOOL = 'zenrows-get-extract-domain-status';
