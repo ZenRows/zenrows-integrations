@@ -6,7 +6,11 @@ import { createZenrowsAllTools, createZenrowsTools } from '../tools.js';
 describe('createZenrowsAllTools', () => {
   it('returns scrape, extract and every generated tool', () => {
     const generated = createZenrowsGeneratedTools();
-    expect(Object.keys(createZenrowsAllTools())).toEqual(['zenrowsScrape', 'zenrowsExtract', ...Object.keys(generated)]);
+    expect(Object.keys(createZenrowsAllTools())).toEqual([
+      'zenrowsScrape',
+      'zenrowsExtract',
+      ...Object.keys(generated),
+    ]);
   });
 });
 
