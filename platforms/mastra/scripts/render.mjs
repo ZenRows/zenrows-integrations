@@ -354,6 +354,8 @@ export default function render({ apiEndpoints, fill }) {
         return assign("", `export const ${name} =`, quote(names.tool(endpoint)), ";");
     };
     const toolIds = [
+        toolId("SCRAPE_TOOL", "fetch"),
+        toolId("EXTRACT_TOOL", "extract"),
         toolId("REQUEST_EXTRACT_DOMAIN_TOOL", "request_extract_domain"),
         toolId("GET_EXTRACT_DOMAIN_STATUS_TOOL", "get_extract_domain_status"),
     ].join("");

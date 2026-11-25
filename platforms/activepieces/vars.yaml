@@ -7,6 +7,9 @@ host_full: "Activepieces"
 # Moving it is its own PR, so CI shows whether their newer code breaks the piece.
 upstream: "6f4be340d7c4bef9fb6ff874ca72224e4933d3d2"
 
+# The hand-written action's name, which shared/actions.yaml's {{tool:fetch}} reads as.
+scrape_action_name: "Scrape URL"
+
 # The wording of the generated actions is shared with Mastra's tools, in
 # shared/actions.yaml. What only Activepieces has, by endpoint id:
 # omit leaves an optional field out of the form (it is never sent), because it

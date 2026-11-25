@@ -32,5 +32,7 @@ export const ADAPTIVE_STEALTH_MODE =
   'Adaptive Stealth Mode starts from the cheapest configuration that can work and escalates to JavaScript rendering or Premium Proxies only when the page needs them, and only the configuration that succeeds is charged';
 export const REQUEST_TIMEOUT =
   'a request can take up to 3 minutes, so wait at least 180 seconds for it, and a request cut short on the client side still runs and can still be charged';
+export const SCRAPE_TOOL = 'zenrows-scrape';
+export const EXTRACT_TOOL = 'zenrows-extract';
 export const REQUEST_EXTRACT_DOMAIN_TOOL = 'zenrows-request-extract-domain';
 export const GET_EXTRACT_DOMAIN_STATUS_TOOL = 'zenrows-get-extract-domain-status';
