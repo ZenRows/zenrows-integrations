@@ -128,8 +128,12 @@ Deno.test({
         assertEquals(result.httpStatus, 200);
         assertEquals(result.isProviderError, false);
         assertEquals(typeof result.output, "string");
-        // A plain request draws exactly one credit, and the claim comes
-        // from the header rather than the rate card.
-        assertEquals(result.usage.credits, { default: 1 });
+        // Shape, not the amount: a vendor price change must not turn a smoke
+        // test red. That the claim comes from the header rather than the rate
+        // card is pinned in the replay test above, which fixes it at one.
+        const credits = result.usage.credits as Record<string, number>;
+        assertEquals(Object.keys(credits), ["default"]);
+        assertEquals(typeof credits.default, "number");
+        assertEquals(credits.default > 0, true);
     },
 });

@@ -16,11 +16,15 @@ const PRODUCT =
     "https://www.scrapingcourse.com/ecommerce/product/abominable-hoodie/";
 
 Deno.test("zenrows#extract happy: the parsed fields without the page", async () => {
+    const loaded = await loadFixture(fixture("extract-product"));
+    const parsed = structuredClone(
+        (loaded.calls[0].res.body as Record<string, Json>).parsed,
+    ) as Record<string, unknown>;
     const result = await runEndpoint({
         unit: await testSealedUnit(EXTRACT),
         input: { queryParams: { url: PRODUCT } },
         mode: "replay",
-        fixture: await loadFixture(fixture("extract-product")),
+        fixture: loaded,
     });
     assertEquals(result.httpStatus, 200);
     assertEquals(result.isProviderError, false);
@@ -30,23 +34,12 @@ Deno.test("zenrows#extract happy: the parsed fields without the page", async () 
     // carried 166604 characters of html beside 2879 bytes of parsed, so
     // this is the difference between a usable answer and the whole page.
     assertEquals("html" in output, false);
-    assertEquals(
-        Object.keys(output).sort(),
-        [
-            "breadcrumbs",
-            "gallery_images",
-            "product",
-            "product_attributes",
-            "related_products",
-        ],
-    );
-    const product = output.product as Record<string, unknown>;
-    assertEquals(product.name, "Abominable Hoodie");
-    assertEquals(product.sku, "MH09");
-    assertEquals(product.price, 69);
-    // A field Extract parsed as empty survives as null rather than being
-    // dropped, so a caller can tell "absent" from "not on the page".
-    assertEquals(product.currency, null);
+    // Every row, not just the key set: breadcrumbs, gallery_images and
+    // related_products could each arrive empty and a key check would still
+    // pass. This also pins that a field Extract parsed as empty survives as
+    // null rather than being dropped, so a caller can tell "absent" from
+    // "not on the page".
+    assertEquals(output, parsed);
 
     assertEquals(result.usage, {
         credits: { default: 1 },
@@ -85,7 +78,9 @@ Deno.test("zenrows#extract provider error: an unprepared domain, digested and un
         unknown
     >;
     assertEquals(raw.reason, "domain_not_prepared");
-    assertEquals(result.usage.credits, {});
+    // The whole usage, not just credits: evidence must be empty too, or a
+    // refused run could still carry a 25-credit hold out with it.
+    assertEquals(result.usage, { credits: {}, evidence: {} });
 });
 
 Deno.test("zenrows#extract input: the vendor's own parameters, strictly", async () => {
