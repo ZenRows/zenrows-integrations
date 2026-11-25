@@ -1,13 +1,13 @@
 ---
 title: 'Zenrows | Tools'
-description: 'Add Zenrows tools to Mastra agents to read any public page as Markdown, plaintext, HTML or structured JSON fields, and to run batch jobs and crawls, with typed Zod schemas.'
+description: 'Add Zenrows tools to Mastra agents to read any public page as Markdown, plaintext, HTML or structured JSON fields, with typed Zod schemas.'
 packages:
   - '@mastra/zenrows'
 ---
 
 # Zenrows
 
-The `@mastra/zenrows` package exposes the [Zenrows](https://www.zenrows.com) API as Mastra-compatible tools: Fetch and Extract, plus batch jobs, crawls and Extract domain preparation. Zenrows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input schema.
+The `@mastra/zenrows` package exposes the [Zenrows](https://www.zenrows.com) API as Mastra-compatible tools: a scrape tool and an extract tool, and a tool for every other endpoint Zenrows offers. Zenrows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input schema.
 
 The scrape tool returns a page's content. The extract tool returns the structured fields Zenrows parsed out of a page, such as a product's name and price, with no selectors to write. The [other tools](#more-tools) cover the rest of the API, one tool per endpoint.
 
@@ -21,7 +21,7 @@ Set `ZENROWS_API_KEY` in your environment. You can also pass an API key directly
 
 ## Quick start
 
-Use `createZenrowsTools()` to create every tool with shared configuration:
+Use `createZenrowsTools()` to create the scrape and extract tools with shared configuration:
 
 ```typescript title="src/mastra/tools/index.ts"
 import { createZenrowsTools } from '@mastra/zenrows'
@@ -31,7 +31,7 @@ export const zenrowsTools = createZenrowsTools()
 // export const zenrowsTools = createZenrowsTools({ apiKey: 'your-zenrows-api-key' })
 ```
 
-The returned object contains `zenrowsScrape`, `zenrowsExtract` and the [other tools](#more-tools).
+The returned object contains `zenrowsScrape` and `zenrowsExtract`. `createZenrowsAllTools()` returns those and the [other tools](#more-tools).
 
 Create a tool on its own when an agent doesn't need them all:
 
@@ -234,7 +234,15 @@ const extractTool = createZenrowsExtractTool()
 
 ## More tools
 
-`createZenrowsTools()` also returns a tool for every other endpoint Zenrows offers. Each takes the endpoint's path, query and body fields as its input, and returns the API's answer: JSON parsed, text as a string, and a file such as a PDF as `{ contentType, base64 }`. Batch jobs and crawls run in the background: start one, then read it with the matching tools until it ends.
+`createZenrowsAllTools()` returns the scrape and extract tools and a tool for every other endpoint Zenrows offers:
+
+```typescript title="src/mastra/tools/index.ts"
+import { createZenrowsAllTools } from '@mastra/zenrows'
+
+export const zenrowsTools = createZenrowsAllTools()
+```
+
+Each factory is also exported on its own, such as `createZenrowsStartCrawlTool()`. Each of these tools takes the endpoint's path, query and body fields as its input, and returns the API's answer: JSON parsed, text as a string, and a file such as a PDF as `{ contentType, base64 }`. Batch jobs and crawls run in the background: start one, then read it with the matching tools until it ends.
 
 GENERATED_TOOLS_TABLE
 

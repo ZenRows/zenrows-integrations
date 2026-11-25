@@ -1,7 +1,7 @@
 {
   "name": "@mastra/zenrows",
   "version": "0.0.0",
-  "description": "Zenrows web scraping, structured extraction, batch and crawl tools for Mastra agents",
+  "description": "Zenrows web scraping and structured extraction tools for Mastra agents",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -1,8 +1,8 @@
 # @mastra/zenrows
 
-[Zenrows](https://www.zenrows.com) web scraping, structured extraction, batch and crawl tools for [Mastra](https://mastra.ai) agents.
+[Zenrows](https://www.zenrows.com) web scraping and structured extraction tools for [Mastra](https://mastra.ai) agents.
 
-Zenrows handles proxies, JavaScript rendering and anti-bot protection. The scrape tool returns a page as Markdown, plaintext or HTML; the extract tool returns the fields Zenrows parsed out of it as JSON. Every other Zenrows endpoint has a tool too: batch jobs over many URLs, crawls from one start URL, and preparing a domain for Extract.
+Zenrows handles proxies, JavaScript rendering and anti-bot protection. The scrape tool returns a page as Markdown, plaintext or HTML; the extract tool returns the fields Zenrows parsed out of it as JSON. `createZenrowsAllTools()` adds a tool for every other endpoint Zenrows offers, such as batch jobs and crawls.
 
 ## Installation
 

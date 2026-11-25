@@ -28,13 +28,18 @@ are listed alphabetically. `scripts/check.sh` applies it.
 | `createZenrowsScrapeTool()` | `zenrows-scrape` | `{ url, content, credits }`: the page as Markdown (default), plaintext or HTML, or the `css_extractor` fields as JSON text |
 | `createZenrowsExtractTool()` | `zenrows-extract` | `{ url, data, credits }`: the fields Extract parsed out of the page (`extract=auto`), as parsed JSON |
 | `createZenrows<Name>Tool()` | `zenrows-<name>` | One generated tool for every other endpoint we offer (see below) |
-| `createZenrowsTools()` | all | `{ zenrowsScrape, zenrowsExtract, … }`: every tool, with shared options |
+| `createZenrowsTools()` | scrape, extract | `{ zenrowsScrape, zenrowsExtract }`, with shared options |
+| `createZenrowsAllTools()` | all | `{ zenrowsScrape, zenrowsExtract, … }`: every tool, with shared options |
+
+Scrape and extract are what most agents need, and the default set, the way
+Mastra's other scraping packages offer two to four tools. The rest are there for
+an agent that runs batch jobs or crawls, through `createZenrowsAllTools()` or
+their own factories.
 
 Scrape and extract are written by hand. Every other endpoint in
 `shared/billing.yaml` that isn't `not_offered` gets a generated tool in
 `integrations/zenrows/src/generated/`, the way the Activepieces piece gets its
-actions: batch jobs, crawls and Extract domain preparation today (13 tools). A
-new endpoint there becomes a new tool at the next `npm run render`, with nothing
+actions. A new endpoint there becomes a new tool at the next `npm run render`, with nothing
 to decide here. Each generated tool takes the endpoint's path, query and body
 fields as one input object, and returns the API's answer: JSON parsed, text as a
 string, any other body (a PDF) as `{ contentType, base64 }`, and `null` for an
