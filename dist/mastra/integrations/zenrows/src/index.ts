@@ -3,4 +3,4 @@ export type { ZenrowsScrapeInput, ZenrowsExtractInput } from './schemas.js';
 export { createZenrowsScrapeTool } from './scrape.js';
 export { createZenrowsExtractTool } from './extract.js';
 export * from './generated/index.js';
-export { createZenrowsTools } from './tools.js';
+export { createZenrowsAllTools, createZenrowsTools } from './tools.js';

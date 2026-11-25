@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { ZenrowsError } from '../client.js';
-import { createZenrowsTools } from '../tools.js';
+import { createZenrowsAllTools } from '../tools.js';
 
 // Calls the real API, so it runs only with ZENROWS_API_KEY set. ZENROWS_API_URL
 // points it at another deployment.
 describe.skipIf(!process.env.ZENROWS_API_KEY)('Zenrows, live', () => {
-  const tools = createZenrowsTools();
+  const tools = createZenrowsAllTools();
   const { zenrowsScrape, zenrowsExtract } = tools;
   const run = async (tool: { execute?: (input: never, context: never) => Promise<unknown> }, input: object) =>
     (await tool.execute!(input as never, {} as never)) as Record<string, unknown>;

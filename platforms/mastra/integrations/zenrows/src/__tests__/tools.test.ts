@@ -1,15 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createZenrowsGeneratedTools } from '../generated/index.js';
-import { createZenrowsTools } from '../tools.js';
+import { createZenrowsAllTools, createZenrowsTools } from '../tools.js';
+
+describe('createZenrowsAllTools', () => {
+  it('returns scrape, extract and every generated tool', () => {
+    const generated = createZenrowsGeneratedTools();
+    expect(Object.keys(createZenrowsAllTools())).toEqual(['zenrowsScrape', 'zenrowsExtract', ...Object.keys(generated)]);
+  });
+});
 
 describe('createZenrowsTools', () => {
-  it('returns scrape, extract and every generated tool, sharing the options', async () => {
+  it('returns scrape and extract only, sharing the options', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
     const tools = createZenrowsTools({ apiKey: 'shared-key', fetch: fetchMock });
-    const generated = createZenrowsGeneratedTools();
 
-    expect(Object.keys(tools)).toEqual(['zenrowsScrape', 'zenrowsExtract', ...Object.keys(generated)]);
+    expect(Object.keys(tools)).toEqual(['zenrowsScrape', 'zenrowsExtract']);
     expect(tools.zenrowsScrape.id).toBe('zenrows-scrape');
     expect(tools.zenrowsExtract.id).toBe('zenrows-extract');
 
