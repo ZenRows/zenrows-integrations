@@ -15,7 +15,7 @@ file at the path it takes there. Nothing here is a skill or a plugin.
 | `integrations/zenrows/` | The `@mastra/zenrows` package, laid out like `@mastra/brightdata` and `@mastra/parallel` |
 | `docs/src/content/en/integrations/tools/zenrows.mdx` | Its page on mastra.ai, in the house style of the Bright Data and Parallel pages, rendered from `scripts/docs-page.mdx` with the generated tools' table added |
 | `docs/static/img/integrations/zenrows.svg` | The sidebar icon, drawn from `shared/assets/logo.png` |
-| `.changeset/zenrows-tools.md` | The changeset that releases the package as a minor version: `package.json` starts at `0.0.0`, as their new packages do, so the first release is `0.1.0` (`0.1.0-alpha.0` while their prerelease mode is on, as `@mastra/parallel`'s was) |
+| `.changeset/zenrows-tools.md` | The changeset that releases the package as a minor version: `package.json` starts at `0.0.0`, as their new packages do, so the first release is `0.1.0` |
 
 One edit to their tree is not a file of ours: the sidebar entry in
 `docs/src/content/en/integrations/sidebars.js`, after Tavily, since the tools
@@ -170,21 +170,22 @@ breaks the package.
 
 ## How it ships
 
-Landing it is a pull request to `mastra-ai/mastra` from a fork:
+Mastra doesn't take pull requests from outside contributors (their
+CONTRIBUTING.md, since October 2026). New integrations land through a
+partnership with Mastra: they agree the scope, and their team or bot opens the
+pull request. Vendors who asked for an integration through an issue alone were
+told to keep it in their own repo.
 
-1. Run `bash platforms/mastra/scripts/check.sh ~/src/mastra` on a branch of
-   your fork. It ends with one commit on that branch, `feat(zenrows): add
-   @mastra/zenrows`: the package, the docs page, the icon, the changeset, the
-   sidebar edit and `pnpm-lock.yaml` with the new importer. Running it again
-   replaces that commit.
-2. Open the pull request. They release with changesets, and the changeset
-   is already in the tree.
-3. Ask a Mastra maintainer to publish the `@mastra/zenrows` placeholder to npm
-   before the merge. Their "New packages exist on npm" job fails for a package
-   npm has never seen, because their release publishes through npm trusted
-   publishing, which only works on a package that already exists, and only
-   their maintainers can create it (`scripts/npm-placeholder-publish.mjs` in their
-   repo). `check.sh` runs that check but only reports it.
+1. Agree the integration with Mastra through the partnership.
+2. Open an `[INTEGRATION]` issue on `mastra-ai/mastra` (their
+   `integration_request.yml` template) for the agreed scope, pointing to
+   `dist/mastra/` here as the reference implementation: the package, its docs
+   page, the icon, the changeset and the sidebar entry, passing their CI.
+3. Mastra builds the pull request from it. Their release needs the package on
+   npm first (trusted publishing only works on an existing package), which only
+   their maintainers can create; `check.sh` reports that check (`npm-exists`)
+   but doesn't fail on it.
 
-Listing the integration waits on the Mastra partnership: do not open the
-upstream pull request until that is agreed.
+`bash platforms/mastra/scripts/check.sh ~/src/mastra` leaves one commit on a
+branch of that checkout, `feat(zenrows): add @mastra/zenrows`, with everything
+above and `pnpm-lock.yaml`'s new importer, for whoever opens the pull request.
