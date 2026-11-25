@@ -239,19 +239,21 @@ function sharedActions() {
 }
 
 // What a call costs, by the endpoint's kind in shared/billing.yaml: the one
-// place a generated action or tool gets its cost sentence, so shared/actions.yaml
-// never states it. A kind with no sentence fails the render.
+// place the cost sentence is written. A generated action or tool ends with it,
+// and a template or host render writes it as {{cost:<kind>}}, so shared/actions.yaml
+// and the hand-written tools never state it. A kind with no sentence fails the render.
 const costSentences = {
   per_credit: "Zenrows charges {{< credit-weights }}.",
   after_run: "{{< billing-after-run }}: {{< credit-weights }}.",
   free: "{{< billing-free }}.",
 };
-function costSentence(endpoint) {
-  const sentence = costSentences[endpoint.billing];
-  if (!sentence) throw new Error(`scripts/lib.mjs: no cost sentence for "${endpoint.billing}" (${endpoint.operation}); add one to costSentences`);
+function costFor(kind, where) {
+  const sentence = costSentences[kind];
+  if (!sentence) throw new Error(`${where}: no cost sentence for billing kind "${kind}"; add one to costSentences in scripts/lib.mjs`);
   const text = sentence.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, "scripts/lib.mjs costSentences"));
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+const costSentence = (endpoint) => costFor(endpoint.billing, `${endpoint.operation} in shared/billing.yaml`);
 
 // An endpoint's wording from shared/actions.yaml: { name, description, ai,
 // props, cost }, each but cost undefined where the file leaves it to the spec.
@@ -495,6 +497,7 @@ function fill(text, values, where) {
   );
   text = text.replace(/\{\{api-sha256\}\}/g, () => apiSpecFor(where).sha256);
   text = text.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, where));
+  text = text.replace(/\{\{cost:([a-z_]+)\}\}/g, (_, kind) => costFor(kind, where));
   return text.replace(/\{\{\s*([a-z_][a-z0-9_]*)(?::([a-z0-9-]+))?\s*\}\}/g, (token, name, arg) => {
     if (name === "skill") {
       if (!values.skills.includes(arg)) {

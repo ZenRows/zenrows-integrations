@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requestZenrows } from './client.js';
 import type { ZenrowsClientOptions } from './client.js';
 import { zenrowsScrapeInputSchema } from './schemas.js';
-import { CREDIT_WEIGHTS, FETCH_SUMMARY } from './spec.js';
+import { FETCH_SUMMARY, PER_REQUEST_COST } from './spec.js';
 
 const outputSchema = z.object({
   url: z.string(),
@@ -17,9 +17,9 @@ export function createZenrowsScrapeTool(options: ZenrowsClientOptions = {}) {
     id: 'zenrows-scrape',
     description:
       FETCH_SUMMARY +
-      ' through Zenrows and return its content: Markdown by default, plaintext, or the HTML. With css_extractor it returns just the named fields as JSON text. For the structured fields of a product, article or listing page with no selectors to write, use zenrows-extract instead. Zenrows charges ' +
-      CREDIT_WEIGHTS +
-      '; mode auto picks the cheapest configuration that works.',
+      ' through Zenrows and return its content: Markdown by default, plaintext, or the HTML. With css_extractor it returns just the named fields as JSON text. For the structured fields of a product, article or listing page with no selectors to write, use zenrows-extract instead. ' +
+      PER_REQUEST_COST +
+      ' mode auto picks the cheapest configuration that works.',
     inputSchema: zenrowsScrapeInputSchema,
     outputSchema,
     execute: async ({ response_type = 'markdown', ...params }) => {

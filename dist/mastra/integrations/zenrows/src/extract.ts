@@ -5,10 +5,10 @@ import { requestZenrows } from './client.js';
 import type { ZenrowsClientOptions } from './client.js';
 import { zenrowsExtractInputSchema } from './schemas.js';
 import {
-  CREDIT_WEIGHTS,
   EXTRACT_NO_CREDITS,
   EXTRACT_SUMMARY,
   GET_EXTRACT_DOMAIN_STATUS_TOOL,
+  PER_REQUEST_COST,
   REQUEST_EXTRACT_DOMAIN_TOOL,
 } from './spec.js';
 
@@ -25,9 +25,9 @@ export function createZenrowsExtractTool(options: ZenrowsClientOptions = {}) {
       EXTRACT_SUMMARY +
       " as JSON, with fields named the way the site names them (a product's name and price, a listing's rows, an article's byline) and no selectors to write. For the page's own content, use zenrows-scrape instead. " +
       EXTRACT_NO_CREDITS +
-      ', which costs ' +
-      CREDIT_WEIGHTS +
-      '. A domain Zenrows has not prepared for Extract yet fails with REQS007: prepare it with ' +
+      '. ' +
+      PER_REQUEST_COST +
+      ' A domain Zenrows has not prepared for Extract yet fails with REQS007: prepare it with ' +
       REQUEST_EXTRACT_DOMAIN_TOOL +
       ' and retry once ' +
       GET_EXTRACT_DOMAIN_STATUS_TOOL +

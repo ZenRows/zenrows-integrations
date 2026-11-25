@@ -282,7 +282,7 @@ function docsTable(tools) {
 export default function render({ apiEndpoints, fill }) {
     // fill() is not applied to what a host renderer returns, so the snippets
     // and the operation's parameters are resolved here.
-    const creditWeights = fill("Zenrows charges {{< credit-weights }}.");
+    const creditWeights = fill("{{cost:per_credit}}");
     const notes = {
         js_render: creditWeights,
         premium_proxy: creditWeights,
@@ -387,9 +387,11 @@ export const DEFAULT_BASE_URL: string = ${quote(parsed("{{api:fetch server}}"))}
 export const RESPONSES: Record<string, string> = {
 ${responses}};
 
-${constant("FETCH_SUMMARY", "{{api:fetch summary}}")}${constant("EXTRACT_SUMMARY", "{{api:extract summary}}")}${constant(
-            "CREDIT_WEIGHTS",
-            "{{text:credit-weights}}",
+${constant("FETCH_SUMMARY", "{{api:fetch summary}}")}${constant("EXTRACT_SUMMARY", "{{api:extract summary}}")}${assign(
+            "",
+            "export const PER_REQUEST_COST =",
+            quote(fill("{{cost:per_credit}}")),
+            ";",
         )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}${constant("REQUEST_TIMEOUT", "{{text:request-timeout}}")}${toolIds}`,
     };
 }

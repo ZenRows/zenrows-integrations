@@ -463,6 +463,12 @@ test("an offered endpoint that takes the key neither way fails the Activepieces 
   "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
   "shared/billing.yaml": typesBilling({ free: ["GET /stub-types"] })["shared/billing.yaml"],
 }, "platforms/activepieces/scripts/render.mjs: the API spec takes the key for GET /stub-types neither in X-API-Key nor as apikey", tokenSpec));
+test("{{cost:<kind>}} is the cost sentence of that billing kind, and an unknown kind fails", () => {
+  const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{cost:free}} {{cost:per_credit}}") });\n'), tokenSpec, ["dist/piece/note.txt"]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist("dist/piece/note.txt"), /^This call uses no credits\. Zenrows charges 1 credit for a basic request/);
+  fails(renders('export default ({ fill }) => ({ "note.txt": fill("{{cost:nope}}") });\n'), 'no cost sentence for billing kind "nope"', tokenSpec)();
+});
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);

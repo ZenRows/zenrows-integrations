@@ -22,8 +22,8 @@ export const RESPONSES: Record<string, string> = {
 
 export const FETCH_SUMMARY = 'Fetch a page';
 export const EXTRACT_SUMMARY = 'Extract structured data from a page';
-export const CREDIT_WEIGHTS =
-  '1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan';
+export const PER_REQUEST_COST =
+  'Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.';
 export const EXTRACT_NO_CREDITS = 'Extract adds no credits on top of the request it runs';
 export const REQUEST_TIMEOUT =
   'a request can take up to 3 minutes, so wait at least 180 seconds for it, and a request cut short on the client side still runs and can still be charged';
