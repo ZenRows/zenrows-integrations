@@ -1,4 +1,4 @@
-# ZenRows on Mastra
+# Zenrows on Mastra
 
 [Mastra](https://mastra.ai) is a TypeScript framework for AI agents. Its
 third-party tools live in its monorepo,
@@ -13,9 +13,9 @@ file at the path it takes there. Nothing here is a skill or a plugin.
 | In `dist/mastra/` | What it is |
 |---|---|
 | `integrations/zenrows/` | The `@mastra/zenrows` package, laid out like `@mastra/brightdata` and `@mastra/parallel` |
-| `docs/src/content/en/integrations/tools/zenrows.mdx` | Its page on mastra.ai, in the house style of the Bright Data and Parallel pages |
+| `docs/src/content/en/integrations/tools/zenrows.mdx` | Its page on mastra.ai, in the house style of the Bright Data and Parallel pages, rendered from `scripts/docs-page.mdx` with the generated tools' table added |
 | `docs/static/img/integrations/zenrows.svg` | The sidebar icon, drawn from `shared/assets/logo.png` |
-| `.changeset/zenrows-scrape-extract-tools.md` | The changeset that releases the package as a minor version: `package.json` starts at `0.0.0`, as their new packages do, so the first release is `0.1.0` (`0.1.0-alpha.0` while their prerelease mode is on, as `@mastra/parallel`'s was) |
+| `.changeset/zenrows-tools.md` | The changeset that releases the package as a minor version: `package.json` starts at `0.0.0`, as their new packages do, so the first release is `0.1.0` (`0.1.0-alpha.0` while their prerelease mode is on, as `@mastra/parallel`'s was) |
 
 One edit to their tree is not a file of ours: the sidebar entry in
 `docs/src/content/en/integrations/sidebars.js`, after Tavily, since the tools
@@ -27,20 +27,34 @@ are listed alphabetically. `scripts/check.sh` applies it.
 |---|---|---|
 | `createZenrowsScrapeTool()` | `zenrows-scrape` | `{ url, content, credits }`: the page as Markdown (default), plaintext or HTML, or the `css_extractor` fields as JSON text |
 | `createZenrowsExtractTool()` | `zenrows-extract` | `{ url, data, credits }`: the fields Extract parsed out of the page (`extract=auto`), as parsed JSON |
-| `createZenrowsTools()` | both | `{ zenrowsScrape, zenrowsExtract }` with shared options |
+| `createZenrows<Name>Tool()` | `zenrows-<name>` | One generated tool for every other endpoint we offer (see below) |
+| `createZenrowsTools()` | all | `{ zenrowsScrape, zenrowsExtract, … }`: every tool, with shared options |
+
+Scrape and extract are written by hand. Every other endpoint in
+`shared/billing.yaml` that isn't `not_offered` gets a generated tool in
+`integrations/zenrows/src/generated/`, the way the Activepieces piece gets its
+actions: batch jobs, crawls and Extract domain preparation today (13 tools). A
+new endpoint there becomes a new tool at the next `npm run render`, with nothing
+to decide here. Each generated tool takes the endpoint's path, query and body
+fields as one input object, and returns the API's answer: JSON parsed, text as a
+string, any other body (a PDF) as `{ contentType, base64 }`, and `null` for an
+empty one. Batch and crawl are background jobs: an agent starts one, then reads
+it with the matching tools, as a flow does in Activepieces.
 
 All take `{ apiKey?, baseUrl?, timeout?, fetch? }`. The key falls back to
 `ZENROWS_API_KEY` and the base URL to `ZENROWS_API_URL`, then the public API.
 A missing key fails when a tool runs, not when it is created, the way
 `@mastra/parallel` does. The key goes in the `X-API-Key` header, never in the
-URL. `credits` comes from the `X-Request-Credits` header, or is `null` without it.
+URL, except for an endpoint the spec says takes it only as `apikey`. `baseUrl`
+replaces the public API's server (`api.zenrows.com`) and only it: the batch
+tools keep the batch server the spec names. `credits` comes from the `X-Request-Credits` header, or is `null` without it.
 
 `html` is the scrape tool's own `response_type` value: the API has none, and
 sending no `response_type` is how it returns the HTML.
 
-The timeout defaults to 180 s, not the 120 s Bright Data uses: the ZenRows
-docs ask clients for 180 s or more, because a request can take 3 minutes and
-one the client gives up on still runs, and can still be charged.
+The timeout defaults to 180 s, not the 120 s Bright Data uses, for the reason
+`shared/text/request-timeout.md` gives; the timeout error and the docs page
+say it in those words.
 
 ## What comes from the spec
 
@@ -57,6 +71,14 @@ Every fact about the API is rendered from the published spec
   map with a reason, so a parameter the slice gains fails the render until
   someone decides. Scrape also takes `css_extractor`, which `GET /` has
   outside the slice; its schema still comes from the spec.
+- **The generated tools**, whole: each one's inputs (nested objects, lists and
+  `oneOf` included), its server, path and where it takes the key, what each
+  response status means, and its description: the spec's summary, the first
+  paragraph of its description, then how it's billed. The billing sentence comes
+  from its kind in `shared/billing.yaml`, through `shared/text/billing-free.md`
+  or `shared/text/billing-after-run.md` and the credit weights; a kind with no
+  sentence fails the render. Mastra's oxfmt config skips `**/generated/**`, so
+  these files are written plainly rather than in oxfmt's layout.
 - **The base URL** is `{{api:fetch server}}`.
 - **The error messages.** A `ZenrowsError` carries the status, the API's `code`,
   `reason` and `detail` from the response body, and the spec's description of
@@ -78,6 +100,10 @@ double-quoted JSON string that oxfmt rewrites.
 
 The factories, their options, the output shapes, the Markdown default and the
 docs page prose are this package's own choices, and are written by hand.
+
+When a spec change breaks the render, `scripts/render.mjs` says "the API spec"
+in its error, which is what `.github/workflows/api-changed.yml` looks for to open
+its "API change: hosts to update" issue rather than fail as a broken run.
 
 ## Check it
 

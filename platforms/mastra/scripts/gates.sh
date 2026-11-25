@@ -12,7 +12,7 @@ cd /work
 results=()
 failed=0
 package=integrations/zenrows
-changeset=.changeset/zenrows-scrape-extract-tools.md
+changeset=.changeset/zenrows-tools.md
 git_as=(-c user.name=check -c user.email=check@localhost)
 
 # install, commit and build are what every other gate stands on, so they always run.
@@ -87,19 +87,26 @@ commit() {
 # formats the docs). Its ignorePatterns skip integrations/ and .changeset/, so
 # that passes on anything there; the same files are then checked against the
 # same config without those two patterns, which is what a maintainer's oxfmt
-# run on the package would rewrite.
+# run on the package would rewrite. Their other patterns still apply, such as
+# **/generated/** (src/generated/ is ours). oxfmt reads ignorePatterns relative
+# to the config file, so that config sits next to theirs, and goes right after,
+# before the clean-worktree gate.
 format() {
   mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$BASE_SHA" HEAD |
     grep -vE '^(docs|examples|explorations)/|^pnpm-lock\.yaml$')
   [ "${#files[@]}" -gt 0 ] || { echo "no changed files outside docs/"; return 0; }
   pnpm exec oxfmt --check --no-error-on-unmatched-pattern "${files[@]}"
+  local config=/work/.oxfmtrc.package.json
   node -e '
     const config = require("/work/.oxfmtrc.json");
     delete config.$schema;
     config.ignorePatterns = config.ignorePatterns.filter(p => p !== "**/integrations/**" && p !== ".changeset/");
     process.stdout.write(JSON.stringify(config));
-  ' >/tmp/oxfmtrc.json
-  pnpm exec oxfmt --check -c /tmp/oxfmtrc.json "${files[@]}"
+  ' >"$config"
+  local status=0
+  pnpm exec oxfmt --check --no-error-on-unmatched-pattern -c "$config" "${files[@]}" || status=$?
+  rm -f "$config"
+  return "$status"
 }
 
 build() { pnpm turbo build --filter @mastra/zenrows --output-logs=errors-only; }

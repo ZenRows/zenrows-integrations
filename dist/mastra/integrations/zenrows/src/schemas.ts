@@ -1,4 +1,4 @@
-// Generated from the ZenRows API spec (https://www.zenrows.com/openapi.json) by
+// Generated from the Zenrows API spec (https://www.zenrows.com/openapi.json) by
 // platforms/mastra/scripts/render.mjs in ZenRows/zenrows-integrations.
 // Change the spec or that script rather than this file.
 import { z } from 'zod';
@@ -25,13 +25,13 @@ export const zenrowsScrapeInputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      'Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). ZenRows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
+      'Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
     ),
   premium_proxy: z
     .boolean()
     .optional()
     .describe(
-      'Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). ZenRows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
+      'Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
     ),
   proxy_country: z
     .string()
@@ -87,13 +87,13 @@ export const zenrowsExtractInputSchema = z.object({
     .boolean()
     .optional()
     .describe(
-      'Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). ZenRows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
+      'Render the page in a headless browser before returning it. Required for content that only exists after JavaScript runs. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
     ),
   premium_proxy: z
     .boolean()
     .optional()
     .describe(
-      'Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). ZenRows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
+      'Route the request through residential IPs. Required by most protected sites. Not allowed with `mode=auto` (400 `REQS004`). Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
     ),
   proxy_country: z
     .string()

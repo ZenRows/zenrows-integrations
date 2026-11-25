@@ -409,3 +409,48 @@ test("a parameter the Mastra tools neither expose nor exclude fails", () => {
   assert.ok(endpoints.includes("custom_headers"), "the fetch slice gained custom_headers");
   fails({ "shared/endpoints.yaml": endpoints }, "the scrape tool neither exposes nor excludes custom_headers from shared/endpoints.yaml's fetch")();
 });
+
+// Mastra generates a tool for every endpoint shared/billing.yaml offers that has no hand-written one.
+test("an endpoint shared/billing.yaml offers becomes a Mastra tool", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const index = "dist/mastra/integrations/zenrows/src/generated/index.ts";
+  // o11 lists the endpoint too, and needs a description for it.
+  const spec = JSON.parse(tokenSpecText);
+  spec.paths["/stub/{job_id}"].get.description = "Reads one job.\n\nMore for the API docs.";
+  const r = run({ "openapi-tokens.json": JSON.stringify(spec), "shared/billing.yaml": billingWith({ free: ["GET /stub/{job_id}"] }) }, tokenSpec, [tool, index]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist(tool), /id: 'zenrows-get-job'/);
+  assert.match(r.dist(tool), /"server":"https:\/\/async\.example\.com\/v1","path":"\/stub\/\{job_id\}"/);
+  assert.match(r.dist(tool), /job_id: z\.string\(\)/);
+  assert.match(r.dist(tool), /description: 'Read a job\. Reads one job\. This call uses no credits\.'/);
+  assert.match(r.dist(index), /zenrowsGetJob: createZenrowsGetJobTool\(options\)/);
+});
+test("a Mastra tool input named in two places of one operation fails", () => {
+  const spec = JSON.parse(tokenSpecText);
+  spec.paths["/stub-dup/{id}"] = {
+    get: {
+      operationId: "readDup",
+      summary: "Read a dup",
+      parameters: [
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
+        { name: "id", in: "query", schema: { type: "string" } },
+      ],
+    },
+  };
+  const billing = JSON.parse(billingWith({ free: ["GET /stub-dup/{id}"] }));
+  fails({ "openapi-tokens.json": JSON.stringify(spec), "shared/billing.yaml": JSON.stringify(billing) }, 'the API spec has "id" in two places of GET /stub-dup/{id}', tokenSpec)();
+});
+// A failure the spec causes in a host's render.mjs says "the API spec", which api-changed.yml looks for.
+test("a spec-caused failure in the Mastra render says the API spec, as api-changed.yml expects", () => {
+  const spec = structuredClone(published);
+  const parameters = [...(spec.paths["/"].parameters ?? []), ...(spec.paths["/"].get.parameters ?? [])];
+  const wait = parameters.find((p) => p.name === "wait");
+  assert.ok(wait, "GET / has a wait parameter");
+  delete wait.description;
+  const r = run({ "openapi-nodesc.json": JSON.stringify(spec) }, { ZENROWS_OPENAPI: "openapi-nodesc.json" });
+  assert.ok(!r.ok, "the render failed");
+  assert.match(r.out, /platforms\/mastra\/scripts\/render\.mjs: the API spec has no description for wait/);
+  const workflow = readFileSync(join(root, ".github/workflows/api-changed.yml"), "utf8");
+  const pattern = workflow.match(/grep -E '(\^❌ [^']+)'/)[1];
+  assert.match(r.out.split("\n").find((line) => line.startsWith("❌")), new RegExp(pattern));
+});

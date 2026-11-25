@@ -8,8 +8,8 @@ import { CREDIT_WEIGHTS, EXTRACT_NO_CREDITS, EXTRACT_SUMMARY } from './spec.js';
 
 const outputSchema = z.object({
   url: z.string(),
-  data: z.unknown().describe('The fields ZenRows extracted from the page, named the way the site names them.'),
-  credits: z.number().nullable().describe('Credits the request used; null when ZenRows did not report them.'),
+  data: z.unknown().describe('The fields Zenrows extracted from the page, named the way the site names them.'),
+  credits: z.number().nullable().describe('Credits the request used; null when Zenrows did not report them.'),
 });
 
 export function createZenrowsExtractTool(options: ZenrowsClientOptions = {}) {

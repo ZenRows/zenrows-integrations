@@ -1,15 +1,15 @@
 ---
-title: 'ZenRows | Tools'
-description: 'Add ZenRows scrape and extract tools to Mastra agents to read any public page as Markdown, plaintext or HTML, or as structured JSON fields, with typed Zod schemas.'
+title: 'Zenrows | Tools'
+description: 'Add Zenrows tools to Mastra agents to read any public page as Markdown, plaintext, HTML or structured JSON fields, and to run batch jobs and crawls, with typed Zod schemas.'
 packages:
   - '@mastra/zenrows'
 ---
 
-# ZenRows
+# Zenrows
 
-The `@mastra/zenrows` package exposes [ZenRows](https://www.zenrows.com) Fetch and Extract as Mastra-compatible tools. ZenRows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input and output schema.
+The `@mastra/zenrows` package exposes the [Zenrows](https://www.zenrows.com) API as Mastra-compatible tools: Fetch and Extract, plus batch jobs, crawls and Extract domain preparation. Zenrows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input schema.
 
-The scrape tool returns a page's content. The extract tool returns the structured fields ZenRows parsed out of a page, such as a product's name and price, with no selectors to write.
+The scrape tool returns a page's content. The extract tool returns the structured fields Zenrows parsed out of a page, such as a product's name and price, with no selectors to write. The [other tools](#more-tools) cover the rest of the API, one tool per endpoint.
 
 ## Installation
 
@@ -21,7 +21,7 @@ Set `ZENROWS_API_KEY` in your environment. You can also pass an API key directly
 
 ## Quick start
 
-Use `createZenrowsTools()` to create both tools with shared configuration:
+Use `createZenrowsTools()` to create every tool with shared configuration:
 
 ```typescript title="src/mastra/tools/index.ts"
 import { createZenrowsTools } from '@mastra/zenrows'
@@ -31,9 +31,9 @@ export const zenrowsTools = createZenrowsTools()
 // export const zenrowsTools = createZenrowsTools({ apiKey: 'your-zenrows-api-key' })
 ```
 
-The returned object contains `zenrowsScrape` and `zenrowsExtract`.
+The returned object contains `zenrowsScrape`, `zenrowsExtract` and the [other tools](#more-tools).
 
-Create either tool separately when an agent doesn't need both:
+Create a tool on its own when an agent doesn't need them all:
 
 ```typescript title="src/mastra/tools/index.ts"
 import { createZenrowsExtractTool, createZenrowsScrapeTool } from '@mastra/zenrows'
@@ -53,21 +53,21 @@ All factories accept `ZenrowsClientOptions`:
   {
     name: 'apiKey',
     type: 'string',
-    description: 'ZenRows API key. Falls back to the `ZENROWS_API_KEY` environment variable.',
+    description: 'Zenrows API key. Falls back to the `ZENROWS_API_KEY` environment variable.',
     isOptional: true,
   },
   {
     name: 'baseUrl',
     type: 'string',
     description:
-      'Override the ZenRows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then `https://api.zenrows.com/v1`.',
+      'Override the Zenrows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then `https://api.zenrows.com/v1`. Batch job tools always use the batch API.',
     isOptional: true,
   },
   {
     name: 'timeout',
     type: 'number',
     description:
-      'Timeout in milliseconds for one request. ZenRows can take up to 3 minutes on a hard page, and a request cut short on your side can still be charged.',
+      'Timeout in milliseconds for one request: {{< request-timeout }}.',
     isOptional: true,
     defaultValue: '180000',
   },
@@ -80,11 +80,11 @@ All factories accept `ZenrowsClientOptions`:
 ]}
 />
 
-A request ZenRows rejects throws a `ZenrowsError` that carries the HTTP `status`, the API error `code` (for example `REQS004` or `REQS007`), its `reason` when it has one, and the API's `detail`. Its message tells the agent what the error means.
+A request Zenrows rejects throws a `ZenrowsError` that carries the HTTP `status`, the API error `code` (for example `REQS004` or `REQS007`), its `reason` when it has one, and the API's `detail`. Its message tells the agent what the error means.
 
 ## Credits
 
-ZenRows charges {{< credit-weights }}. Both tools return the credits a request used as `credits`, read from the `X-Request-Credits` response header, or `null` when the response doesn't carry it. `mode: 'auto'` turns on Adaptive Stealth Mode. {{< adaptive-stealth-mode }}.
+Zenrows charges {{< credit-weights }}. Both tools return the credits a request used as `credits`, read from the `X-Request-Credits` response header, or `null` when the response doesn't carry it. `mode: 'auto'` turns on Adaptive Stealth Mode. {{< adaptive-stealth-mode }}.
 
 ## `createZenrowsScrapeTool()`
 
@@ -104,7 +104,7 @@ const scrapeTool = createZenrowsScrapeTool()
   {
     name: 'response_type',
     type: "'markdown' | 'plaintext' | 'html'",
-    description: 'What to return. `html` returns the page as ZenRows received it.',
+    description: 'What to return. `html` returns the page as Zenrows received it.',
     isOptional: true,
     defaultValue: "'markdown'",
   },
@@ -176,7 +176,7 @@ const scrapeTool = createZenrowsScrapeTool()
 
 ## `createZenrowsExtractTool()`
 
-Creates the `zenrows-extract` tool. Extract returns the fields of a page as JSON, named the way the site names them. It works on any domain ZenRows has prepared. A domain that isn't prepared yet, or a page Extract doesn't recognise, throws a `ZenrowsError` with code `REQS007` and isn't charged.
+Creates the `zenrows-extract` tool. Extract returns the fields of a page as JSON, named the way the site names them. It works on any domain Zenrows has prepared. A domain that isn't prepared yet, or a page Extract doesn't recognise, throws a `ZenrowsError` with code `REQS007` and isn't charged.
 
 ```typescript
 import { createZenrowsExtractTool } from '@mastra/zenrows'
@@ -232,6 +232,14 @@ const extractTool = createZenrowsExtractTool()
 ]}
 />
 
+## More tools
+
+`createZenrowsTools()` also returns a tool for every other endpoint Zenrows offers. Each takes the endpoint's path, query and body fields as its input, and returns the API's answer: JSON parsed, text as a string, and a file such as a PDF as `{ contentType, base64 }`. Batch jobs and crawls run in the background: start one, then read it with the matching tools until it ends.
+
+GENERATED_TOOLS_TABLE
+
+The [Zenrows API reference](https://docs.zenrows.com) describes each endpoint's fields.
+
 ## Use the tools with an agent
 
 ```typescript title="src/mastra/agents/research-agent.ts"
@@ -252,12 +260,12 @@ export const researchAgent = new Agent({
 
 | Variable | Description |
 | - | - |
-| `ZENROWS_API_KEY` | Your ZenRows API key. Used when `apiKey` isn't passed to a factory function. |
+| `ZENROWS_API_KEY` | Your Zenrows API key. Used when `apiKey` isn't passed to a factory function. |
 | `ZENROWS_API_URL` | Optional. Overrides the API base URL when `baseUrl` isn't passed. |
 
 ## Related
 
-- [ZenRows Fetch API reference](https://docs.zenrows.com/fetch/api-reference)
-- [ZenRows Extract documentation](https://docs.zenrows.com/extract/setup)
-- [ZenRows API error codes](https://docs.zenrows.com/api-error-codes)
+- [Zenrows Fetch API reference](https://docs.zenrows.com/fetch/api-reference)
+- [Zenrows Extract documentation](https://docs.zenrows.com/extract/setup)
+- [Zenrows API error codes](https://docs.zenrows.com/api-error-codes)
 - [`createTool()` reference](/reference/tools/create-tool)

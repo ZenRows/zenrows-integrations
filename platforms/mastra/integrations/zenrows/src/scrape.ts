@@ -9,7 +9,7 @@ import { CREDIT_WEIGHTS, FETCH_SUMMARY } from './spec.js';
 const outputSchema = z.object({
   url: z.string(),
   content: z.string().describe('The page as Markdown, plaintext or HTML, or the css_extractor fields as JSON text.'),
-  credits: z.number().nullable().describe('Credits the request used; null when ZenRows did not report them.'),
+  credits: z.number().nullable().describe('Credits the request used; null when Zenrows did not report them.'),
 });
 
 export function createZenrowsScrapeTool(options: ZenrowsClientOptions = {}) {
@@ -17,7 +17,7 @@ export function createZenrowsScrapeTool(options: ZenrowsClientOptions = {}) {
     id: 'zenrows-scrape',
     description:
       FETCH_SUMMARY +
-      ' through ZenRows and return its content: Markdown by default, plaintext, or the HTML. With css_extractor it returns just the named fields as JSON text. For the structured fields of a product, article or listing page with no selectors to write, use zenrows-extract instead. ZenRows charges ' +
+      ' through Zenrows and return its content: Markdown by default, plaintext, or the HTML. With css_extractor it returns just the named fields as JSON text. For the structured fields of a product, article or listing page with no selectors to write, use zenrows-extract instead. Zenrows charges ' +
       CREDIT_WEIGHTS +
       '; mode auto picks the cheapest configuration that works.',
     inputSchema: zenrowsScrapeInputSchema,

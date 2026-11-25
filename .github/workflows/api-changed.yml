@@ -88,8 +88,10 @@ jobs:
           set -euo pipefail
           existing=$(gh issue list --search "\"$ISSUE_TITLE\" in:title" --state open --json number,title --jq ".[] | select(.title == \"$ISSUE_TITLE\") | .number" | head -1)
           # Only a host out of step with the spec is the hosts' problem; anything
-          # else (the spec didn't download, a broken render) is this run's.
-          problems=$(grep -E '^❌ .*(the API has no operation|has no (query|path) parameter|has no JSON body)' validate.log || true)
+          # else (the spec didn't download, a broken render) is this run's. A host's
+          # own scripts/render.mjs words a spec-caused failure "the API spec has…",
+          # "…gives…" or "…takes…".
+          problems=$(grep -E '^❌ .*(the API has no operation|has no (query|path) parameter|has no JSON body|the API spec (has|gives|takes) )' validate.log || true)
 
           if [ "$FAILED" = "true" ] && [ -z "$problems" ]; then
             echo "::error::validate failed for a reason other than the API spec; see the log above."

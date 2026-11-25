@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { requestZenrows, ZenrowsError } from '../client.js';
-import { RESPONSES } from '../spec.js';
+import { REQUEST_TIMEOUT, RESPONSES } from '../spec.js';
 
 const fetchMock = vi.fn<typeof fetch>();
 const problem = (status: number, body: Record<string, unknown>) =>
@@ -113,7 +113,7 @@ describe('requestZenrows', () => {
 
   it('fails at request time, before any call, when no key is set', async () => {
     await expect(requestZenrows({ fetch: fetchMock }, { url: 'https://example.com/' })).rejects.toThrow(
-      'ZenRows API key is required',
+      'Zenrows API key is required',
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -160,7 +160,7 @@ describe('requestZenrows', () => {
 
     expect(error.status).toBe(502);
     expect(error.code).toBeUndefined();
-    expect(error.message).toContain('ZenRows answered 502.');
+    expect(error.message).toContain('Zenrows answered 502.');
     expect(error.message).toContain('Bad gateway');
   });
 
@@ -174,6 +174,6 @@ describe('requestZenrows', () => {
 
     await expect(
       requestZenrows({ apiKey: 'k', timeout: 20, fetch: fetchMock }, { url: 'https://example.com/' }),
-    ).rejects.toThrow('ZenRows did not answer within 20 ms');
+    ).rejects.toThrow(`Zenrows did not answer within 20 ms. ${REQUEST_TIMEOUT.charAt(0).toUpperCase()}`);
   });
 });

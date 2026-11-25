@@ -75,7 +75,7 @@ const entry = `
         {
           type: \x27doc\x27,
           id: \x27tools/zenrows\x27,
-          label: \x27ZenRows\x27,
+          label: \x27Zenrows\x27,
           customProps: { icon: \x27/img/integrations/zenrows.svg\x27 },
         },`;
 fs.writeFileSync(file, source.slice(0, at) + entry + source.slice(at));
@@ -93,4 +93,4 @@ fi
 docker run --rm -v "$mastra:/work" -w /work -v mastra-pnpm-store:/pnpm-store -v mastra-tools:/tools \
   -v "$repo/platforms/mastra/scripts/gates.sh:/gates.sh:ro" \
   -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -e CI=1 -e BASE_SHA="$base" -e GATES -e DOCS_BUILD -e LIVE \
-  "${network[@]}" "$node_image" bash /gates.sh
+  ${network[@]+"${network[@]}"} "$node_image" bash /gates.sh
