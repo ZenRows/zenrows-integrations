@@ -605,6 +605,15 @@ test("a parameter the Mastra tools neither expose nor exclude fails", () => {
   fails({ "shared/endpoints.yaml": endpoints }, "the scrape tool neither exposes nor excludes custom_headers from shared/endpoints.yaml's fetch")();
 });
 
+test("a response_type value the Mastra scrape tool neither offers nor excludes fails", () => {
+  const spec = structuredClone(published);
+  const parameters = [...(spec.paths["/"].parameters ?? []), ...(spec.paths["/"].get.parameters ?? [])];
+  const param = parameters.map((p) => (p.$ref ? spec.components.parameters[p.$ref.split("/").pop()] : p)).find((p) => p.name === "response_type");
+  assert.ok(param?.schema?.enum, "GET / has a response_type enum");
+  param.schema.enum.push("docx");
+  fails({ "openapi-rt.json": JSON.stringify(spec) }, "the API spec gives response_type docx, which the scrape tool neither offers nor excludes", { ZENROWS_OPENAPI: "openapi-rt.json" })();
+});
+
 // Mastra generates a tool for every endpoint shared/billing.yaml offers that has no hand-written one.
 test("an endpoint shared/billing.yaml offers becomes a Mastra tool", () => {
   const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";

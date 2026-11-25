@@ -64,11 +64,17 @@ const tools = {
 
 // The spec's response_type offers pdf, a binary body with no place in a string
 // output, and has no html, which the scrape tool sends as no response_type at
-// all. The spec's description names its own values, so it is replaced.
+// all. The spec's description names its own values, so it is replaced. Every
+// value the spec gives is offered or excluded with a reason, so a new one fails
+// the render until someone decides, as a new parameter does.
+const responseTypes = {
+    offered: ["markdown", "plaintext"],
+    excluded: { pdf: "a binary body has no place in the tool's string content" },
+};
 const replaced = {
     response_type: {
         type: "string",
-        enum: ["markdown", "plaintext", "html"],
+        enum: [...responseTypes.offered, "html"],
         description:
             "What to return: 'markdown' (the default) for the page as Markdown, 'plaintext' for its text alone, 'html' for the page's own markup.",
     },
@@ -317,6 +323,14 @@ export default function render({ apiEndpoints, fill }) {
         const stale = Object.keys(excluded).filter((name) => !(name in sliced.properties));
         if (stale.length) throw new Error(`${where}: the ${tool} tool excludes ${stale.join(", ")}, which ${slice} no longer has`);
 
+        if (expose.includes("response_type")) {
+            const values = (sliced.properties.response_type ?? operation.properties?.response_type)?.enum ?? [];
+            const known = [...responseTypes.offered, ...Object.keys(responseTypes.excluded)];
+            const unplaced = values.filter((v) => !known.includes(v));
+            if (unplaced.length) throw new Error(`${where}: the API spec gives response_type ${unplaced.join(", ")}, which the ${tool} tool neither offers nor excludes; add each to responseTypes`);
+            const gone = known.filter((v) => !values.includes(v));
+            if (gone.length) throw new Error(`${where}: the API spec gives response_type no ${gone.join(", ")}, which responseTypes still lists`);
+        }
         const required = new Set([...(sliced.required ?? []), ...(operation.required ?? [])]);
         const fields = expose.map((name) => {
             const schema = replaced[name] ?? sliced.properties[name] ?? operation.properties?.[name];
