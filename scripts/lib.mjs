@@ -194,7 +194,7 @@ function sharedEndpoints() {
 // name or the operation, id the shared name or the operationId in snake_case,
 // description undefined where the spec has none, input the query, path and body
 // schemas it takes, security its key schemes from the spec, and billing its kind
-// in shared/billing.yaml.
+// in shared/billing.yaml. apiEndpoints adds wording, from shared/actions.yaml.
 const httpMethods = ["get", "post", "put", "patch", "delete"];
 // shared/billing.yaml as { endpoint: kind }. Every name must be an API operation or
 // a shared endpoint, in one kind only, and every API operation must be named,
@@ -232,7 +232,38 @@ export function apiNotOffered(spec) {
   return all.filter((operation) => billing[operation] === "not_offered");
 }
 
+// shared/actions.yaml: how each endpoint we offer reads as an action or tool.
+function sharedActions() {
+  const file = join(root, "shared", "actions.yaml");
+  return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
+}
+
+// An endpoint's wording from shared/actions.yaml: { name, description, ai,
+// props }, each undefined where the file leaves it to the spec. props holds
+// action_props for the fields the endpoint takes, then its own. A field the
+// endpoint doesn't take fails, and so does an entry for no endpoint we offer
+// (checked in apiEndpoints): a spec change that drops either says "the API spec".
+function endpointWording(endpoint, actions) {
+  const own = actions.actions?.[endpoint.id] ?? {};
+  const takes = Object.values(endpoint.input).flatMap((schema) => Object.keys(schema.properties ?? {}));
+  for (const name of Object.keys(own.props ?? {})) {
+    if (!takes.includes(name)) throw new Error(`shared/actions.yaml: actions.${endpoint.id}.props describes "${name}", but the API spec takes no "${name}" in ${endpoint.operation}`);
+  }
+  const shared = Object.fromEntries(Object.entries(actions.action_props ?? {}).filter(([name]) => takes.includes(name)));
+  return { name: own.name, description: own.description, ai: own.ai, props: { ...shared, ...own.props } };
+}
+
 export function apiEndpoints(spec, where) {
+  const endpoints = offeredEndpoints(spec, where);
+  const actions = sharedActions();
+  const ids = endpoints.map((e) => e.id);
+  for (const id of Object.keys(actions.actions ?? {})) {
+    if (!ids.includes(id)) throw new Error(`shared/actions.yaml: actions.${id} is for no endpoint we offer; the API spec has none by that id, or shared/billing.yaml lists it as not_offered`);
+  }
+  return endpoints.map((e) => ({ ...e, wording: endpointWording(e, actions) }));
+}
+
+function offeredEndpoints(spec, where) {
   const all = apiOperations(spec);
   const shared = sharedEndpoints();
   const billing = sharedBilling(spec, all, shared);

@@ -12,7 +12,7 @@ export const requestExtractDomainAction = createAction({
   description: "Ask Zenrows to prepare a domain for Extract. Preparation usually takes minutes.",
   audience: 'both',
   aiMetadata: {
-    description: "Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe.",
+    description: "Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe. Costs no credits.",
     idempotent: false,
   },
   props: {

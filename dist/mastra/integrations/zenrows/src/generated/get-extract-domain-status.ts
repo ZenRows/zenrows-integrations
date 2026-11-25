@@ -16,7 +16,7 @@ export const zenrowsGetExtractDomainStatusInputSchema = z.object({
 export function createZenrowsGetExtractDomainStatusTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-get-extract-domain-status',
-    description: "Track a domain's preparation. How far a submission has got. Branch on `status` (`preparing`, `ready`, `failed`); `state` is the finer-grained step. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints. This call uses no credits.",
+    description: 'Reads the preparation status of a domain submitted with Request Extract Domain. Branch on status: preparing, ready or failed. Costs no credits; safe to retry.',
     inputSchema: zenrowsGetExtractDomainStatusInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

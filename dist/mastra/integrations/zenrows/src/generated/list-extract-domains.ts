@@ -15,7 +15,7 @@ export const zenrowsListExtractDomainsInputSchema = z.object({
 export function createZenrowsListExtractDomainsTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-list-extract-domains',
-    description: 'List the domains Extract serves. The domains Extract lists publicly as ready. A domain in this list works with `extract=auto`. The list is not complete: some prepared domains are not listed and still work, so a domain missing from it is not proof it answers `REQS007`. Send the request and branch on `REQS007`, or prepare the domain with `requestExtractDomain`. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints. This call uses no credits.',
+    description: 'Lists domains that Extract announces as ready. The list is not complete: a domain missing from it may still work, so try Extract Structured Data and branch on REQS007 instead of relying on it. Costs no credits; safe to retry.',
     inputSchema: zenrowsListExtractDomainsInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

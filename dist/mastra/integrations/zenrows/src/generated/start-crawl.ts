@@ -14,15 +14,15 @@ export const zenrowsStartCrawlInputSchema = z.object({
   depth: z.number().int().min(1).max(100000).optional().describe('How many link steps to follow from the start URL. At `1`, the links on the start page. Omit it to follow links until `max_items` or `max_pages` stops the crawl.'),
   max_items: z.number().int().min(1).max(100000).optional().describe('Stop after keeping this many URLs.'),
   max_pages: z.number().int().min(1).max(100000).optional().describe('Stop after fetching this many pages. Caps what the crawl costs. If both limits are reached together, `stop_reason` is `max_pages`.'),
-  include_patterns: z.array(z.string()).optional().describe('Keep, and open, only URLs that contain at least one of these texts, such as `/product/`. The start URL is never returned.'),
+  include_patterns: z.array(z.string()).optional().describe('Keep, and follow, only URLs that contain one of these texts, such as /product/.'),
   exclude_patterns: z.array(z.string()).optional().describe('Drop URLs that contain any of these texts, even when they match an include pattern.'),
-  output_format: z.literal('html').optional().describe('`html` also returns the HTML of each kept page. Omit it to get URLs only.'),
+  output_format: z.literal('html').optional().describe('HTML also fetches and keeps the HTML of each page found. Leave it empty to get URLs only.'),
 });
 
 export function createZenrowsStartCrawlTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-start-crawl',
-    description: 'Start a crawl. Start a crawl from one URL and return at once with `202 Accepted`, the crawl in the body and its path in the `Location` header. Each page it opens is one Fetch request with Adaptive Stealth Mode, billed 1 to 25 credits; failed pages are not billed. Documented at https://docs.zenrows.com/crawl/endpoints#start-a-crawl. A job is billed after it runs, by the credits each page or task it fetches uses: 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
+    description: 'Starts a crawl from one URL that follows links on the same domain and returns its crawl_id at once. Use it to discover the URLs of a site or section; use Create Batch Job when you already have the URLs. Read results with Get Crawl or Download Crawl Results. Each page fetched costs 1 to 25 credits, and each call starts a new crawl, so a retry duplicates the work.',
     inputSchema: zenrowsStartCrawlInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

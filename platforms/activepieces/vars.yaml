@@ -7,96 +7,12 @@ host_full: "Activepieces"
 # Moving it is its own PR, so CI shows whether their newer code breaks the piece.
 upstream: "6f4be340d7c4bef9fb6ff874ca72224e4933d3d2"
 
-# How the generated actions read in Activepieces. The spec's own summaries and
-# descriptions are written for the API docs: they name operationIds and paths
-# the piece has no action for, and say nothing to an agent choosing between
-# tools. Per action (by its name): name is the display name, description the
-# line under it, ai its aiMetadata description (when to pick it, what it costs,
-# whether a retry is safe), props a description for one of its fields, omit
-# the optional fields to leave out of the form (they are never sent).
-# action_props describes a field in every action that has it, unless the action
-# gives its own. Anything left out comes from the spec, so a new endpoint still
-# gets an action; classification is derived from the method unless set here.
-action_props:
-  job_id: "The batch job's ID, as Create Batch Job returned it (job_id)."
-  task_id: "The task's ID, from Get Batch Results (task_id)."
-  crawl_id: "The crawl's ID, as Start Crawl returned it (crawl_id)."
-actions:
-  extract:
-    name: "Extract Structured Data"
-    description: "Get a page's data as JSON without writing selectors, or map your own fields to CSS selectors."
-    ai: "Fetches one page and returns its data as structured JSON: extract=auto returns the site's own field names, or css_extractor maps your keys to CSS selectors. Pick it when you need specific fields; use Scrape URL for the whole page as Markdown or HTML. A domain Extract has not prepared yet answers REQS007: prepare it with Request Extract Domain. Billed as the request it runs; safe to retry."
-    props:
-      extract: "Auto and Native return the website's own field names; Standard returns one schema shared by every site in a vertical (real estate only for now). Leave it empty to use CSS Extractor instead. A domain that isn't prepared yet fails with REQS007: prepare it with Request Extract Domain."
-  list_extract_domains:
-    name: "List Extract Domains"
-    description: "List the domains Extract serves publicly."
-    ai: "Lists domains that Extract announces as ready. The list is not complete: a domain missing from it may still work, so try Extract Structured Data and branch on REQS007 instead of relying on it. Costs no credits; safe to retry."
-  request_extract_domain:
-    name: "Request Extract Domain"
-    description: "Ask Zenrows to prepare a domain for Extract. Preparation usually takes minutes."
-    ai: "Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe."
-    props:
-      example_urls: "1 to 5 page URLs on the domain. At least 3 pages of your main page type (for example product pages) work best; other page types can fill the rest."
-  get_extract_domain_status:
-    name: "Get Extract Domain Status"
-    description: "Check how far a domain's preparation for Extract has got."
-    ai: "Reads the preparation status of a domain submitted with Request Extract Domain. Branch on status: preparing, ready or failed. Costs no credits; safe to retry."
-  create_batch_job:
-    name: "Create Batch Job"
-    description: "Scrape many URLs in one job, now or on a schedule. Read the results later with Get Batch Job and Get Batch Results."
-    ai: "Creates a batch job that scrapes a list of URLs (up to 100,000) in the background and returns its job_id at once. Pick it over Scrape URL for more than a handful of pages. Poll Get Batch Job until latest_run.status is terminal, then page through Get Batch Results. Each call creates a new job and spends credits per page, so a retry duplicates the work."
-    props:
-      type: "Regular runs once, now. Scheduled runs on the schedule you give in Schedule."
-      status: "Closed (the default) means Tasks is the full list of URLs. Open is only for regular jobs."
-      zenrows_params: 'Scrape options for every task, as JSON, for example {"mode": "auto"} or {"js_render": "true", "response_type": "markdown"}. Supported keys: mode, js_render, js_instructions, custom_headers, premium_proxy, proxy_country, session_id, original_status, allowed_status_codes, wait_for, wait, block_resources, json_response, css_extractor, autoparse, extract, extract_fields, response_type, outputs. Screenshots are not supported. A task''s own zenrows_params win over these.'
-      schedule: 'For a scheduled job only, as JSON with exactly one of at, rate or calendar, for example {"rate": "1 day"}.'
-      tasks: 'The URLs to scrape, as a JSON list, for example [{"url": "https://example.com/"}]. Each task can also have external_id, metadata and its own zenrows_params.'
-      file_input_id: "The ID of a CSV of URLs uploaded through the Zenrows API, instead of Tasks."
-      external_id: "Your own ID for the job, returned with it. It doesn't need to be unique."
-      name: "A label for the job, up to 100 characters."
-      metadata: "Your own key/value pairs, as JSON, kept with the job."
-      webhook: 'Where to send a notification when the run ends, as JSON, for example {"url": "https://example.com/hook"}.'
-  get_batch_job:
-    name: "Get Batch Job"
-    description: "Read a batch job and the progress of its latest run."
-    ai: "Reads a batch job with its latest run: progress in latest_run.stats, spend in latest_run.stats.spend. Poll it after Create Batch Job until latest_run.status is terminal, then read Get Batch Results. Costs no credits; safe to retry."
-  cancel_batch_job:
-    name: "Cancel Batch Job"
-    description: "Stop the batch job's current run. Tasks not yet scraped are not scraped or billed."
-    ai: "Stops a batch job's current run for good; tasks already scraped keep their results. A run that already ended answers 409 run_not_stoppable. It cannot be undone."
-  get_batch_results:
-    name: "Get Batch Results"
-    description: "List the tasks of a batch job's latest run with their status, one page at a time."
-    ai: "Lists the tasks of a batch job's latest run, one page at a time, with each task's URL, status and task_id. Filter by status, and pass next_cursor back as Cursor for the next page. Read a task's page with Get Batch Task Content. Costs no credits; safe to retry."
-  get_batch_task_content:
-    name: "Get Batch Task Content"
-    description: "Get the scraped page of one task in a batch job's latest run."
-    ai: "Returns what one task of a batch job scraped: HTML, Markdown or JSON, depending on the job's zenrows_params. A task still processing answers 409 task_not_ready. Costs no credits; safe to retry."
-  start_crawl:
-    name: "Start Crawl"
-    description: "Crawl a site from one URL to find its pages, and optionally fetch their HTML."
-    ai: "Starts a crawl from one URL that follows links on the same domain and returns its crawl_id at once. Use it to discover the URLs of a site or section; use Create Batch Job when you already have the URLs. Read results with Get Crawl or Download Crawl Results. Each page fetched costs 1 to 25 credits, and each call starts a new crawl, so a retry duplicates the work."
-    props:
-      include_patterns: "Keep, and follow, only URLs that contain one of these texts, such as /product/."
-      exclude_patterns: "Drop URLs that contain any of these texts, even when they match an include pattern."
-      output_format: "HTML also fetches and keeps the HTML of each page found. Leave it empty to get URLs only."
-  get_crawl:
-    name: "Get Crawl"
-    description: "Read a crawl's status and one page of the URLs it found."
-    ai: "Reads a crawl's status, coverage and one page of results. While it runs, pass next_cursor back as Cursor to get only new URLs; it is null once the crawl has ended and everything is read. Costs no credits; safe to retry."
-  download_crawl:
-    name: "Download Crawl Results"
-    description: "Get every result of a crawl as a list, one item per URL."
-    ai: "Returns every result of a crawl as a list, one object per URL (with content_status and the HTML in content when the crawl has an output format). Use it once the crawl has ended; Get Crawl pages through the same results. Costs no credits; safe to retry."
-  get_crawl_content:
-    name: "Get Crawl Page"
-    description: "Get the HTML of one page a crawl fetched."
-    ai: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Costs no credits; safe to retry."
-    # download only asks the API to send the page as an attachment: the step
-    # returns the same HTML either way.
-    omit: [download]
-  stop_crawl:
-    name: "Stop Crawl"
-    description: "Stop a running crawl. Pages already being fetched finish and are kept."
-    ai: "Stops a running crawl: no new page is fetched, pages in progress finish and are billed. Read it afterwards with Get Crawl for the final results. Stopping a crawl that already ended returns its final state."
+# The wording of the generated actions is shared with Mastra's tools, in
+# shared/actions.yaml. What only Activepieces has, by endpoint id:
+# omit leaves an optional field out of the form (it is never sent), because it
+# means nothing in Activepieces; classification sets the badge where the one
+# derived from the method is wrong.
+omit:
+  # download only asks the API to send the page as an attachment: the step
+  # returns the same HTML either way.
+  get_crawl_content: [download]

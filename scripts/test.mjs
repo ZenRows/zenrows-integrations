@@ -332,9 +332,12 @@ typesSpec.paths["/stub-lines/{job_id}"] = {
 };
 const actionFile = (name) => `dist/activepieces/src/lib/actions/${name}.ts`;
 const actionFiles = ["generated", "get-job", "create-job", "get-types", "get-lines", "stop-lines", "fetch-page", "fetch", "extract"].map(actionFile);
-// vars.yaml with its own action wording replaced (none by default), so the stub
-// endpoints read the spec.
-const apVars = (wording = "\n") => ({ "platforms/activepieces/vars.yaml": readFileSync(join(root, "platforms/activepieces/vars.yaml"), "utf8").replace(/\naction_props:[\s\S]*$/, wording) });
+// shared/actions.yaml with no wording by default, so the stub endpoints read the
+// spec; and Activepieces' vars.yaml with its own omit and classification replaced.
+const apVars = (own = "\n", wording = "") => ({
+  "shared/actions.yaml": wording,
+  "platforms/activepieces/vars.yaml": readFileSync(join(root, "platforms/activepieces/vars.yaml"), "utf8").replace(/\n# The wording of the generated actions[\s\S]*$/, own),
+});
 const typesBilling = (kinds) => {
   const billing = parseYaml(billingWith(kinds));
   for (const op of ["GET /stub-types", "GET /stub-lines/{job_id}", "POST /stub-lines/{job_id}"]) {
@@ -342,7 +345,7 @@ const typesBilling = (kinds) => {
   }
   return { "openapi-tokens.json": JSON.stringify(typesSpec), "shared/billing.yaml": JSON.stringify(billing) };
 };
-const actions = (kinds, wording) => run({ ...typesBilling(kinds), ...apVars(wording) }, tokenSpec, actionFiles);
+const actions = (kinds, own, wording) => run({ ...typesBilling(kinds), ...apVars(own, wording) }, tokenSpec, actionFiles);
 test("Activepieces gets an action per offered endpoint, and none for the rest", () => {
   const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] });
   assert.ok(r.ok, r.out);
@@ -389,9 +392,9 @@ test("Activepieces reads NDJSON as a list, and a stop is destructive", () => {
   const stop = r.dist(actionFile("stop-lines"));
   assert.ok(stop.includes('classification: "DESTRUCTIVE",') && stop.includes("idempotent: false,"), stop);
 });
-test("vars.yaml's actions and action_props give an action its wording", () => {
-  const wording = `\naction_props:\n  job_id: "The job, from Create Job."\nactions:\n  get_job:\n    name: "Get Job"\n    description: "Read one job."\n    ai: "Reads a job by its ID. Safe to retry."\n    classification: SEARCH\n  create_job:\n    props:\n      urls: "The URLs to scrape."\n`;
-  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, wording);
+const stubWording = `action_props:\n  job_id: "The job, from Create Job."\nactions:\n  get_job:\n    name: "Get Job"\n    description: "Read one job."\n    ai: "Reads a job by its ID. Safe to retry."\n  create_job:\n    props:\n      urls: "The URLs to scrape."\n`;
+test("shared/actions.yaml gives an action its wording, and vars.yaml its classification", () => {
+  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, `\nclassification:\n  get_job: SEARCH\n`, stubWording);
   assert.ok(r.ok, r.out);
   const job = r.dist(actionFile("get-job"));
   for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
@@ -400,7 +403,7 @@ test("vars.yaml's actions and action_props give an action its wording", () => {
   assert.ok(r.dist(actionFile("create-job")).includes('urls: Property.Array({ displayName: "URLs", description: "The URLs to scrape.", required: false }),'));
 });
 test("vars.yaml's omit leaves an optional field out of the form and the request", () => {
-  const r = actions({ free: ["GET /stub-types"] }, `\nactions:\n  get_types:\n    omit: [download, filter]\n`);
+  const r = actions({ free: ["GET /stub-types"] }, `\nomit:\n  get_types: [download, filter]\n`);
   assert.ok(r.ok, r.out);
   const ts = r.dist(actionFile("get-types"));
   assert.ok(!ts.includes("download:") && !ts.includes("filter:"), ts);
@@ -408,16 +411,30 @@ test("vars.yaml's omit leaves an optional field out of the form and the request"
 });
 test("omitting a required field fails the Activepieces render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-  ...apVars(`\nactions:\n  get_job:\n    omit: [job_id]\n`),
-}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.omit drops "job_id", which GET /stub/{job_id} requires', tokenSpec));
-test("wording for a field an action doesn't take fails the Activepieces render", fails({
+  ...apVars(`\nomit:\n  get_job: [job_id]\n`),
+}, 'platforms/activepieces/scripts/render.mjs: vars.yaml omit.get_job drops "job_id", which the API spec has as required in GET /stub/{job_id}', tokenSpec));
+test("shared wording for a field an endpoint doesn't take fails the render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-  ...apVars(`\nactions:\n  get_job:\n    props:\n      nope: "x"\n`),
-}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.props describes "nope", which GET /stub/{job_id} doesn\'t take', tokenSpec));
+  ...apVars(undefined, `actions:\n  get_job:\n    props:\n      nope: "x"\n`),
+}, 'shared/actions.yaml: actions.get_job.props describes "nope", but the API spec takes no "nope" in GET /stub/{job_id}', tokenSpec));
+test("shared wording for an endpoint we don't offer fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  create_job:\n    name: "Create Job"\n`),
+}, "shared/actions.yaml: actions.create_job is for no endpoint we offer", tokenSpec));
+test("Mastra's generated tools read the same shared wording as Activepieces' actions", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const docs = "dist/mastra/docs/src/content/en/integrations/tools/zenrows.mdx";
+  const r = run({ ...typesBilling({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }), ...apVars(undefined, stubWording) }, tokenSpec, [tool, docs, actionFile("get-job")]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist(tool), /description: 'Reads a job by its ID\. Safe to retry\.',/, "the ai text alone, with no billing sentence after it");
+  assert.match(r.dist(tool), /job_id: z\.string\(\)\.describe\('The job, from Create Job\.'\)/);
+  assert.match(r.dist(docs), /\| `zenrows-get-job` \| Read one job\. \| Free \|/);
+  assert.ok(r.dist(actionFile("get-job")).includes('description: "Reads a job by its ID. Safe to retry.",'));
+});
 test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
   "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
   "shared/billing.yaml": typesBilling({ free: ["GET /stub-types"] })["shared/billing.yaml"],
-}, "platforms/activepieces/scripts/render.mjs: GET /stub-types takes the key neither in X-API-Key nor as apikey", tokenSpec));
+}, "platforms/activepieces/scripts/render.mjs: the API spec takes the key for GET /stub-types neither in X-API-Key nor as apikey", tokenSpec));
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);

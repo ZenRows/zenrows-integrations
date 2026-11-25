@@ -73,11 +73,14 @@ Every fact about the API is rendered from the published spec
   outside the slice; its schema still comes from the spec.
 - **The generated tools**, whole: each one's inputs (nested objects, lists and
   `oneOf` included), its server, path and where it takes the key, what each
-  response status means, and its description: the spec's summary, the first
-  paragraph of its description, then how it's billed. The billing sentence comes
-  from its kind in `shared/billing.yaml`, through `shared/text/billing-free.md`
-  or `shared/text/billing-after-run.md` and the credit weights; a kind with no
-  sentence fails the render. Mastra's oxfmt config skips `**/generated/**`, so
+  response status means. Its description and its inputs' descriptions come
+  from `shared/actions.yaml` (`ai` and `props`), the text Activepieces' actions
+  use, which already says what each call costs; the docs page's table uses its
+  `description`. Where that file says nothing, the spec's: the summary, the
+  first paragraph of its description, then how it's billed. That billing
+  sentence comes from its kind in `shared/billing.yaml`, through
+  `shared/text/billing-free.md` or `shared/text/billing-after-run.md` and the
+  credit weights; a kind with no sentence fails the render. Mastra's oxfmt config skips `**/generated/**`, so
   these files are written plainly rather than in oxfmt's layout.
 - **The base URL** is `{{api:fetch server}}`.
 - **The error messages.** A `ZenrowsError` carries the status, the API's `code`,

@@ -12,13 +12,13 @@ const operation: ZenrowsOperation = {"method":"GET","server":"https://api.zenrow
 export const zenrowsGetCrawlInputSchema = z.object({
   cursor: z.string().optional().describe('The `next_cursor` from the previous read. Omit it to start from the first result.'),
   limit: z.number().int().min(1).max(10000).optional().describe('How many results to return.'),
-  crawl_id: z.string().describe("The crawl's ID, as returned when it started."),
+  crawl_id: z.string().describe("The crawl's ID, as Start Crawl returned it (crawl_id)."),
 });
 
 export function createZenrowsGetCrawlTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-get-crawl',
-    description: 'Read a crawl and its results. The crawl, its coverage so far and one page of results. While it runs, `next_cursor` is never `null`: read again with the same cursor to get only the new URLs. Each URL is returned once. Documented at https://docs.zenrows.com/crawl/endpoints#read-a-crawl. This call uses no credits.',
+    description: "Reads a crawl's status, coverage and one page of results. While it runs, pass next_cursor back as Cursor to get only new URLs; it is null once the crawl has ended and everything is read. Costs no credits; safe to retry.",
     inputSchema: zenrowsGetCrawlInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

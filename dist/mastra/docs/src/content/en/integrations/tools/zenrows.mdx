@@ -238,19 +238,19 @@ const extractTool = createZenrowsExtractTool()
 
 | Factory | Tool ID | What it does | Billing |
 | - | - | - | - |
-| `createZenrowsListExtractDomainsTool()` | `zenrows-list-extract-domains` | List the domains Extract serves | Free |
-| `createZenrowsRequestExtractDomainTool()` | `zenrows-request-extract-domain` | Ask for a domain to be prepared for Extract | Free |
-| `createZenrowsGetExtractDomainStatusTool()` | `zenrows-get-extract-domain-status` | Track a domain's preparation | Free |
-| `createZenrowsCreateBatchJobTool()` | `zenrows-create-batch-job` | Create a batch job (many URLs in one request) | After it runs, per page or task |
-| `createZenrowsGetBatchJobTool()` | `zenrows-get-batch-job` | Read a job and its latest run | Free |
-| `createZenrowsCancelBatchJobTool()` | `zenrows-cancel-batch-job` | Cancel the current run | Free |
-| `createZenrowsGetBatchResultsTool()` | `zenrows-get-batch-results` | Page through per-task results for the latest run of a job | Free |
-| `createZenrowsGetBatchTaskContentTool()` | `zenrows-get-batch-task-content` | Fetch the scraped content for a task in the latest run | Free |
-| `createZenrowsStartCrawlTool()` | `zenrows-start-crawl` | Start a crawl | After it runs, per page or task |
-| `createZenrowsGetCrawlTool()` | `zenrows-get-crawl` | Read a crawl and its results | Free |
-| `createZenrowsDownloadCrawlTool()` | `zenrows-download-crawl` | Download all results | Free |
-| `createZenrowsGetCrawlContentTool()` | `zenrows-get-crawl-content` | Read one page's HTML | Free |
-| `createZenrowsStopCrawlTool()` | `zenrows-stop-crawl` | Stop a crawl | Free |
+| `createZenrowsListExtractDomainsTool()` | `zenrows-list-extract-domains` | List the domains Extract serves publicly. | Free |
+| `createZenrowsRequestExtractDomainTool()` | `zenrows-request-extract-domain` | Ask Zenrows to prepare a domain for Extract. Preparation usually takes minutes. | Free |
+| `createZenrowsGetExtractDomainStatusTool()` | `zenrows-get-extract-domain-status` | Check how far a domain's preparation for Extract has got. | Free |
+| `createZenrowsCreateBatchJobTool()` | `zenrows-create-batch-job` | Scrape many URLs in one job, now or on a schedule. Read the results later with Get Batch Job and Get Batch Results. | After it runs, per page or task |
+| `createZenrowsGetBatchJobTool()` | `zenrows-get-batch-job` | Read a batch job and the progress of its latest run. | Free |
+| `createZenrowsCancelBatchJobTool()` | `zenrows-cancel-batch-job` | Stop the batch job's current run. Tasks not yet scraped aren't scraped or billed. | Free |
+| `createZenrowsGetBatchResultsTool()` | `zenrows-get-batch-results` | List the tasks of a batch job's latest run with their status, one page at a time. | Free |
+| `createZenrowsGetBatchTaskContentTool()` | `zenrows-get-batch-task-content` | Get the scraped page of one task in a batch job's latest run. | Free |
+| `createZenrowsStartCrawlTool()` | `zenrows-start-crawl` | Crawl a site from one URL to find its pages, and optionally fetch their HTML. | After it runs, per page or task |
+| `createZenrowsGetCrawlTool()` | `zenrows-get-crawl` | Read a crawl's status and one page of the URLs it found. | Free |
+| `createZenrowsDownloadCrawlTool()` | `zenrows-download-crawl` | Get every result of a crawl as a list, one item per URL. | Free |
+| `createZenrowsGetCrawlContentTool()` | `zenrows-get-crawl-content` | Get the HTML of one page a crawl fetched. | Free |
+| `createZenrowsStopCrawlTool()` | `zenrows-stop-crawl` | Stop a running crawl. Pages already being fetched finish and are kept. | Free |
 
 The [Zenrows API reference](https://docs.zenrows.com) describes each endpoint's fields.
 

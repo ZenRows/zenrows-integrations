@@ -11,14 +11,14 @@ const operation: ZenrowsOperation = {"method":"GET","server":"https://api.zenrow
 
 export const zenrowsGetCrawlContentInputSchema = z.object({
   download: z.boolean().optional().describe('`true` returns the page as a file to save.'),
-  crawl_id: z.string().describe("The crawl's ID, as returned when it started."),
+  crawl_id: z.string().describe("The crawl's ID, as Start Crawl returned it (crawl_id)."),
   content_id: z.string().describe("From the result's `content_url`."),
 });
 
 export function createZenrowsGetCrawlContentTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-get-crawl-content',
-    description: "Read one page's HTML. The HTML of one kept page, for a crawl started with `output_format`. Take the path from the result's `content_url`. Documented at https://docs.zenrows.com/crawl/endpoints#read-a-page. This call uses no credits.",
+    description: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Costs no credits; safe to retry.",
     inputSchema: zenrowsGetCrawlContentInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

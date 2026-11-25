@@ -13,9 +13,9 @@ import { readFileSync } from "node:fs";
 //
 // Every other endpoint we offer (shared/billing.yaml) gets a generated tool in
 // src/generated/, the way the Activepieces piece gets its actions: one input
-// per path, query or body field, the spec's summary and description, and how
-// it's billed. A new endpoint in shared/billing.yaml is a new tool at the next
-// render. Mastra's oxfmt config skips **/generated/**, its place for generated code.
+// per path, query or body field, worded by shared/actions.yaml (the same text as
+// those actions), and from the spec where it says nothing. A new endpoint in
+// shared/billing.yaml is a new tool at the next render. Mastra's oxfmt config skips **/generated/**, its place for generated code.
 //
 // The docs page is scripts/docs-page.mdx with the generated tools' table added.
 //
@@ -156,7 +156,7 @@ const header = `// Generated from the Zenrows API spec (https://www.zenrows.com/
 
 // A generated tool's input field as a zod expression, from its JSON Schema,
 // nested objects and lists included. Defaults are left to the API.
-function zodValue(name, schema, required) {
+function zodValue(name, schema, required, text) {
     let base;
     const alternatives = schema.oneOf ?? schema.anyOf;
     if (schema.enum) {
@@ -202,7 +202,8 @@ function zodValue(name, schema, required) {
         throw new Error(`${where}: the API spec gives ${name} type ${schema.type}, which this generator does not map`);
     }
     if (!required) base += ".optional()";
-    if (schema.description) base += `.describe(${quote(schema.description.trim())})`;
+    const description = text ?? schema.description?.trim();
+    if (description) base += `.describe(${quote(description)})`;
     return base;
 }
 
@@ -239,17 +240,18 @@ function generatedTool(endpoint, fill) {
             if (fields.some(([taken]) => taken === field)) {
                 throw new Error(`${where}: the API spec has "${field}" in two places of ${endpoint.operation}`);
             }
-            fields.push([field, zodValue(field, value, required.has(field))]);
+            fields.push([field, zodValue(field, value, required.has(field), endpoint.wording.props[field])]);
         }
     }
 
-    // The summary, the description's first paragraph (the rest is for the API
-    // docs), then how it's billed.
+    // shared/actions.yaml's ai, which already says what it costs. Without it: the
+    // summary, the description's first paragraph (the rest is for the API docs),
+    // then how it's billed.
     const paragraph = (endpoint.description ?? "").trim().split(/\n\s*\n/)[0].replace(/\s*\n\s*/g, " ");
     const summary = endpoint.name.replace(/\.$/, "");
-    const description = [`${summary}.`, paragraph, `${billing.charAt(0).toUpperCase()}${billing.slice(1)}`]
-        .filter(Boolean)
-        .join(" ");
+    const description =
+        endpoint.wording.ai ??
+        [`${summary}.`, paragraph, `${billing.charAt(0).toUpperCase()}${billing.slice(1)}`].filter(Boolean).join(" ");
 
     const file = `${header}import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
@@ -281,8 +283,10 @@ function docsTable(tools) {
     const rows = tools.map(({ endpoint, name }) => {
         const label = billingLabels[endpoint.billing];
         if (!label) throw new Error(`${where}: no docs billing label for "${endpoint.billing}"; add one to billingLabels`);
-        if (/[{}<>|]/.test(endpoint.name)) throw new Error(`${where}: the API spec's summary of ${endpoint.operation} has a character MDX would read`);
-        return `| \`createZenrows${name}Tool()\` | \`zenrows-${kebab(endpoint.id)}\` | ${endpoint.name.replace(/\.$/, "")} | ${label} |`;
+        // shared/actions.yaml's description, else the spec's summary.
+        const what = endpoint.wording.description ?? `${endpoint.name.replace(/\.$/, "")}.`;
+        if (/[{}<>|]/.test(what)) throw new Error(`${where}: the API spec's summary of ${endpoint.operation}, or its description in shared/actions.yaml, has a character MDX would read`);
+        return `| \`createZenrows${name}Tool()\` | \`zenrows-${kebab(endpoint.id)}\` | ${what} | ${label} |`;
     });
     return ["| Factory | Tool ID | What it does | Billing |", "| - | - | - | - |", ...rows].join("\n");
 }

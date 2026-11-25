@@ -12,13 +12,13 @@ const operation: ZenrowsOperation = {"method":"GET","server":"https://async.api.
 export const zenrowsGetBatchResultsInputSchema = z.object({
   status: z.enum(['all', 'successful', 'failed', 'processing']).optional().describe('`processing` covers both `pending` and `processing` task\nstates (anything not yet terminal).'),
   cursor: z.string().optional().describe('Opaque pagination token; echo `next_cursor`.'),
-  job_id: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).describe('Assigned by the server on submit.'),
+  job_id: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/).describe("The batch job's ID, as Create Batch Job returned it (job_id)."),
 });
 
 export function createZenrowsGetBatchResultsTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-get-batch-results',
-    description: 'Page through per-task results for the latest run of a job. Shortcut for the latest run; see `getBatchRunResults` for the explicit form. This call uses no credits.',
+    description: "Lists the tasks of a batch job's latest run, one page at a time, with each task's URL, status and task_id. Filter by status, and pass next_cursor back as Cursor for the next page. Read a task's page with Get Batch Task Content. Costs no credits; safe to retry.",
     inputSchema: zenrowsGetBatchResultsInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

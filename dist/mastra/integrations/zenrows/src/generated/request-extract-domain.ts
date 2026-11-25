@@ -11,13 +11,13 @@ const operation: ZenrowsOperation = {"method":"POST","server":"https://api.zenro
 
 export const zenrowsRequestExtractDomainInputSchema = z.object({
   domain: z.string().describe('The domain to prepare, without scheme.'),
-  example_urls: z.array(z.string().url()).optional().describe('1 to 5 URLs on that domain. One works; at least 3 pages of your main page type work better, and other types can share the rest of the 5. When present, they replace discovery.'),
+  example_urls: z.array(z.string().url()).optional().describe('1 to 5 page URLs on the domain. At least 3 pages of your main page type (for example product pages) work best; other page types can fill the rest.'),
 });
 
 export function createZenrowsRequestExtractDomainTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-request-extract-domain',
-    description: 'Ask for a domain to be prepared for Extract. Submit a domain for preparation, within a monthly allowance. The submission is accepted immediately and works through discovery, preparation and verification, typically in minutes: poll `getExtractDomainStatus` instead of blocking. Send `example_urls` when you can; they replace discovery. One URL works, but up to 5 related URLs work better: Extract compares the pages of one type against each other, so it can check the fields it found and fill in fields one page is missing. Send at least 3 pages of your main page type; other types can share the rest of the 5 (for example 3 product pages and 2 search result pages). Submitting a domain that is already prepared returns its current record rather than starting again, so it does not add new kinds of page. Send an `Idempotency-Key` header to make a retry safe. Costs no credits. Documented at https://docs.zenrows.com/extract/endpoints. This call uses no credits.',
+    description: 'Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe. Costs no credits.',
     inputSchema: zenrowsRequestExtractDomainInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

@@ -9,10 +9,10 @@ export const cancelBatchJobAction = createAction({
   name: "cancel_batch_job",
   classification: "DESTRUCTIVE",
   displayName: "Cancel Batch Job",
-  description: "Stop the batch job's current run. Tasks not yet scraped are not scraped or billed.",
+  description: "Stop the batch job's current run. Tasks not yet scraped aren't scraped or billed.",
   audience: 'both',
   aiMetadata: {
-    description: "Stops a batch job's current run for good; tasks already scraped keep their results. A run that already ended answers 409 run_not_stoppable. It cannot be undone.",
+    description: "Stops a batch job's current run for good; tasks already scraped keep their results. A run that already ended answers 409 run_not_stoppable. It cannot be undone. Costs no credits.",
     idempotent: false,
   },
   props: {
