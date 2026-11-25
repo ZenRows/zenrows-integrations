@@ -11,7 +11,7 @@ export function createZenrowsTools(options?: ZenrowsClientOptions) {
   };
 }
 
-/** Scrape and extract, plus one tool for every other endpoint Zenrows offers: batch jobs, crawls and Extract domains. */
+/** Scrape and extract, plus one tool for every other endpoint Zenrows offers, such as batch jobs and crawls. */
 export function createZenrowsAllTools(options?: ZenrowsClientOptions) {
   return {
     ...createZenrowsTools(options),
