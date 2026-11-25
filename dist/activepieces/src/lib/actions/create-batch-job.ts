@@ -12,7 +12,7 @@ export const createBatchJobAction = createAction({
   description: "Scrape many URLs in one job, now or on a schedule. Read the results later with Get Batch Job and Get Batch Results.",
   audience: 'both',
   aiMetadata: {
-    description: "Creates a batch job that scrapes a list of URLs (up to 100,000) in the background and returns its job_id at once. Pick it over Scrape URL for more than a handful of pages. Poll Get Batch Job until latest_run.status is terminal, then page through Get Batch Results. Each call creates a new job and spends credits per page, so a retry duplicates the work.",
+    description: "Creates a batch job that scrapes a list of URLs (up to 100,000) in the background and returns its job_id at once. Pick it over Scrape URL for more than a handful of pages. Poll Get Batch Job until latest_run.status is terminal, then page through Get Batch Results. Each call creates a new job, so a retry duplicates the work. A job is billed after it runs, by the credits each page or task it fetches uses: 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.",
     idempotent: false,
   },
   props: {

@@ -12,7 +12,7 @@ export const listExtractDomainsAction = createAction({
   description: "List the domains Extract serves publicly.",
   audience: 'both',
   aiMetadata: {
-    description: "Lists domains that Extract announces as ready. The list is not complete: a domain missing from it may still work, so try Extract Structured Data and branch on REQS007 instead of relying on it. Costs no credits; safe to retry.",
+    description: "Lists domains that Extract announces as ready. The list is not complete: a domain missing from it may still work, so try Extract Structured Data and branch on REQS007 instead of relying on it. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {},

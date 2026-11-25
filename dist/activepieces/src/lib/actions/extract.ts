@@ -12,7 +12,7 @@ export const extractAction = createAction({
   description: "Get a page's data as JSON without writing selectors, or map your own fields to CSS selectors.",
   audience: 'both',
   aiMetadata: {
-    description: "Fetches one page and returns its data as structured JSON: extract=auto returns the site's own field names, or css_extractor maps your keys to CSS selectors. Pick it when you need specific fields; use Scrape URL for the whole page as Markdown or HTML. A domain Extract has not prepared yet answers REQS007: prepare it with Request Extract Domain. Billed as the request it runs; safe to retry.",
+    description: "Fetches one page and returns its data as structured JSON: extract=auto returns the site's own field names, or css_extractor maps your keys to CSS selectors. Pick it when you need specific fields; use Scrape URL for the whole page as Markdown or HTML. A domain Extract has not prepared yet answers REQS007: prepare it with Request Extract Domain. Safe to retry. Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.",
     idempotent: true,
   },
   props: {

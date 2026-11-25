@@ -356,7 +356,7 @@ test("Activepieces gets an action per offered endpoint, and none for the rest", 
   const create = r.dist(actionFile("create-job"));
   assert.ok(job.includes("import { createAction, Property } from '@activepieces/pieces-framework';"), job);
   assert.ok(job.includes('export const getJobAction = createAction({\n  auth: zenrowsAuth,\n  name: "get_job",\n  classification: "READ",\n  displayName: "Read A Job",'), job);
-  assert.ok(job.includes("  audience: 'both',\n  aiMetadata: {\n    description: \"Reads a job.\",\n    idempotent: true,\n  },\n"), "with no wording in vars.yaml, the agent reads the spec's description");
+  assert.ok(job.includes("  audience: 'both',\n  aiMetadata: {\n    description: \"Reads a job. This call uses no credits.\",\n    idempotent: true,\n  },\n"), "with no shared wording, the agent reads the spec's description, then the cost");
   assert.ok(job.includes('job_id: Property.ShortText({ displayName: "Job ID", required: true }),'), job);
   assert.ok(job.includes('  description: "Reads a job.",\n'), "the description is the spec's first paragraph");
   assert.ok(job.includes("async run({ auth, propsValue, files })") && job.includes("values: propsValue, files });"), job);
@@ -397,7 +397,7 @@ test("shared/actions.yaml gives an action its wording, and vars.yaml its classif
   const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, `\nclassification:\n  get_job: SEARCH\n`, stubWording);
   assert.ok(r.ok, r.out);
   const job = r.dist(actionFile("get-job"));
-  for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
+  for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry. This call uses no credits.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
     assert.ok(job.includes(line), `expected ${line} in:\n${job}`);
   }
   assert.ok(r.dist(actionFile("create-job")).includes('urls: Property.Array({ displayName: "URLs", description: "The URLs to scrape.", required: false }),'));
@@ -426,11 +426,39 @@ test("Mastra's generated tools read the same shared wording as Activepieces' act
   const docs = "dist/mastra/docs/src/content/en/integrations/tools/zenrows.mdx";
   const r = run({ ...typesBilling({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }), ...apVars(undefined, stubWording) }, tokenSpec, [tool, docs, actionFile("get-job")]);
   assert.ok(r.ok, r.out);
-  assert.match(r.dist(tool), /description: 'Reads a job by its ID\. Safe to retry\.',/, "the ai text alone, with no billing sentence after it");
+  assert.match(r.dist(tool), /description: 'Reads a job by its ID\. Safe to retry\. This call uses no credits\.',/, "the ai text, then the cost from its kind");
   assert.match(r.dist(tool), /job_id: z\.string\(\)\.describe\('The job, from Create Job\.'\)/);
   assert.match(r.dist(docs), /\| `zenrows-get-job` \| Read one job\. \| Free \|/);
-  assert.ok(r.dist(actionFile("get-job")).includes('description: "Reads a job by its ID. Safe to retry.",'));
+  assert.ok(r.dist(actionFile("get-job")).includes('description: "Reads a job by its ID. Safe to retry. This call uses no credits.",'));
 });
+test("both hosts add what a call costs from its kind in shared/billing.yaml", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/create-job.ts";
+  const r = run({ ...typesBilling({ after_run: ["POST /stub-jobs"] }), ...apVars(undefined, `actions:\n  create_job:\n    ai: "Creates a job."\n`) }, tokenSpec, [tool, actionFile("create-job")]);
+  assert.ok(r.ok, r.out);
+  const after = "Creates a job. A job is billed after it runs, by the credits each page or task it fetches uses: 1 credit for a basic request";
+  assert.ok(r.dist(tool).includes(after), r.dist(tool));
+  assert.ok(r.dist(actionFile("create-job")).includes(after), r.dist(actionFile("create-job")));
+});
+test("an ai line in shared/actions.yaml that says what a call costs fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    ai: "Reads a job. Costs no credits."\n`),
+}, "shared/actions.yaml: actions.get_job.ai says what the call costs", tokenSpec));
+test("{{tool:…}} and {{field:…}} read in each host's own terms", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const wording = `actions:\n  create_job:\n    name: "Create Job"\n  get_job:\n    ai: "Read it after {{tool:create_job}}, or use {{tool:fetch}}; pass {{field:job_id}} back."\n`;
+  const r = run({ ...typesBilling({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }), ...apVars(undefined, wording) }, tokenSpec, [tool, actionFile("get-job")]);
+  assert.ok(r.ok, r.out);
+  assert.ok(r.dist(actionFile("get-job")).includes('description: "Read it after Create Job, or use Scrape URL; pass Job ID back. This call uses no credits."'), r.dist(actionFile("get-job")));
+  assert.ok(r.dist(tool).includes("Read it after zenrows-create-job, or use zenrows-scrape; pass job_id back. This call uses no credits."), r.dist(tool));
+});
+test("{{tool:…}} for an endpoint we don't offer fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    ai: "Then use {{tool:nope}}."\n`),
+}, "shared/actions.yaml: actions.get_job.ai names {{tool:nope}}, but the API spec has no endpoint we offer by that id", tokenSpec));
+test("{{field:…}} for a field the endpoint doesn't take fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    description: "Pass {{field:cursor}}."\n`),
+}, 'shared/actions.yaml: actions.get_job.description names {{field:cursor}}, but the API spec takes no "cursor" in GET /stub/{job_id}', tokenSpec));
 test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
   "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
   "shared/billing.yaml": typesBilling({ free: ["GET /stub-types"] })["shared/billing.yaml"],

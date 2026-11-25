@@ -12,7 +12,7 @@ export const downloadCrawlAction = createAction({
   description: "Get every result of a crawl as a list, one item per URL.",
   audience: 'both',
   aiMetadata: {
-    description: "Returns every result of a crawl as a list, one object per URL (with content_status and the HTML in content when the crawl has an output format). Use it once the crawl has ended; Get Crawl pages through the same results. Costs no credits; safe to retry.",
+    description: "Returns every result of a crawl as a list, one object per URL (with content_status and the HTML in content when the crawl has an output format). Use it once the crawl has ended; Get Crawl pages through the same results. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

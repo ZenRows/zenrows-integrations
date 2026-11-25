@@ -27,14 +27,6 @@ const where = "platforms/mastra/scripts/render.mjs";
 // The endpoints with a hand-written tool, by their key in apiEndpoints().
 const handWritten = ["fetch", "extract"];
 
-// What a generated tool's description says about billing, by its kind in
-// shared/billing.yaml. A kind with no sentence fails the render.
-const billingSentences = {
-    per_credit: "Zenrows charges {{< credit-weights }}.",
-    after_run: "{{< billing-after-run }}: {{< credit-weights }}.",
-    free: "{{< billing-free }}.",
-};
-
 const tools = {
     scrape: {
         slice: "fetch",
@@ -218,9 +210,6 @@ function generatedTool(endpoint, fill) {
     if (!inHeader && endpoint.keyIn.query !== "apikey") {
         throw new Error(`${where}: the API spec takes the key for ${endpoint.operation} neither in X-API-Key nor as apikey`);
     }
-    const sentence = billingSentences[endpoint.billing];
-    if (!sentence) throw new Error(`${where}: no billing sentence for "${endpoint.billing}" (${endpoint.operation}); add one to billingSentences`);
-    const billing = fill(sentence);
 
     const operation = {
         method: endpoint.method,
@@ -244,14 +233,13 @@ function generatedTool(endpoint, fill) {
         }
     }
 
-    // shared/actions.yaml's ai, which already says what it costs. Without it: the
-    // summary, the description's first paragraph (the rest is for the API docs),
-    // then how it's billed.
+    // shared/actions.yaml's ai, else the summary and the description's first
+    // paragraph (the rest is for the API docs); then what it costs, from its kind
+    // in shared/billing.yaml.
     const paragraph = (endpoint.description ?? "").trim().split(/\n\s*\n/)[0].replace(/\s*\n\s*/g, " ");
     const summary = endpoint.name.replace(/\.$/, "");
-    const description =
-        endpoint.wording.ai ??
-        [`${summary}.`, paragraph, `${billing.charAt(0).toUpperCase()}${billing.slice(1)}`].filter(Boolean).join(" ");
+    const what = endpoint.wording.ai ?? [`${summary}.`, paragraph].filter(Boolean).join(" ");
+    const description = `${what} ${endpoint.wording.cost}`;
 
     const file = `${header}import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
@@ -302,7 +290,16 @@ export default function render({ apiEndpoints, fill }) {
             "The content is then the JSON text of those fields; {{< css-extractor-overrides-response-type }}.",
         ),
     };
-    const endpoints = apiEndpoints();
+    // How shared/actions.yaml's {{tool:<id>}} and {{field:<name>}} read here: a
+    // tool by its ID (a hand-written one by its own), a field by its input name.
+    const names = {
+        tool: (e) => {
+            const own = Object.keys(tools).find((tool) => tools[tool].slice === e.key);
+            return own ? `zenrows-${own}` : `zenrows-${kebab(e.id)}`;
+        },
+        field: (name) => name,
+    };
+    const endpoints = apiEndpoints(names);
 
     const schemas = Object.entries(tools).map(([tool, { slice, expose, excluded }]) => {
         const endpoint = endpoints.find((e) => e.key === slice);

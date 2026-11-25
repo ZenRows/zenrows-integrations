@@ -238,29 +238,67 @@ function sharedActions() {
   return existsSync(file) ? (parseYaml(readFileSync(file, "utf8")) ?? {}) : {};
 }
 
-// An endpoint's wording from shared/actions.yaml: { name, description, ai,
-// props }, each undefined where the file leaves it to the spec. props holds
-// action_props for the fields the endpoint takes, then its own. A field the
-// endpoint doesn't take fails, and so does an entry for no endpoint we offer
-// (checked in apiEndpoints): a spec change that drops either says "the API spec".
-function endpointWording(endpoint, actions) {
-  const own = actions.actions?.[endpoint.id] ?? {};
-  const takes = Object.values(endpoint.input).flatMap((schema) => Object.keys(schema.properties ?? {}));
-  for (const name of Object.keys(own.props ?? {})) {
-    if (!takes.includes(name)) throw new Error(`shared/actions.yaml: actions.${endpoint.id}.props describes "${name}", but the API spec takes no "${name}" in ${endpoint.operation}`);
-  }
-  const shared = Object.fromEntries(Object.entries(actions.action_props ?? {}).filter(([name]) => takes.includes(name)));
-  return { name: own.name, description: own.description, ai: own.ai, props: { ...shared, ...own.props } };
+// What a call costs, by the endpoint's kind in shared/billing.yaml: the one
+// place a generated action or tool gets its cost sentence, so shared/actions.yaml
+// never states it. A kind with no sentence fails the render.
+const costSentences = {
+  per_credit: "Zenrows charges {{< credit-weights }}.",
+  after_run: "{{< billing-after-run }}: {{< credit-weights }}.",
+  free: "{{< billing-free }}.",
+};
+function costSentence(endpoint) {
+  const sentence = costSentences[endpoint.billing];
+  if (!sentence) throw new Error(`scripts/lib.mjs: no cost sentence for "${endpoint.billing}" (${endpoint.operation}); add one to costSentences`);
+  const text = sentence.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, "scripts/lib.mjs costSentences"));
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export function apiEndpoints(spec, where) {
+// An endpoint's wording from shared/actions.yaml: { name, description, ai,
+// props, cost }, each but cost undefined where the file leaves it to the spec.
+// props holds action_props for the fields the endpoint takes, then its own.
+// {{tool:<id>}} and {{field:<name>}} read as the host names them, through
+// names.tool(endpoint) and names.field(name). A field the endpoint doesn't take,
+// a tool for no endpoint we offer, or an ai line that says what it costs (cost
+// comes from shared/billing.yaml) fails; a spec change that causes it says "the API spec".
+function endpointWording(endpoint, actions, endpoints, names) {
+  const own = actions.actions?.[endpoint.id] ?? {};
+  const at = `shared/actions.yaml: actions.${endpoint.id}`;
+  const takes = Object.values(endpoint.input).flatMap((schema) => Object.keys(schema.properties ?? {}));
+  for (const name of Object.keys(own.props ?? {})) {
+    if (!takes.includes(name)) throw new Error(`${at}.props describes "${name}", but the API spec takes no "${name}" in ${endpoint.operation}`);
+  }
+  if (own.ai && /credit|\bcosts?\b/i.test(own.ai)) {
+    throw new Error(`${at}.ai says what the call costs; leave that out, the render adds it from shared/billing.yaml`);
+  }
+  const resolve = (text, field) =>
+    text?.replace(/\{\{\s*(tool|field):([a-z0-9_]+)\s*\}\}/g, (_, kind, name) => {
+      if (kind === "field") {
+        if (!takes.includes(name)) throw new Error(`${at}${field} names {{field:${name}}}, but the API spec takes no "${name}" in ${endpoint.operation}`);
+        return names.field(name);
+      }
+      const target = endpoints.find((e) => e.id === name);
+      if (!target) throw new Error(`${at}${field} names {{tool:${name}}}, but the API spec has no endpoint we offer by that id`);
+      return names.tool(target);
+    });
+  const shared = Object.fromEntries(Object.entries(actions.action_props ?? {}).filter(([name]) => takes.includes(name)));
+  const props = Object.fromEntries(Object.entries({ ...shared, ...own.props }).map(([name, text]) => [name, resolve(text, `.props.${name}`)]));
+  return { name: own.name, description: resolve(own.description, ".description"), ai: resolve(own.ai, ".ai"), props, cost: costSentence(endpoint) };
+}
+
+// names: how this host reads {{tool:<id>}} and {{field:<name>}} in
+// shared/actions.yaml, as { tool(endpoint), field(name) }; tool gets the named
+// endpoint, with its shared name as wordingName. Without names, an endpoint has
+// no wording (a host that doesn't use it).
+export function apiEndpoints(spec, where, names) {
   const endpoints = offeredEndpoints(spec, where);
   const actions = sharedActions();
   const ids = endpoints.map((e) => e.id);
   for (const id of Object.keys(actions.actions ?? {})) {
     if (!ids.includes(id)) throw new Error(`shared/actions.yaml: actions.${id} is for no endpoint we offer; the API spec has none by that id, or shared/billing.yaml lists it as not_offered`);
   }
-  return endpoints.map((e) => ({ ...e, wording: endpointWording(e, actions) }));
+  if (!names) return endpoints;
+  const named = endpoints.map((e) => ({ ...e, wordingName: actions.actions?.[e.id]?.name }));
+  return named.map((e) => ({ ...e, wording: endpointWording(e, actions, named, names) }));
 }
 
 function offeredEndpoints(spec, where) {
@@ -555,7 +593,7 @@ export function renderHost(host) {
     const files = hostRenderers[host]({
       values,
       fill: (text) => fill(text, values, where),
-      apiEndpoints: () => apiEndpoints(loadedSpec.spec, where),
+      apiEndpoints: (names) => apiEndpoints(loadedSpec.spec, where, names),
       apiNotOffered: () => apiNotOffered(loadedSpec.spec),
     });
     for (const [path, content] of Object.entries(files ?? {})) {

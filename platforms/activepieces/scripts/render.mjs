@@ -6,6 +6,9 @@
 // tools), and vars.yaml's omit and classification what only Activepieces has;
 // what they leave out comes from the spec.
 const handWritten = ["fetch"];
+// How shared/actions.yaml's {{tool:<id>}} and {{field:<name>}} read here: an
+// action by its display name, a field by its form label.
+const handWrittenNames = { fetch: "Scrape URL" };
 
 // The description shown is the spec's first paragraph; the rest is for the API docs.
 // "create_batch_job" → "createBatchJobAction" in "create-batch-job.ts"; "Read a job" → "Read A Job"; "job_id" → "Job ID".
@@ -50,7 +53,11 @@ export default function render({ apiEndpoints, values }) {
   const where = "platforms/activepieces/scripts/render.mjs";
   const omits = values.omit ?? {};
   const classifications = values.classification ?? {};
-  const endpoints = apiEndpoints().filter((e) => !handWritten.includes(e.key));
+  const names = {
+    tool: (e) => handWrittenNames[e.key] ?? e.wordingName ?? titleCase(e.name),
+    field: (name) => label(name),
+  };
+  const endpoints = apiEndpoints(names).filter((e) => !handWritten.includes(e.key));
   const files = {};
   for (const e of endpoints) {
     const own = e.wording;
@@ -96,7 +103,7 @@ export const ${camel(e.id)}Action = createAction({
   description: ${str(description)},
   audience: 'both',
   aiMetadata: {
-    description: ${str(own.ai ?? description)},
+    description: ${str(`${own.ai ?? description} ${own.cost}`)},
     idempotent: ${classification === "READ" || classification === "SEARCH"},
   },
   props: ${propsCode},

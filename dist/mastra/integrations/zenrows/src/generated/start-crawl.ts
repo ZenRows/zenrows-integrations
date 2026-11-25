@@ -22,7 +22,7 @@ export const zenrowsStartCrawlInputSchema = z.object({
 export function createZenrowsStartCrawlTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-start-crawl',
-    description: 'Starts a crawl from one URL that follows links on the same domain and returns its crawl_id at once. Use it to discover the URLs of a site or section; use Create Batch Job when you already have the URLs. Read results with Get Crawl or Download Crawl Results. Each page fetched costs 1 to 25 credits, and each call starts a new crawl, so a retry duplicates the work.',
+    description: 'Starts a crawl from one URL that follows links on the same domain and returns its crawl_id at once. Use it to discover the URLs of a site or section; use zenrows-create-batch-job when you already have the URLs. Read results with zenrows-get-crawl or zenrows-download-crawl. Each call starts a new crawl, so a retry duplicates the work. A job is billed after it runs, by the credits each page or task it fetches uses: 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.',
     inputSchema: zenrowsStartCrawlInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

@@ -17,7 +17,7 @@ export const zenrowsRequestExtractDomainInputSchema = z.object({
 export function createZenrowsRequestExtractDomainTool(options: ZenrowsClientOptions = {}) {
   return createTool({
     id: 'zenrows-request-extract-domain',
-    description: 'Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after Extract Structured Data answers REQS007, then poll Get Extract Domain Status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe. Costs no credits.',
+    description: 'Submits a domain for Extract to prepare, within a monthly allowance, and returns at once. Use it after zenrows-extract answers REQS007, then poll zenrows-get-extract-domain-status until status is ready. Send 3 to 5 example URLs of the main page type when you can. Submitting a prepared domain returns its current state, so a retry is safe. This call uses no credits.',
     inputSchema: zenrowsRequestExtractDomainInputSchema,
     execute: async input => callOperation(options, operation, input),
   });

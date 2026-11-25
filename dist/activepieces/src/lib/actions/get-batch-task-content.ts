@@ -12,7 +12,7 @@ export const getBatchTaskContentAction = createAction({
   description: "Get the scraped page of one task in a batch job's latest run.",
   audience: 'both',
   aiMetadata: {
-    description: "Returns what one task of a batch job scraped: HTML, Markdown or JSON, depending on the job's zenrows_params. A task still processing answers 409 task_not_ready. Costs no credits; safe to retry.",
+    description: "Returns what one task of a batch job scraped: HTML, Markdown or JSON, depending on the job's zenrows_params. A task still processing answers 409 task_not_ready. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

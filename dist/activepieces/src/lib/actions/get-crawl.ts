@@ -12,7 +12,7 @@ export const getCrawlAction = createAction({
   description: "Read a crawl's status and one page of the URLs it found.",
   audience: 'both',
   aiMetadata: {
-    description: "Reads a crawl's status, coverage and one page of results. While it runs, pass next_cursor back as Cursor to get only new URLs; it is null once the crawl has ended and everything is read. Costs no credits; safe to retry.",
+    description: "Reads a crawl's status, coverage and one page of results. While it runs, pass next_cursor back as Cursor to get only new URLs; it is null once the crawl has ended and everything is read. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

@@ -12,7 +12,7 @@ export const getExtractDomainStatusAction = createAction({
   description: "Check how far a domain's preparation for Extract has got.",
   audience: 'both',
   aiMetadata: {
-    description: "Reads the preparation status of a domain submitted with Request Extract Domain. Branch on status: preparing, ready or failed. Costs no credits; safe to retry.",
+    description: "Reads the preparation status of a domain submitted with Request Extract Domain. Branch on status: preparing, ready or failed. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

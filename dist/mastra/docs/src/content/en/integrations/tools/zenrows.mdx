@@ -241,7 +241,7 @@ const extractTool = createZenrowsExtractTool()
 | `createZenrowsListExtractDomainsTool()` | `zenrows-list-extract-domains` | List the domains Extract serves publicly. | Free |
 | `createZenrowsRequestExtractDomainTool()` | `zenrows-request-extract-domain` | Ask Zenrows to prepare a domain for Extract. Preparation usually takes minutes. | Free |
 | `createZenrowsGetExtractDomainStatusTool()` | `zenrows-get-extract-domain-status` | Check how far a domain's preparation for Extract has got. | Free |
-| `createZenrowsCreateBatchJobTool()` | `zenrows-create-batch-job` | Scrape many URLs in one job, now or on a schedule. Read the results later with Get Batch Job and Get Batch Results. | After it runs, per page or task |
+| `createZenrowsCreateBatchJobTool()` | `zenrows-create-batch-job` | Scrape many URLs in one job, now or on a schedule. Read the results later with zenrows-get-batch-job and zenrows-get-batch-results. | After it runs, per page or task |
 | `createZenrowsGetBatchJobTool()` | `zenrows-get-batch-job` | Read a batch job and the progress of its latest run. | Free |
 | `createZenrowsCancelBatchJobTool()` | `zenrows-cancel-batch-job` | Stop the batch job's current run. Tasks not yet scraped aren't scraped or billed. | Free |
 | `createZenrowsGetBatchResultsTool()` | `zenrows-get-batch-results` | List the tasks of a batch job's latest run with their status, one page at a time. | Free |
