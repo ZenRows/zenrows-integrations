@@ -7,11 +7,9 @@ import { zenrowsExtractInputSchema } from './schemas.js';
 import {
   EXTRACT_NO_CREDITS,
   EXTRACT_SUMMARY,
-  EXTRACT_TOOL,
   GET_EXTRACT_DOMAIN_STATUS_TOOL,
   PER_REQUEST_COST,
   REQUEST_EXTRACT_DOMAIN_TOOL,
-  SCRAPE_TOOL,
 } from './spec.js';
 
 const outputSchema = z.object({
@@ -22,12 +20,10 @@ const outputSchema = z.object({
 
 export function createZenrowsExtractTool(options: ZenrowsClientOptions = {}) {
   return createTool({
-    id: EXTRACT_TOOL,
+    id: 'zenrows-extract',
     description:
       EXTRACT_SUMMARY +
-      " as JSON, with fields named the way the site names them (a product's name and price, a listing's rows, an article's byline) and no selectors to write. For the page's own content, use " +
-      SCRAPE_TOOL +
-      ' instead. ' +
+      " as JSON, with fields named the way the site names them (a product's name and price, a listing's rows, an article's byline) and no selectors to write. For the page's own content, use zenrows-scrape instead. " +
       EXTRACT_NO_CREDITS +
       '. ' +
       PER_REQUEST_COST +
