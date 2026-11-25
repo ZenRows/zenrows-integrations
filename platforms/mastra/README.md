@@ -50,7 +50,7 @@ All take `{ apiKey?, baseUrl?, timeout?, fetch? }`. The key falls back to
 `ZENROWS_API_KEY` and the base URL to `ZENROWS_API_URL`, then the public API.
 A missing key fails when a tool runs, not when it is created, the way
 `@mastra/parallel` does. The key goes in the `X-API-Key` header, never in the
-URL, except for an endpoint the spec says takes it only as `apikey`. `baseUrl`
+URL, except for an endpoint the spec says takes it only as `apikey`. Every request sends `X-ZenRows-Client: mastra`, as Activepieces sends its own name, and appends `mastra` to the User-Agent, as Mastra's Parallel and Tavily packages do. `baseUrl`
 replaces the public API's server (`{{api:fetch server}}`) and only it: a tool
 whose endpoint has its own server in the spec keeps it. `credits` comes from the `X-Request-Credits` header, or is `null` without it.
 

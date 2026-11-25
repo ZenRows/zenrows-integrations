@@ -46,6 +46,13 @@ describe('requestZenrows', () => {
     expect(sentUrl().searchParams.has('apikey')).toBe(false);
   });
 
+  it('says the request comes from Mastra', async () => {
+    await requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' });
+
+    expect(sentHeaders().get('X-ZenRows-Client')).toBe('mastra');
+    expect(sentHeaders().get('User-Agent')).toBe('mastra');
+  });
+
   it('sends a GET to the public API by default', async () => {
     await requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' });
 

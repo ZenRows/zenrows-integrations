@@ -111,7 +111,12 @@ async function send(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
-    const response = await (options.fetch ?? globalThis.fetch)(url, { ...init, signal: controller.signal });
+    // Which integration sent the request: X-ZenRows-Client for Zenrows, as every
+    // host here sends it, and mastra in the User-Agent, as Mastra's packages add it.
+    const headers = new Headers(init.headers);
+    headers.set('X-ZenRows-Client', 'mastra');
+    headers.set('User-Agent', [headers.get('User-Agent'), 'mastra'].filter(Boolean).join(' '));
+    const response = await (options.fetch ?? globalThis.fetch)(url, { ...init, headers, signal: controller.signal });
     if (!response.ok) throw toError(response.status, await response.text(), responses);
     // Read the body before the timer is cleared, so a stalled body times out too.
     const body = await response.arrayBuffer();
