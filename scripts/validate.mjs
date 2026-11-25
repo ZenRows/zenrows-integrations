@@ -334,6 +334,14 @@ for (const file of listFiles(sharedTextDir)) {
   }
 }
 
+// The name is written "Zenrows". "ZenRows" stays only in the GitHub org (ZenRows/…)
+// and the X-ZenRows-Client header.
+for (const file of [...snippetSources, ...codeHostReadmes.map((f) => join(platformsDir, f))]) {
+  if (textFile.test(file) && existsSync(file) && /ZenRows(?!\/|-Client)/.test(readFileSync(file, "utf8"))) {
+    errors.push(`${relative(root, file)} writes "ZenRows"; write Zenrows (only the GitHub org ZenRows/ and the X-ZenRows-Client header keep it)`);
+  }
+}
+
 console.log(report.join("\n"));
 if (errors.length) {
   console.error(`\n${errors.map((e) => `❌ ${e}`).join("\n")}`);
