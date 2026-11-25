@@ -60,7 +60,7 @@ All factories accept `ZenrowsClientOptions`:
     name: 'baseUrl',
     type: 'string',
     description:
-      'Override the Zenrows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then `https://api.zenrows.com/v1`. Batch job tools always use the batch API.',
+      'Override the Zenrows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then the public API, {{api:fetch server}}. A tool whose endpoint Zenrows serves from another server keeps that server.',
     isOptional: true,
   },
   {

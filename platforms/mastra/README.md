@@ -51,8 +51,8 @@ All take `{ apiKey?, baseUrl?, timeout?, fetch? }`. The key falls back to
 A missing key fails when a tool runs, not when it is created, the way
 `@mastra/parallel` does. The key goes in the `X-API-Key` header, never in the
 URL, except for an endpoint the spec says takes it only as `apikey`. `baseUrl`
-replaces the public API's server (`api.zenrows.com`) and only it: the batch
-tools keep the batch server the spec names. `credits` comes from the `X-Request-Credits` header, or is `null` without it.
+replaces the public API's server (`{{api:fetch server}}`) and only it: a tool
+whose endpoint has its own server in the spec keeps it. `credits` comes from the `X-Request-Credits` header, or is `null` without it.
 
 `html` is the scrape tool's own `response_type` value: the API has none, and
 sending no `response_type` is how it returns the HTML.
