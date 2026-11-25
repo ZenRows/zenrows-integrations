@@ -409,6 +409,9 @@ ${constant("FETCH_SUMMARY", "{{api:fetch summary}}")}${constant("EXTRACT_SUMMARY
             "export const PER_REQUEST_COST =",
             quote(fill("{{cost:per_credit}}")),
             ";",
-        )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}${constant("REQUEST_TIMEOUT", "{{text:request-timeout}}")}${toolIds}`,
+        )}${constant("EXTRACT_NO_CREDITS", "{{text:extract-no-credits}}")}${constant(
+            "ADAPTIVE_STEALTH_MODE",
+            "{{text:adaptive-stealth-mode}}",
+        )}${constant("REQUEST_TIMEOUT", "{{text:request-timeout}}")}${toolIds}`,
     };
 }

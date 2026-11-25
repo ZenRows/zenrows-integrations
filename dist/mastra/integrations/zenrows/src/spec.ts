@@ -28,6 +28,8 @@ export const EXTRACT_SUMMARY = 'Extract structured data from a page';
 export const PER_REQUEST_COST =
   'Zenrows charges 1 credit for a basic request, 5 with JavaScript rendering, 10 with premium proxies and 25 with both, the same on every plan.';
 export const EXTRACT_NO_CREDITS = 'Extract adds no credits on top of the request it runs';
+export const ADAPTIVE_STEALTH_MODE =
+  'Adaptive Stealth Mode starts from the cheapest configuration that can work and escalates to JavaScript rendering or Premium Proxies only when the page needs them, and only the configuration that succeeds is charged';
 export const REQUEST_TIMEOUT =
   'a request can take up to 3 minutes, so wait at least 180 seconds for it, and a request cut short on the client side still runs and can still be charged';
 export const REQUEST_EXTRACT_DOMAIN_TOOL = 'zenrows-request-extract-domain';
