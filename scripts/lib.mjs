@@ -269,11 +269,18 @@ function endpointWording(endpoint, actions, endpoints, names) {
   for (const name of Object.keys(own.props ?? {})) {
     if (!takes.includes(name)) throw new Error(`${at}.props describes "${name}", but the API spec takes no "${name}" in ${endpoint.operation}`);
   }
-  if (own.ai && /credit|\bcosts?\b/i.test(own.ai)) {
-    throw new Error(`${at}.ai says what the call costs; leave that out, the render adds it from shared/billing.yaml`);
+  // Billing words outside a {{< snippet}}: the cost comes from shared/billing.yaml,
+  // and any other billing fact from shared/text/.
+  const texts = [["ai", own.ai], ["description", own.description], ...Object.entries(own.props ?? {}).map(([name, text]) => [`props.${name}`, text])];
+  for (const [field, text] of texts) {
+    if (text && /credit|\bcosts?\b|bill|charg/i.test(text.replace(/\{\{<[^}]*\}\}/g, ""))) {
+      throw new Error(`${at}.${field} states what something costs; the render adds the cost from shared/billing.yaml, and any other billing fact goes in shared/text/ as {{< name}}`);
+    }
   }
   const resolve = (text, field) =>
-    text?.replace(/\{\{\s*(tool|field):([a-z0-9_]+)\s*\}\}/g, (_, kind, name) => {
+    text
+      ?.replace(/\{\{<\s*([a-z0-9-]+)\s*\}\}/g, (_, name) => sharedText(name, `${at}${field}`))
+      .replace(/\{\{\s*(tool|field):([a-z0-9_]+)\s*\}\}/g, (_, kind, name) => {
       if (kind === "field") {
         if (!takes.includes(name)) throw new Error(`${at}${field} names {{field:${name}}}, but the API spec takes no "${name}" in ${endpoint.operation}`);
         return names.field(name);

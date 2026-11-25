@@ -12,7 +12,7 @@ export const stopCrawlAction = createAction({
   description: "Stop a running crawl. Pages already being fetched finish and are kept.",
   audience: 'both',
   aiMetadata: {
-    description: "Stops a running crawl: no new page is fetched, pages in progress finish and are billed. Read it afterwards with Get Crawl for the final results. Stopping a crawl that already ended returns its final state. This call uses no credits.",
+    description: "Stops a running crawl: no new page is fetched, and pages already in flight still finish and are billed. Read it afterwards with Get Crawl for the final results. Stopping a crawl that already ended returns its final state. This call uses no credits.",
     idempotent: false,
   },
   props: {

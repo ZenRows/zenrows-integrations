@@ -176,7 +176,7 @@ const scrapeTool = createZenrowsScrapeTool()
 
 ## `createZenrowsExtractTool()`
 
-Creates the `zenrows-extract` tool. Extract returns the fields of a page as JSON, named the way the site names them. It works on any domain Zenrows has prepared. A domain that isn't prepared yet, or a page Extract doesn't recognise, throws a `ZenrowsError` with code `REQS007` and isn't charged.
+Creates the `zenrows-extract` tool. Extract returns the fields of a page as JSON, named the way the site names them. It works on any domain Zenrows has prepared. A domain that isn't prepared yet, or a page Extract doesn't recognise, throws a `ZenrowsError` with code `REQS007`; {{< failed-not-billed }}.
 
 ```typescript
 import { createZenrowsExtractTool } from '@mastra/zenrows'

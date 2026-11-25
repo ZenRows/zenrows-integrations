@@ -18,7 +18,7 @@ The user's instructions take precedence over this skill. If they conflict, follo
 3. Wait for it: `crawl_wait(crawl_id)`. It returns the status, the counts and the first 20 URLs. If it returns `status: running` with a note, call `crawl_wait` again, or read the partial list with `crawl_results`.
 4. Read every URL with `crawl_results(crawl_id)`. Pass the returned `next_cursor` as `cursor` until it is `null`.
 5. For a page's content (only with `output_format='html'`): `crawl_content(crawl_id, content_id)`, using the `content_url` from a `crawl_results` row. It returns raw HTML, capped by `max_chars`. For markdown, call `scrape` on that page's URL instead.
-6. If the user stops the task, call `crawl_stop(crawl_id)`. Pages already in flight still finish and are billed. A stopped crawl cannot resume.
+6. If the user stops the task, call `crawl_stop(crawl_id)`: pages already in flight still finish and are billed. A stopped crawl cannot resume.
 7. Summarize from what you read. For a large result, report the count and a sample rather than every URL.
 
 ## Notes
