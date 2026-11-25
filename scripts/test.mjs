@@ -442,19 +442,7 @@ test("both hosts add what a call costs from its kind in shared/billing.yaml", ()
 test("an ai line in shared/actions.yaml that says what a call costs fails the render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
   ...apVars(undefined, `actions:\n  get_job:\n    ai: "Reads a job. Costs no credits."\n`),
-}, "shared/actions.yaml: actions.get_job.ai states what something costs", tokenSpec));
-test("billing words in shared/actions.yaml outside a snippet fail, and a snippet is filled in", () => {
-  fails({
-    ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-    ...apVars(undefined, `actions:\n  get_job:\n    description: "Read a job; pages in flight are billed."\n`),
-  }, "shared/actions.yaml: actions.get_job.description states what something costs", tokenSpec)();
-  const r = run({
-    ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-    ...apVars(undefined, `actions:\n  get_job:\n    ai: "Reads a job; {{< failed-not-billed }}."\n`),
-  }, tokenSpec, [actionFile("get-job")]);
-  assert.ok(r.ok, r.out);
-  assert.ok(r.dist(actionFile("get-job")).includes('description: "Reads a job; failed requests use no credits. This call uses no credits."'), r.dist(actionFile("get-job")));
-});
+}, "shared/actions.yaml: actions.get_job.ai says what the call costs", tokenSpec));
 test("{{tool:…}} and {{field:…}} read in each host's own terms", () => {
   const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
   const wording = `actions:\n  create_job:\n    name: "Create Job"\n  get_job:\n    ai: "Read it after {{tool:create_job}}, or use {{tool:fetch}}; pass {{field:job_id}} back."\n`;

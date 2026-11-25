@@ -251,7 +251,7 @@ Each factory is also exported on its own, such as `createZenrowsStartCrawlTool()
 | `createZenrowsGetExtractDomainStatusTool()` | `zenrows-get-extract-domain-status` | Check how far a domain's preparation for Extract has got. | Free |
 | `createZenrowsCreateBatchJobTool()` | `zenrows-create-batch-job` | Scrape many URLs in one job, now or on a schedule. Read the results later with zenrows-get-batch-job and zenrows-get-batch-results. | After it runs, per page or task |
 | `createZenrowsGetBatchJobTool()` | `zenrows-get-batch-job` | Read a batch job and the progress of its latest run. | Free |
-| `createZenrowsCancelBatchJobTool()` | `zenrows-cancel-batch-job` | Stop the batch job's current run: tasks not yet scraped aren't scraped or billed. | Free |
+| `createZenrowsCancelBatchJobTool()` | `zenrows-cancel-batch-job` | Stop the batch job's current run. Tasks not yet scraped aren't scraped or billed. | Free |
 | `createZenrowsGetBatchResultsTool()` | `zenrows-get-batch-results` | List the tasks of a batch job's latest run with their status, one page at a time. | Free |
 | `createZenrowsGetBatchTaskContentTool()` | `zenrows-get-batch-task-content` | Get the scraped page of one task in a batch job's latest run. | Free |
 | `createZenrowsStartCrawlTool()` | `zenrows-start-crawl` | Crawl a site from one URL to find its pages, and optionally fetch their HTML. | After it runs, per page or task |
