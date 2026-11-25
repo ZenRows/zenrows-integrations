@@ -14,7 +14,11 @@ scrape_action_name: "Scrape URL"
 # shared/actions.yaml. What only Activepieces has, by endpoint id:
 # omit leaves an optional field out of the form (it is never sent), because it
 # means nothing in Activepieces; classification sets the badge where the one
-# derived from the method is wrong.
+# derived from the method is wrong; idempotent marks a non-read that is safe to
+# retry (only reads are, by default).
+idempotent:
+  # Submitting a prepared domain returns its current state.
+  request_extract_domain: true
 omit:
   # download only asks the API to send the page as an attachment: the step
   # returns the same HTML either way.

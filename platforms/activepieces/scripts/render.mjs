@@ -52,6 +52,7 @@ export default function render({ apiEndpoints, values }) {
   const where = "platforms/activepieces/scripts/render.mjs";
   const omits = values.omit ?? {};
   const classifications = values.classification ?? {};
+  const idempotents = values.idempotent ?? {};
   const handWrittenNames = { fetch: values.scrape_action_name };
   const names = {
     tool: (e) => handWrittenNames[e.key] ?? e.wordingName ?? titleCase(e.name),
@@ -104,7 +105,7 @@ export const ${camel(e.id)}Action = createAction({
   audience: 'both',
   aiMetadata: {
     description: ${str(`${own.ai ?? description} ${own.cost}`)},
-    idempotent: ${classification === "READ" || classification === "SEARCH"},
+    idempotent: ${idempotents[e.id] ?? (classification === "READ" || classification === "SEARCH")},
   },
   props: ${propsCode},
   async run({ auth, propsValue, files }) {
