@@ -305,6 +305,9 @@ const codeHostReadmes = hosts().filter((h) => isCodeHost(vars(h))).map((h) => `$
 const snippetSources = [
   join(root, "shared", "README.md"),
   join(root, "shared", "endpoints.yaml"),
+  join(root, "shared", "actions.yaml"),
+  // The cost sentences every generated action or tool ends with.
+  join(root, "scripts", "lib.mjs"),
   ...skillNames().map((n) => join(root, "skills", n, "SKILL.md")),
   ...listFiles(platformsDir)
     .filter((f) => !codeHostReadmes.includes(f) && !/\/(vars\.yaml|overrides\.lock)$/.test(f))

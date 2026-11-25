@@ -564,6 +564,11 @@ test('"ZenRows" in a host fails; the GitHub org and the client header pass', () 
   assert.ok(r.ok, r.out);
 });
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
+test("a snippet the cost sentences in scripts/lib.mjs use isn't reported unused", () => {
+  const r = run({});
+  assert.ok(r.ok, r.out);
+  for (const name of ["billing-free", "billing-after-run"]) assert.ok(!r.out.includes(`shared/text/${name}.md isn't used`), r.out);
+});
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));
 
