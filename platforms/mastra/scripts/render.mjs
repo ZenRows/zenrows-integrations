@@ -383,6 +383,9 @@ export type ZenrowsExtractInput = z.infer<typeof zenrowsExtractInputSchema>;
         "integrations/zenrows/src/spec.ts": `${header}
 export const DEFAULT_BASE_URL: string = ${quote(parsed("{{api:fetch server}}"))};
 
+// The wait REQUEST_TIMEOUT (shared/text/request-timeout.md) asks clients for, in ms.
+export const DEFAULT_TIMEOUT = ${fill("{{request_timeout_ms}}")};
+
 // What each response status of a fetch means, keyed by status.
 export const RESPONSES: Record<string, string> = {
 ${responses}};

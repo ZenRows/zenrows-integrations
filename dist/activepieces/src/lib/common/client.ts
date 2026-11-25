@@ -188,6 +188,7 @@ function readHeader({ headers, name }: { headers: HttpHeaders | undefined; name:
   return value ?? null;
 }
 
+// The wait shared/text/request-timeout.md asks clients for.
 const FETCH_TIMEOUT_MS = 180000;
 
 const CLIENT_HEADERS = { 'X-ZenRows-Client': 'activepieces' };

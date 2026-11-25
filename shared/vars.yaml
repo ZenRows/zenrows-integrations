@@ -6,3 +6,6 @@ contact_email: "integrations@zenrows.com"
 logo_url: "https://raw.githubusercontent.com/ZenRows/zenrows-integrations/main/shared/assets/logo.png"
 # The website, whose own endpoints in the API spec (/ask, /mcp) aren't part of the API: no host sees them.
 website_server: "https://zenrows.com"
+# How long a client waits for one request, in milliseconds: the wait
+# shared/text/request-timeout.md asks for (a test checks they agree).
+request_timeout_ms: 180000

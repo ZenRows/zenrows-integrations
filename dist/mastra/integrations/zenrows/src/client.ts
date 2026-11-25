@@ -1,14 +1,11 @@
-import { DEFAULT_BASE_URL, REQUEST_TIMEOUT, RESPONSES } from './spec.js';
-
-// The wait REQUEST_TIMEOUT (shared/text/request-timeout.md) asks clients for.
-const DEFAULT_TIMEOUT = 180_000;
+import { DEFAULT_BASE_URL, DEFAULT_TIMEOUT, REQUEST_TIMEOUT, RESPONSES } from './spec.js';
 
 export interface ZenrowsClientOptions {
   /** Zenrows API key. Falls back to the `ZENROWS_API_KEY` environment variable. */
   apiKey?: string;
   /** Base URL of the API. Falls back to `ZENROWS_API_URL`, then the public API. */
   baseUrl?: string;
-  /** Milliseconds to wait for one request. Defaults to 180000. */
+  /** Milliseconds to wait for one request. Defaults to DEFAULT_TIMEOUT, the wait Zenrows asks clients for. */
   timeout?: number;
   /** Custom `fetch` implementation. */
   fetch?: typeof fetch;

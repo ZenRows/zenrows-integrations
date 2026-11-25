@@ -4,6 +4,9 @@
 
 export const DEFAULT_BASE_URL: string = 'https://api.zenrows.com/v1';
 
+// The wait REQUEST_TIMEOUT (shared/text/request-timeout.md) asks clients for, in ms.
+export const DEFAULT_TIMEOUT = 180000;
+
 // What each response status of a fetch means, keyed by status.
 export const RESPONSES: Record<string, string> = {
   '200':

@@ -57,9 +57,9 @@ tools keep the batch server the spec names. `credits` comes from the `X-Request-
 `html` is the scrape tool's own `response_type` value: the API has none, and
 sending no `response_type` is how it returns the HTML.
 
-The timeout defaults to 180 s, not the 120 s Bright Data uses, for the reason
-`shared/text/request-timeout.md` gives; the timeout error and the docs page
-say it in those words.
+The timeout defaults to `request_timeout_ms` in `shared/vars.yaml`, not the
+120 s Bright Data uses, for the reason `shared/text/request-timeout.md`
+gives; the timeout error and the docs page say it in those words.
 
 ## What comes from the spec
 

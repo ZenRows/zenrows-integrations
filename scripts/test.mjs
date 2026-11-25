@@ -587,6 +587,11 @@ test("a snippet the cost sentences in scripts/lib.mjs use isn't reported unused"
   assert.ok(r.ok, r.out);
   for (const name of ["billing-free", "billing-after-run"]) assert.ok(!r.out.includes(`shared/text/${name}.md isn't used`), r.out);
 });
+test("shared/text/request-timeout.md states the wait shared/vars.yaml sets", () => {
+  const ms = parseYaml(readFileSync(join(root, "shared/vars.yaml"), "utf8")).request_timeout_ms;
+  assert.ok(Number.isInteger(ms) && ms > 0, "request_timeout_ms is a whole number of milliseconds");
+  assert.match(readFileSync(join(root, "shared/text/request-timeout.md"), "utf8"), new RegExp(`\\b${ms / 1000} seconds\\b`));
+});
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));
 
