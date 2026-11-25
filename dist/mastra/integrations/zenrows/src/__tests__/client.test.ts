@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { requestZenrows, ZenrowsError } from '../client.js';
-import { REQUEST_TIMEOUT, RESPONSES } from '../spec.js';
+import { DEFAULT_BASE_URL, REQUEST_TIMEOUT, RESPONSES } from '../spec.js';
 
 const fetchMock = vi.fn<typeof fetch>();
 const problem = (status: number, body: Record<string, unknown>) =>
@@ -57,7 +57,7 @@ describe('requestZenrows', () => {
     await requestZenrows({ apiKey: 'k', fetch: fetchMock }, { url: 'https://example.com/' });
 
     expect(fetchMock.mock.calls[0]![1]!.method).toBe('GET');
-    expect(`${sentUrl().origin}${sentUrl().pathname}`).toBe('https://api.zenrows.com/v1/');
+    expect(`${sentUrl().origin}${sentUrl().pathname}`).toBe(`${DEFAULT_BASE_URL.replace(/\/$/, '')}/`);
   });
 
   it('reads the key and the base URL from the environment', async () => {
