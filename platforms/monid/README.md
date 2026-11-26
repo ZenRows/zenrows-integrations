@@ -38,6 +38,15 @@ The rate is an identity (`PER_UNIT` on `CREDIT`, 1 per credit), so the engine's
 derived fold equals the vendor's claim and a correctly metered run carries no
 `usage.mismatch`.
 
+The meter also decides whether a run failed. Zenrows counts a 404 or 410 from
+the target as a request it carried out and charges for it, so `lifecycle.start`
+reports any run with a positive meter as completed and puts the vendor's status
+on `providerHttpStatus`. Passing that status through as the run's own would
+have the engine read it as a vendor failure, force zero usage and skip the
+consolidate, and the credit Zenrows took would never be billed on. A zero or
+absent meter keeps the vendor's status, so a bad key, an empty balance or a
+page it could not reach stays the error it is and bills nothing.
+
 A missing or malformed meter falls back to 25 in the evidence and omits the
 pool entry in the consolidate. Never `?? 0`: a stripped header would become a
 free run and leave the cost with whoever brokers it.
@@ -58,6 +67,10 @@ the one input that cannot be priced ahead, so it holds 25.
   page and can settle at 25, which is why the hold for that pair is 25.
 - `response_type` beside `outputs` is a 400. `css_extractor` beside `outputs`
   is served, and the `css_extractor` fields win.
+- A target that answers 404 draws 1 credit and comes back as a RESP002 envelope
+  under the target's own status. `allowed_status_codes` turns the same fetch
+  into a 200 carrying the page's body, for the same 1 credit. A page Zenrows
+  could not fetch at all (RESP001) and a rejected key (AUTH002) both draw 0.
 
 Monid cannot enforce cross-field rules in the schema: refinements do not
 survive `z.toJSONSchema`. So each rule is stated in the `.describe()` of the

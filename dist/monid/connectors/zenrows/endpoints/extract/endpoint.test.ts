@@ -83,6 +83,29 @@ Deno.test("zenrows#extract provider error: an unprepared domain, digested and un
     assertEquals(result.usage, { credits: {}, evidence: {} });
 });
 
+Deno.test("zenrows#extract a charged 404 settles at its meter, not as a failure", async () => {
+    // Extract inherits the rule from the provider's lifecycle.start: Zenrows
+    // counts a 404 from the target as a request it carried out and charges for
+    // it, so a positive meter settles the run and the target's status rides on
+    // providerHttpStatus. Scrape has the same test; this one proves the second
+    // endpoint is covered by the same fn rather than by luck.
+    const result = await runEndpoint({
+        unit: await testSealedUnit(EXTRACT),
+        input: { queryParams: { url: PRODUCT } },
+        mode: "replay",
+        fixture: await loadFixture(fixture("extract-page-gone")),
+    });
+    assertEquals(result.isProviderError, false);
+    assertEquals(result.httpStatus, 200);
+    assertEquals(result.providerHttpStatus, 404);
+    assertEquals(result.usage, {
+        credits: { default: 1 },
+        evidence: { CREDIT: 1 },
+    });
+    // No `parsed` to unwrap, so the envelope passes through whole.
+    assertEquals((result.output as Record<string, unknown>).code, "RESP002");
+});
+
 Deno.test("zenrows#extract input: the vendor's own parameters, strictly", async () => {
     const unit = await testSealedUnit(EXTRACT);
     for (

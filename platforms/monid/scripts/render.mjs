@@ -46,8 +46,7 @@ const notes = {
     outputs:
         "This endpoint sends a response_type unless you ask for 'html', which sends none, so pair outputs with response_type 'html'.",
     original_status:
-        "Zenrows counts a 404 or 410 from the target as a request it carried out, and charges for it, so such a run settles at the credits it drew and reports the target's status beside the result rather than as a failure.",
-    allowed_status_codes: "Zenrows charges these requests.",
+        "A run settles at the credits it drew whenever Zenrows charged, and reports the target's status beside the result rather than as a failure.",
     css_extractor:
         "It overrides response_type, which is why this endpoint's own 'html' value exists, and it does coexist with outputs.",
 };
@@ -86,10 +85,18 @@ const replacedDescriptions = {
 // that is quoted as a whole.
 const carriesCreditWeights = ["js_render", "premium_proxy"];
 
+// Vendor facts that belong to Zenrows rather than to this connector, so they
+// live in shared/text and reach every host from one place. `notes` above keeps
+// only what is true of monid's engine.
+const vendorFacts = {
+    original_status: "{{< target-gone-billed }}.",
+    allowed_status_codes: "{{< allowed-codes-billed }}.",
+};
+
 const str = (value) => JSON.stringify(value);
 
 /** One zod expression for a parameter, from its JSON Schema. */
-function zod(name, schema, required, creditWeights) {
+function zod(name, schema, required, creditWeights, facts) {
     const values = schema.enum &&
         schema.enum.filter((v) => !(dropped[name] ?? []).includes(v));
     let base;
@@ -117,7 +124,9 @@ function zod(name, schema, required, creditWeights) {
     }
     const spec = replacedDescriptions[name] ?? schema.description;
     const weights = carriesCreditWeights.includes(name) ? creditWeights : undefined;
-    const description = [spec, weights, notes[name]].filter(Boolean).join(" ");
+    const description = [spec, weights, facts[name], notes[name]]
+        .filter(Boolean)
+        .join(" ");
     if (!description) throw new Error(`${where}: ${name} has no description in the spec`);
     return `    ${name}: ${base}.describe(\n        ${str(description)},\n    )${required ? "" : ".optional()"},\n`;
 }
@@ -131,6 +140,9 @@ export default function render({ apiEndpoints, fill }) {
     // resolved here. A typo would survive as text, and the render's
     // leftover-token check would then fail the build rather than ship it.
     const creditWeights = fill("Zenrows charges {{< credit-weights }}.");
+    const facts = Object.fromEntries(
+        Object.entries(vendorFacts).map(([name, text]) => [name, fill(text)]),
+    );
     const endpoints = apiEndpoints();
     const query = {};
     const required = new Set();
@@ -146,7 +158,7 @@ export default function render({ apiEndpoints, fill }) {
 
     const field = (name) => {
         if (!query[name]) throw new Error(`${where}: the spec no longer has a "${name}" parameter`);
-        return zod(name, query[name], required.has(name), creditWeights);
+        return zod(name, query[name], required.has(name), creditWeights, facts);
     };
 
     return {
