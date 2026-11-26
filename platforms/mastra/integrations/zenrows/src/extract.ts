@@ -36,7 +36,11 @@ export function createZenrowsExtractTool(options: ZenrowsClientOptions = {}) {
     outputSchema,
     execute: async params => {
       const response = await requestZenrows(options, { ...params, extract: 'auto' });
-      return { url: params.url, data: JSON.parse(response.body) as unknown, credits: response.credits };
+      // The API answers { html, parsed }: the page itself, often hundreds of KB, and
+      // the fields. The agent needs only the fields; a body without parsed is kept whole.
+      const body = JSON.parse(response.body) as unknown;
+      const data = body && typeof body === 'object' && 'parsed' in body ? body.parsed : body;
+      return { url: params.url, data, credits: response.credits };
     },
   });
 }

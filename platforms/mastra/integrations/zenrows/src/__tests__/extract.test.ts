@@ -40,4 +40,10 @@ describe('createZenrowsExtractTool', () => {
       credits: 1,
     });
   });
+
+  it('returns only the parsed fields when the API also sends the page HTML', async () => {
+    fetchMock.mockResolvedValue(Response.json({ html: '<!doctype html><html></html>', parsed: { name: 'Mug' } }));
+
+    await expect(extract({ url: 'https://shop.example/mug' })).resolves.toMatchObject({ data: { name: 'Mug' } });
+  });
 });

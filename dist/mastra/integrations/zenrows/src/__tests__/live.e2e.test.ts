@@ -38,6 +38,8 @@ describe.skipIf(!process.env.ZENROWS_API_KEY)('Zenrows, live', () => {
       expect((outcome.error as ZenrowsError).code).toMatch(/^[A-Za-z0-9_]+$/);
     } else {
       expect(outcome.result).toMatchObject({ url: product, data: expect.anything() });
+      // The fields only, not the page's HTML.
+      expect((outcome.result as { data: Record<string, unknown> }).data).not.toHaveProperty('html');
     }
   });
 
