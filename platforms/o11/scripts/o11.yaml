@@ -51,7 +51,7 @@ prices:
     priceTerms:
       details: >-
         Metered from the X-Request-Credits response header: the credits the request used,
-        times the per-credit price; {{< failed-not-billed}}.
+        times the per-credit price; {{< failed-not-billed}}, but {{< target-gone-billed}}.
   after_run:
     price:
       kind: unresolved
