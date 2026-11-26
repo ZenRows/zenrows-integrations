@@ -46,7 +46,7 @@ const notes = {
     outputs:
         "This endpoint sends a response_type unless you ask for 'html', which sends none, so pair outputs with response_type 'html'.",
     original_status:
-        "Be careful pairing it with allowed_status_codes: a non-2xx status is a provider error here, so the page arrives digested as an error and the run records no credits, while Zenrows still charges it.",
+        "Zenrows counts a 404 or 410 from the target as a request it carried out, and charges for it, so such a run settles at the credits it drew and reports the target's status beside the result rather than as a failure.",
     allowed_status_codes: "Zenrows charges these requests.",
     css_extractor:
         "It overrides response_type, which is why this endpoint's own 'html' value exists, and it does coexist with outputs.",
