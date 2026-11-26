@@ -147,6 +147,30 @@ async function fetchPage({
   }
 }
 
+// Custom API Call attaches the key to whatever URL the step holds, and that URL
+// can come from an earlier step: only HTTPS to the Zenrows API gets the key,
+// and never with redirects on, which could carry it elsewhere.
+function apiKeyHeaderFor({ apiKey, url, followRedirects }: { apiKey: string; url: unknown; followRedirects: unknown }): Record<string, string> {
+  // The url prop is a group: { url: '<what the user typed>' }.
+  const value = typeof url === 'object' && url !== null && 'url' in url ? url.url : url;
+  const target = typeof value === 'string' ? value.trim() : '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(target);
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.protocol !== 'https:' || !ZENROWS_API_HOSTS.includes(parsed.hostname)) {
+      throw new Error(`Zenrows: Custom API Call only sends your API key to https://${ZENROWS_API_HOSTS.join(' or https://')}. Use a path such as /subscriptions/self/details, or a full URL on one of those hosts.`);
+    }
+  }
+  if (followRedirects === true) {
+    throw new Error('Zenrows: turn off Follow redirects. The Zenrows API does not redirect, and a redirect could carry your API key to another host.');
+  }
+  return { 'X-API-Key': apiKey };
+}
+
 // The API answers every failure with a code and a reason
 // (https://docs.zenrows.com/api-error-codes); the message keeps both, and adds
 // what to do next for the codes where Activepieces changes the answer.
@@ -223,6 +247,9 @@ const ERROR_HINTS: Record<string, string> = {
 
 export const ZENROWS_API_BASE_URL = "https://api.zenrows.com/v1";
 
+// The hosts the API is served from (Batch has its own), the only ones that get the key.
+export const ZENROWS_API_HOSTS = [new URL(ZENROWS_API_BASE_URL).hostname, new URL("https://async.api.zenrows.com/v1").hostname];
+
 // The parameters the actions send, as the published API spec defines them
 // (rendered from it): a name the API doesn't take fails the build, and the
 // actions take each one's description from here.
@@ -232,6 +259,7 @@ export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, s
 export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;
 
 export const zenrowsClient = {
+  apiKeyHeaderFor,
   callOperation,
   fetchPage,
   readHeader,
