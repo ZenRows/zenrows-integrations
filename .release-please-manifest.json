@@ -1,7 +1,7 @@
 {
   "dist/openclaw": "0.1.4",
   "dist/copilot": "0.1.1",
-  "dist/claude": "0.1.6",
+  "dist/claude": "0.2.0",
   "dist/openai": "0.1.8",
   "dist/cursor": "0.2.2",
   "dist/o11": "0.1.0"
