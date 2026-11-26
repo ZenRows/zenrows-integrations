@@ -149,7 +149,9 @@ async function fetchPage({
 
 // Custom API Call attaches the key to whatever URL the step holds, and that URL
 // can come from an earlier step: only HTTPS to the Zenrows API gets the key,
-// and never with redirects on, which could carry it elsewhere.
+// and only with redirects off, since a redirect could carry it elsewhere. Their
+// HTTP client follows redirects when the setting is missing (an imported flow,
+// a step made through their API), so only an explicit false counts as off.
 function apiKeyHeaderFor({ apiKey, url, followRedirects }: { apiKey: string; url: unknown; followRedirects: unknown }): Record<string, string> {
   // The url prop is a group: { url: '<what the user typed>' }.
   const value = typeof url === 'object' && url !== null && 'url' in url ? url.url : url;
@@ -165,8 +167,8 @@ function apiKeyHeaderFor({ apiKey, url, followRedirects }: { apiKey: string; url
       throw new Error(`Zenrows: Custom API Call only sends your API key to https://${ZENROWS_API_HOSTS.join(' or https://')}. Use a path such as /subscriptions/self/details, or a full URL on one of those hosts.`);
     }
   }
-  if (followRedirects === true) {
-    throw new Error('Zenrows: turn off Follow redirects. The Zenrows API does not redirect, and a redirect could carry your API key to another host.');
+  if (followRedirects !== false) {
+    throw new Error('Zenrows: Follow redirects must be off (in the step\'s advanced settings; switch it on and off again if it already shows off). The Zenrows API does not redirect, and a redirect could carry your API key to another host.');
   }
   return { 'X-API-Key': apiKey };
 }
