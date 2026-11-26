@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/ZenRows/zenrows-integrations/compare/openai-v0.1.8...openai-v0.2.0) (2026-11-26)
+
+
+### Features
+
+* **monid:** Zenrows connector for Monid, as a code host ([#20](https://github.com/ZenRows/zenrows-integrations/issues/20)) ([bd65d61](https://github.com/ZenRows/zenrows-integrations/commit/bd65d610be811762a87dbbf03043f40df75cb267))
+* **openai:** `getting-started` names ChatGPT and Codex, and on a 401 or `AUTH003` asks the user to reconnect Zenrows the same way they first connected it. ([3041d76](https://github.com/ZenRows/zenrows-integrations/commit/3041d76a7f3c5344727c2100d925cc5f89299896))
+* **openai:** The plugin description in `plugin.json`, the README intro and the opening of `using-zenrows` now say in full what Zenrows does: fetch any public page as Markdown, HTML or text, pull structured fields as JSON, run batch jobs, crawl a site from one start URL and drive a hosted browser, with proxies, JavaScript rendering and anti-bot protection handled by Zenrows. ([3041d76](https://github.com/ZenRows/zenrows-integrations/commit/3041d76a7f3c5344727c2100d925cc5f89299896))
+* **openai:** The README has a Setup section: install Zenrows from the plugins directory in ChatGPT or Codex, sign in when the model first asks to use it, then try the example prompt. ([3041d76](https://github.com/ZenRows/zenrows-integrations/commit/3041d76a7f3c5344727c2100d925cc5f89299896))
+* **openai:** The README links the MCP server documentation, and the contact address is integrations@zenrows.com (was success@zenrows.com). ([3041d76](https://github.com/ZenRows/zenrows-integrations/commit/3041d76a7f3c5344727c2100d925cc5f89299896))
+
+
+### Bug Fixes
+
+* **render:** write versioned JSON the way release-please rewrites it ([#26](https://github.com/ZenRows/zenrows-integrations/issues/26)) ([3a78cf1](https://github.com/ZenRows/zenrows-integrations/commit/3a78cf1f1b513dd0230e97edc5208893a6819229))
+
 ## 0.1.8
 
 - The `extract` skills no longer say `fallback_autoparse` retries with autoparse: it has had no effect since the Zenrows MCP server removed that fallback. They now handle `REQS007` by its `reason`: `domain_not_prepared` (prepare the domain with `prepare_domain`, then wait for `prepared_domain_status`), `page_not_recognised` and `domain_not_enabled`. `mode='autoparse'` is marked deprecated, and `include_html` is listed.
