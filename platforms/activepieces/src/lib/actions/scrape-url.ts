@@ -31,7 +31,7 @@ export const scrapeUrlAction = createAction({
   props: {
     url: Property.ShortText({
       displayName: 'URL',
-      description: FETCH_PARAMS.properties.url.description,
+      description: plainText(FETCH_PARAMS.properties.url.description),
       required: true,
     }),
     output_format: Property.StaticDropdown<OutputFormat>({
@@ -63,7 +63,7 @@ export const scrapeUrlAction = createAction({
     }),
     custom_headers: Property.Object({
       displayName: 'Custom Headers',
-      description: FETCH_PARAMS.properties.custom_headers.description,
+      description: plainText(FETCH_PARAMS.properties.custom_headers.description),
       required: false,
     }),
   },
@@ -127,6 +127,11 @@ function pngOrThrow(data: Buffer): Buffer {
 }
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+// The builder shows descriptions as plain text, so the spec's `code` marks go.
+function plainText(text: string): string {
+  return text.replace(/`/g, '');
+}
 
 // The headers the form holds as text, trimmed; other values are left out.
 function stringValues(value: Record<string, unknown> | null | undefined): Record<string, string> {

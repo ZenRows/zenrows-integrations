@@ -37,7 +37,14 @@ async function callOperation({
   files?: Files;
 }): Promise<unknown> {
   const given = (name: string) => values[name] !== undefined && values[name] !== null && values[name] !== '';
-  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => encodeURIComponent(String(values[name])));
+  // An empty ID would turn /jobs/{job_id} into /jobs/, which lists every job
+  // and succeeds: a mapped value that came out empty fails the step instead.
+  const path = operation.path.replace(/\{([a-z_]+)\}/g, (_, name: string) => {
+    if (!given(name)) {
+      throw new Error(`Zenrows: ${name} is empty. Check the value mapped into it.`);
+    }
+    return encodeURIComponent(String(values[name]));
+  });
   const queryParams: Record<string, string> = {};
   for (const name of (operation.query ?? []).filter(given)) {
     queryParams[name] = String(values[name]);
@@ -140,6 +147,32 @@ async function fetchPage({
   }
 }
 
+// Custom API Call attaches the key to whatever URL the step holds, and that URL
+// can come from an earlier step: only HTTPS to the Zenrows API gets the key,
+// and only with redirects off, since a redirect could carry it elsewhere. Their
+// HTTP client follows redirects when the setting is missing (an imported flow,
+// a step made through their API), so only an explicit false counts as off.
+function apiKeyHeaderFor({ apiKey, url, followRedirects }: { apiKey: string; url: unknown; followRedirects: unknown }): Record<string, string> {
+  // The url prop is a group: { url: '<what the user typed>' }.
+  const value = typeof url === 'object' && url !== null && 'url' in url ? url.url : url;
+  const target = typeof value === 'string' ? value.trim() : '';
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(target);
+    } catch {
+      parsed = null;
+    }
+    if (!parsed || parsed.protocol !== 'https:' || !ZENROWS_API_HOSTS.includes(parsed.hostname)) {
+      throw new Error(`Zenrows: Custom API Call only sends your API key to https://${ZENROWS_API_HOSTS.join(' or https://')}. Use a path such as /subscriptions/self/details, or a full URL on one of those hosts.`);
+    }
+  }
+  if (followRedirects !== false) {
+    throw new Error('Zenrows: Follow redirects must be off (in the step\'s advanced settings; switch it on and off again if it already shows off). The Zenrows API does not redirect, and a redirect could carry your API key to another host.');
+  }
+  return { 'X-API-Key': apiKey };
+}
+
 // The API answers every failure with a code and a reason
 // (https://docs.zenrows.com/api-error-codes); the message keeps both, and adds
 // what to do next for the codes where Activepieces changes the answer.
@@ -216,6 +249,9 @@ const ERROR_HINTS: Record<string, string> = {
 
 export const ZENROWS_API_BASE_URL = {{api:GET / server}};
 
+// The hosts the API is served from (Batch has its own), the only ones that get the key.
+export const ZENROWS_API_HOSTS = [new URL(ZENROWS_API_BASE_URL).hostname, new URL({{api:POST /jobs server}}).hostname];
+
 // The parameters the actions send, as the published API spec defines them
 // (rendered from it): a name the API doesn't take fails the build, and the
 // actions take each one's description from here.
@@ -225,6 +261,7 @@ export type FetchParams = Partial<Record<keyof typeof FETCH_PARAMS.properties, s
 export type FetchValue<P extends keyof typeof FETCH_PARAMS.properties> = (typeof FETCH_PARAMS.properties)[P] extends { enum: readonly (infer V)[] } ? V : string;
 
 export const zenrowsClient = {
+  apiKeyHeaderFor,
   callOperation,
   fetchPage,
   readHeader,

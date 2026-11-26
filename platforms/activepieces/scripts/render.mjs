@@ -19,7 +19,8 @@ const label = (name) => name.split("_").map((w) => words[w] ?? w.charAt(0).toUpp
 const str = (value) => JSON.stringify(value);
 // The spec wraps its prose at a fixed width: a lone line break inside a sentence
 // is a space in the builder. A blank line or a list item ("- ") keeps its break.
-const unwrap = (text) => text.trim().replace(/\n(?!\n|\s*- )/g, " ").replace(/ {2,}/g, " ");
+// The builder shows descriptions as plain text, so the spec's `code` marks go.
+const unwrap = (text) => text.trim().replace(/\n(?!\n|\s*- )/g, " ").replace(/ {2,}/g, " ").replace(/`/g, "");
 
 // Activepieces' badge for what a step does to Zenrows: reads are READ or SEARCH
 // (a list), a cancel or stop is DESTRUCTIVE (a retry can't undo it), anything

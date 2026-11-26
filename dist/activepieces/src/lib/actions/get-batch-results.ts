@@ -16,8 +16,8 @@ export const getBatchResultsAction = createAction({
     idempotent: true,
   },
   props: {
-    status: Property.StaticDropdown({ displayName: "Status", description: "`processing` covers both `pending` and `processing` task states (anything not yet terminal).", required: false, defaultValue: "all", options: { disabled: false, options: [{ label: "All", value: "all" }, { label: "Successful", value: "successful" }, { label: "Failed", value: "failed" }, { label: "Processing", value: "processing" }] } }),
-    cursor: Property.ShortText({ displayName: "Cursor", description: "Opaque pagination token; echo `next_cursor`.", required: false }),
+    status: Property.StaticDropdown({ displayName: "Status", description: "processing covers both pending and processing task states (anything not yet terminal).", required: false, defaultValue: "all", options: { disabled: false, options: [{ label: "All", value: "all" }, { label: "Successful", value: "successful" }, { label: "Failed", value: "failed" }, { label: "Processing", value: "processing" }] } }),
+    cursor: Property.ShortText({ displayName: "Cursor", description: "Opaque pagination token; echo next_cursor.", required: false }),
     job_id: Property.ShortText({ displayName: "Job ID", description: "The batch job's ID, as Create Batch Job returned it (job_id).", required: true }),
   },
   async run({ auth, propsValue, files }) {
