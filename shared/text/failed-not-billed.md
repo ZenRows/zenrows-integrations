@@ -1,1 +1,1 @@
-failed requests use no credits
+a request Zenrows could not carry out uses no credits
