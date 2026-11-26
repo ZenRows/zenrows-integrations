@@ -14,6 +14,7 @@ Each host's guide covers installing the plugin and signing in to Zenrows. You si
 | Claude | [dist/claude/README.md](dist/claude/README.md) |
 | Cursor | [dist/cursor/README.md](dist/cursor/README.md) |
 | GitHub Copilot | [dist/copilot/README.md](dist/copilot/README.md) |
+| Mastra | [platforms/mastra/README.md](platforms/mastra/README.md) |
 | Monid | [platforms/monid/README.md](platforms/monid/README.md) |
 | o11.ai | [platforms/o11/README.md](platforms/o11/README.md) |
 | OpenClaw | [dist/openclaw/README.md](dist/openclaw/README.md) |

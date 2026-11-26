@@ -12,7 +12,7 @@ export const getCrawlContentAction = createAction({
   description: "Get the HTML of one page a crawl fetched.",
   audience: 'both',
   aiMetadata: {
-    description: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Costs no credits; safe to retry.",
+    description: "Returns the HTML of one page a crawl with an output format fetched. Take Content ID from the result's content_url. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

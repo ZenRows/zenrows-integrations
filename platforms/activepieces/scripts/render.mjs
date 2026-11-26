@@ -2,9 +2,12 @@
 // the published API spec, each in its own src/lib/actions/<name>.ts, and
 // src/lib/actions/generated.ts listing them for index.ts. Fetch has a
 // hand-written action (Scrape URL), so it's left out here. npm run render runs it.
-// vars.yaml's actions and action_props give the wording Activepieces shows;
+// shared/actions.yaml gives the wording Activepieces shows (the same as Mastra's
+// tools), and vars.yaml's omit and classification what only Activepieces has;
 // what they leave out comes from the spec.
 const handWritten = ["fetch"];
+// How shared/actions.yaml's {{tool:<id>}} and {{field:<name>}} read here: an
+// action by its display name, a field by its form label.
 
 // The description shown is the spec's first paragraph; the rest is for the API docs.
 // "create_batch_job" → "createBatchJobAction" in "create-batch-job.ts"; "Read a job" → "Read A Job"; "job_id" → "Job ID".
@@ -47,15 +50,21 @@ function prop(name, schema, required, description) {
 
 export default function render({ apiEndpoints, values }) {
   const where = "platforms/activepieces/scripts/render.mjs";
-  const wording = values.actions ?? {};
-  const sharedProps = values.action_props ?? {};
-  const endpoints = apiEndpoints().filter((e) => !handWritten.includes(e.key));
+  const omits = values.omit ?? {};
+  const classifications = values.classification ?? {};
+  const idempotents = values.idempotent ?? {};
+  const handWrittenNames = { fetch: values.scrape_action_name };
+  const names = {
+    tool: (e) => handWrittenNames[e.key] ?? e.wordingName ?? titleCase(e.name),
+    field: (name) => label(name),
+  };
+  const endpoints = apiEndpoints(names).filter((e) => !handWritten.includes(e.key));
   const files = {};
   for (const e of endpoints) {
-    const own = wording[e.id] ?? {};
+    const own = e.wording;
     // The key goes in the X-API-Key header where the operation takes it, else as apikey.
     const inHeader = e.keyIn.header === "X-API-Key";
-    if (!inHeader && e.keyIn.query !== "apikey") throw new Error(`${where}: ${e.operation} takes the key neither in X-API-Key nor as apikey`);
+    if (!inHeader && e.keyIn.query !== "apikey") throw new Error(`${where}: the API spec takes the key for ${e.operation} neither in X-API-Key nor as apikey`);
     const props = [];
     const operation = { method: e.method, server: e.server, path: e.path, key: inHeader ? "header" : "query" };
     // NDJSON comes back as a list, one item per line; a response that can be a
@@ -63,28 +72,25 @@ export default function render({ apiEndpoints, values }) {
     if (e.responseTypes.includes("application/x-ndjson")) operation.lines = true;
     else if (e.responseTypes.some((type) => !type.includes("json") && !type.startsWith("text/"))) operation.binary = true;
     // omit drops an optional field that means nothing in Activepieces; it is never sent.
-    const omit = own.omit ?? [];
+    const omit = omits[e.id] ?? [];
     for (const [part, schema] of Object.entries(e.input)) {
-      if (schema.type !== "object" || !schema.properties) throw new Error(`${where}: ${e.operation}'s ${part} isn't an object with properties`);
+      if (schema.type !== "object" || !schema.properties) throw new Error(`${where}: the API spec gives ${e.operation} a ${part} that isn't an object with properties`);
       for (const name of omit.filter((n) => n in schema.properties)) {
-        if (part === "path" || (schema.required ?? []).includes(name)) throw new Error(`${where}: vars.yaml actions.${e.id}.omit drops "${name}", which ${e.operation} requires`);
+        if (part === "path" || (schema.required ?? []).includes(name)) throw new Error(`${where}: vars.yaml omit.${e.id} drops "${name}", which the API spec has as required in ${e.operation}`);
       }
       const fields = Object.entries(schema.properties).filter(([name]) => !omit.includes(name));
       // Path parameters are filled into the path by name; the client needs the others' names.
       if (part !== "path") operation[part] = fields.map(([name]) => name);
       for (const [name, field] of fields) {
-        if (props.some(([n]) => n === name)) throw new Error(`${where}: ${e.operation} has "${name}" in two places`);
-        props.push([name, prop(name, field, (schema.required ?? []).includes(name), own.props?.[name] ?? sharedProps[name])]);
+        if (props.some(([n]) => n === name)) throw new Error(`${where}: the API spec has "${name}" in two places of ${e.operation}`);
+        props.push([name, prop(name, field, (schema.required ?? []).includes(name), own.props[name])]);
       }
     }
     for (const name of omit.filter((n) => !Object.values(e.input).some((schema) => n in schema.properties))) {
-      throw new Error(`${where}: vars.yaml actions.${e.id}.omit drops "${name}", which ${e.operation} doesn't take`);
-    }
-    for (const name of Object.keys(own.props ?? {})) {
-      if (!props.some(([n]) => n === name)) throw new Error(`${where}: vars.yaml actions.${e.id}.props describes "${name}", which ${e.operation} doesn't take`);
+      throw new Error(`${where}: vars.yaml omit.${e.id} drops "${name}", but the API spec takes no "${name}" in ${e.operation}`);
     }
     const description = own.description ?? unwrap((e.description ?? e.name).split(/\n\s*\n/)[0]);
-    const classification = own.classification ?? classify(e);
+    const classification = classifications[e.id] ?? classify(e);
     const propsCode = props.length ? `{\n${props.map(([name, p]) => `    ${name}: ${p},\n`).join("")}  }` : "{}";
     files[`src/lib/actions/${file(e.id)}.ts`] = `${header}import { createAction${props.length ? ", Property" : ""} } from '@activepieces/pieces-framework';
 import { zenrowsAuth } from '../auth';
@@ -98,8 +104,8 @@ export const ${camel(e.id)}Action = createAction({
   description: ${str(description)},
   audience: 'both',
   aiMetadata: {
-    description: ${str(own.ai ?? description)},
-    idempotent: ${classification === "READ" || classification === "SEARCH"},
+    description: ${str(`${own.ai ?? description} ${own.cost}`)},
+    idempotent: ${idempotents[e.id] ?? (classification === "READ" || classification === "SEARCH")},
   },
   props: ${propsCode},
   async run({ auth, propsValue, files }) {

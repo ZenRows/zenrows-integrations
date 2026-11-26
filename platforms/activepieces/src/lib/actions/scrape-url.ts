@@ -18,7 +18,7 @@ export const scrapeUrlAction = createAction({
   auth: zenrowsAuth,
   name: 'scrape_url',
   classification: 'READ',
-  displayName: 'Scrape URL',
+  displayName: '{{scrape_action_name}}',
   description:
     'Get the content of any web page as Markdown, HTML, plain text or a screenshot, bypassing anti-bot protection.',
   audience: 'both',

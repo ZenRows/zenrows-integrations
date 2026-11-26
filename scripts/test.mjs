@@ -102,6 +102,11 @@ test("every form of this tool's tokens is caught", () => {
   }
 });
 test("a {{…}} in a file type the render doesn't fill fails", fails({ ...piece, "platforms/piece/setup.py": "name = \"{{host_full}}\"\n" }, "setup.py still has an unrendered {{host_full}}"));
+test("an MDX page is filled", () => {
+  const r = run({ ...piece, "platforms/piece/docs/page.mdx": "# {{host_full}}\n\n<Table content={[{ name: 'x' }]} />\n" }, {}, ["dist/piece/docs/page.mdx"]);
+  assert.ok(r.ok, r.out);
+  assert.equal(r.dist("dist/piece/docs/page.mdx"), "# Piece\n\n<Table content={[{ name: 'x' }]} />\n");
+});
 test("a mistyped snippet token fails on the way through the render", fails({
   ...piece,
   "shared/text/cost.md": "A request with js_render costs 5 credits.\n",
@@ -149,7 +154,12 @@ const tokenSpecText = JSON.stringify({
         { name: "url", in: "query", required: true, description: "The page.", schema: { type: "string", format: "uri" }, example: "https://example.com/" },
         { $ref: "#/components/parameters/stubMode" },
       ],
-      get: { operationId: "fetchPage", summary: "Fetch a page", description: "Fetches a stub page." },
+      get: {
+        operationId: "fetchPage",
+        summary: "Fetch a page",
+        description: "Fetches a stub page.",
+        responses: { 200: { description: "The page." }, 404: { $ref: "#/components/responses/StubMissing" }, 500: {} },
+      },
     },
     "/stub/{job_id}": {
       servers: [{ url: "https://async.example.com/v1" }],
@@ -170,6 +180,7 @@ const tokenSpecText = JSON.stringify({
   components: {
     ...published.components,
     parameters: { ...published.components?.parameters, stubMode: { name: "mode", in: "query", schema: { type: "string", enum: ["auto"] } } },
+    responses: { ...published.components?.responses, StubMissing: { description: "No such page." } },
     schemas: {
       ...published.components?.schemas,
       StubJob: { type: "object", properties: { urls: { type: "array", items: { $ref: "#/components/schemas/StubUrl" } } } },
@@ -205,6 +216,9 @@ test("{{api:…}} for a parameter the operation doesn't have fails", fails(usesT
 test("{{api:… summary}} and {{api:… description}} render the operation's text", rendersTo("[{{api:POST /stub-jobs summary}}, {{api:POST /stub-jobs description}}]", '["Create a job", "Sends every URL at once."]'));
 test("{{api:… server}} takes the operation's server, then the path's, then the spec's", rendersTo("[{{api:POST /stub-jobs server}}, {{api:GET /stub/{job_id} server}}, {{api:GET /stub server}}]", '["https://jobs.example.com/v1", "https://async.example.com/v1", "https://api.example.com/v1"]'));
 test("{{api:… description}} for an operation without one fails", fails(usesToken("{{api:GET /stub/{job_id} description}}"), "the API spec has no description for GET /stub/{job_id}", tokenSpec));
+test("{{api:… responses}} renders each described response's description, $refs followed", rendersTo("{{api:GET /stub responses}}", '{"200":"The page.","404":"No such page."}'));
+test("{{api:… responses}} renders only the statuses it names", rendersTo("{{api:GET /stub responses 404}}", '{"404":"No such page."}'));
+test("{{api:… responses}} naming a status the spec doesn't describe fails", fails(usesToken("{{api:GET /stub responses 500}}"), "the API spec has no described 500 response for GET /stub", tokenSpec));
 // shared/endpoints.yaml: an endpoint that is a slice of one operation, for every host.
 // The repo's own shared endpoints stay (o11 uses them); the case adds one.
 const sliced = (yaml, token) => ({ ...usesToken(token), "shared/endpoints.yaml": readFileSync(join(root, "shared/endpoints.yaml"), "utf8") + yaml });
@@ -318,9 +332,12 @@ typesSpec.paths["/stub-lines/{job_id}"] = {
 };
 const actionFile = (name) => `dist/activepieces/src/lib/actions/${name}.ts`;
 const actionFiles = ["generated", "get-job", "create-job", "get-types", "get-lines", "stop-lines", "fetch-page", "fetch", "extract"].map(actionFile);
-// vars.yaml with its own action wording replaced (none by default), so the stub
-// endpoints read the spec.
-const apVars = (wording = "\n") => ({ "platforms/activepieces/vars.yaml": readFileSync(join(root, "platforms/activepieces/vars.yaml"), "utf8").replace(/\naction_props:[\s\S]*$/, wording) });
+// shared/actions.yaml with no wording by default, so the stub endpoints read the
+// spec; and Activepieces' vars.yaml with its own omit and classification replaced.
+const apVars = (own = "\n", wording = "") => ({
+  "shared/actions.yaml": wording,
+  "platforms/activepieces/vars.yaml": readFileSync(join(root, "platforms/activepieces/vars.yaml"), "utf8").replace(/\n# The wording of the generated actions[\s\S]*$/, own),
+});
 const typesBilling = (kinds) => {
   const billing = parseYaml(billingWith(kinds));
   for (const op of ["GET /stub-types", "GET /stub-lines/{job_id}", "POST /stub-lines/{job_id}"]) {
@@ -328,7 +345,7 @@ const typesBilling = (kinds) => {
   }
   return { "openapi-tokens.json": JSON.stringify(typesSpec), "shared/billing.yaml": JSON.stringify(billing) };
 };
-const actions = (kinds, wording) => run({ ...typesBilling(kinds), ...apVars(wording) }, tokenSpec, actionFiles);
+const actions = (kinds, own, wording) => run({ ...typesBilling(kinds), ...apVars(own, wording) }, tokenSpec, actionFiles);
 test("Activepieces gets an action per offered endpoint, and none for the rest", () => {
   const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] });
   assert.ok(r.ok, r.out);
@@ -339,7 +356,7 @@ test("Activepieces gets an action per offered endpoint, and none for the rest", 
   const create = r.dist(actionFile("create-job"));
   assert.ok(job.includes("import { createAction, Property } from '@activepieces/pieces-framework';"), job);
   assert.ok(job.includes('export const getJobAction = createAction({\n  auth: zenrowsAuth,\n  name: "get_job",\n  classification: "READ",\n  displayName: "Read A Job",'), job);
-  assert.ok(job.includes("  audience: 'both',\n  aiMetadata: {\n    description: \"Reads a job.\",\n    idempotent: true,\n  },\n"), "with no wording in vars.yaml, the agent reads the spec's description");
+  assert.ok(job.includes("  audience: 'both',\n  aiMetadata: {\n    description: \"Reads a job. This call uses no credits.\",\n    idempotent: true,\n  },\n"), "with no shared wording, the agent reads the spec's description, then the cost");
   assert.ok(job.includes('job_id: Property.ShortText({ displayName: "Job ID", required: true }),'), job);
   assert.ok(job.includes('  description: "Reads a job.",\n'), "the description is the spec's first paragraph");
   assert.ok(job.includes("async run({ auth, propsValue, files })") && job.includes("values: propsValue, files });"), job);
@@ -375,18 +392,18 @@ test("Activepieces reads NDJSON as a list, and a stop is destructive", () => {
   const stop = r.dist(actionFile("stop-lines"));
   assert.ok(stop.includes('classification: "DESTRUCTIVE",') && stop.includes("idempotent: false,"), stop);
 });
-test("vars.yaml's actions and action_props give an action its wording", () => {
-  const wording = `\naction_props:\n  job_id: "The job, from Create Job."\nactions:\n  get_job:\n    name: "Get Job"\n    description: "Read one job."\n    ai: "Reads a job by its ID. Safe to retry."\n    classification: SEARCH\n  create_job:\n    props:\n      urls: "The URLs to scrape."\n`;
-  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, wording);
+const stubWording = `action_props:\n  job_id: "The job, from Create Job."\nactions:\n  get_job:\n    name: "Get Job"\n    description: "Read one job."\n    ai: "Reads a job by its ID. Safe to retry."\n  create_job:\n    props:\n      urls: "The URLs to scrape."\n`;
+test("shared/actions.yaml gives an action its wording, and vars.yaml its classification", () => {
+  const r = actions({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }, `\nclassification:\n  get_job: SEARCH\n`, stubWording);
   assert.ok(r.ok, r.out);
   const job = r.dist(actionFile("get-job"));
-  for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
+  for (const line of ['classification: "SEARCH",', 'displayName: "Get Job",', 'description: "Read one job.",', 'description: "Reads a job by its ID. Safe to retry. This call uses no credits.",', 'job_id: Property.ShortText({ displayName: "Job ID", description: "The job, from Create Job.", required: true }),']) {
     assert.ok(job.includes(line), `expected ${line} in:\n${job}`);
   }
   assert.ok(r.dist(actionFile("create-job")).includes('urls: Property.Array({ displayName: "URLs", description: "The URLs to scrape.", required: false }),'));
 });
 test("vars.yaml's omit leaves an optional field out of the form and the request", () => {
-  const r = actions({ free: ["GET /stub-types"] }, `\nactions:\n  get_types:\n    omit: [download, filter]\n`);
+  const r = actions({ free: ["GET /stub-types"] }, `\nomit:\n  get_types: [download, filter]\n`);
   assert.ok(r.ok, r.out);
   const ts = r.dist(actionFile("get-types"));
   assert.ok(!ts.includes("download:") && !ts.includes("filter:"), ts);
@@ -394,16 +411,64 @@ test("vars.yaml's omit leaves an optional field out of the form and the request"
 });
 test("omitting a required field fails the Activepieces render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-  ...apVars(`\nactions:\n  get_job:\n    omit: [job_id]\n`),
-}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.omit drops "job_id", which GET /stub/{job_id} requires', tokenSpec));
-test("wording for a field an action doesn't take fails the Activepieces render", fails({
+  ...apVars(`\nomit:\n  get_job: [job_id]\n`),
+}, 'platforms/activepieces/scripts/render.mjs: vars.yaml omit.get_job drops "job_id", which the API spec has as required in GET /stub/{job_id}', tokenSpec));
+test("shared wording for a field an endpoint doesn't take fails the render", fails({
   ...typesBilling({ free: ["GET /stub/{job_id}"] }),
-  ...apVars(`\nactions:\n  get_job:\n    props:\n      nope: "x"\n`),
-}, 'platforms/activepieces/scripts/render.mjs: vars.yaml actions.get_job.props describes "nope", which GET /stub/{job_id} doesn\'t take', tokenSpec));
+  ...apVars(undefined, `actions:\n  get_job:\n    props:\n      nope: "x"\n`),
+}, 'shared/actions.yaml: actions.get_job.props describes "nope", but the API spec takes no "nope" in GET /stub/{job_id}', tokenSpec));
+test("shared wording for an endpoint we don't offer fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  create_job:\n    name: "Create Job"\n`),
+}, "shared/actions.yaml: actions.create_job is for no endpoint we offer", tokenSpec));
+test("Mastra's generated tools read the same shared wording as Activepieces' actions", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const docs = "dist/mastra/docs/src/content/en/integrations/tools/zenrows.mdx";
+  const r = run({ ...typesBilling({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }), ...apVars(undefined, stubWording) }, tokenSpec, [tool, docs, actionFile("get-job")]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist(tool), /description: 'Reads a job by its ID\. Safe to retry\. This call uses no credits\.',/, "the ai text, then the cost from its kind");
+  assert.match(r.dist(tool), /job_id: z\.string\(\)\.describe\('The job, from Create Job\.'\)/);
+  assert.match(r.dist(docs), /\| `zenrows-get-job` \| Read one job\. \| Free \|/);
+  assert.ok(r.dist(actionFile("get-job")).includes('description: "Reads a job by its ID. Safe to retry. This call uses no credits.",'));
+});
+test("both hosts add what a call costs from its kind in shared/billing.yaml", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/create-job.ts";
+  const r = run({ ...typesBilling({ after_run: ["POST /stub-jobs"] }), ...apVars(undefined, `actions:\n  create_job:\n    ai: "Creates a job."\n`) }, tokenSpec, [tool, actionFile("create-job")]);
+  assert.ok(r.ok, r.out);
+  const after = "Creates a job. A job is billed after it runs, by the credits each page or task it fetches uses: 1 credit for a basic request";
+  assert.ok(r.dist(tool).includes(after), r.dist(tool));
+  assert.ok(r.dist(actionFile("create-job")).includes(after), r.dist(actionFile("create-job")));
+});
+test("an ai line in shared/actions.yaml that says what a call costs fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    ai: "Reads a job. Costs no credits."\n`),
+}, "shared/actions.yaml: actions.get_job.ai says what the call costs", tokenSpec));
+test("{{tool:…}} and {{field:…}} read in each host's own terms", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const wording = `actions:\n  create_job:\n    name: "Create Job"\n  get_job:\n    ai: "Read it after {{tool:create_job}}, or use {{tool:fetch}}; pass {{field:job_id}} back."\n`;
+  const r = run({ ...typesBilling({ free: ["GET /stub/{job_id}", "POST /stub-jobs"] }), ...apVars(undefined, wording) }, tokenSpec, [tool, actionFile("get-job")]);
+  assert.ok(r.ok, r.out);
+  assert.ok(r.dist(actionFile("get-job")).includes('description: "Read it after Create Job, or use Scrape URL; pass Job ID back. This call uses no credits."'), r.dist(actionFile("get-job")));
+  assert.ok(r.dist(tool).includes("Read it after zenrows-create-job, or use zenrows-scrape; pass job_id back. This call uses no credits."), r.dist(tool));
+});
+test("{{tool:…}} for an endpoint we don't offer fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    ai: "Then use {{tool:nope}}."\n`),
+}, "shared/actions.yaml: actions.get_job.ai names {{tool:nope}}, but the API spec has no endpoint we offer by that id", tokenSpec));
+test("{{field:…}} for a field the endpoint doesn't take fails the render", fails({
+  ...typesBilling({ free: ["GET /stub/{job_id}"] }),
+  ...apVars(undefined, `actions:\n  get_job:\n    description: "Pass {{field:cursor}}."\n`),
+}, 'shared/actions.yaml: actions.get_job.description names {{field:cursor}}, but the API spec takes no "cursor" in GET /stub/{job_id}', tokenSpec));
 test("an offered endpoint that takes the key neither way fails the Activepieces render", fails({
   "openapi-tokens.json": JSON.stringify({ ...typesSpec, paths: { ...typesSpec.paths, "/stub-types": { get: { ...typesSpec.paths["/stub-types"].get, security: [{ other: [] }] } } } }),
   "shared/billing.yaml": typesBilling({ free: ["GET /stub-types"] })["shared/billing.yaml"],
-}, "platforms/activepieces/scripts/render.mjs: GET /stub-types takes the key neither in X-API-Key nor as apikey", tokenSpec));
+}, "platforms/activepieces/scripts/render.mjs: the API spec takes the key for GET /stub-types neither in X-API-Key nor as apikey", tokenSpec));
+test("{{cost:<kind>}} is the cost sentence of that billing kind, and an unknown kind fails", () => {
+  const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{cost:free}} {{cost:per_credit}}") });\n'), tokenSpec, ["dist/piece/note.txt"]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist("dist/piece/note.txt"), /^This call uses no credits\. Zenrows charges 1 credit for a basic request/);
+  fails(renders('export default ({ fill }) => ({ "note.txt": fill("{{cost:nope}}") });\n'), 'no cost sentence for billing kind "nope"', tokenSpec)();
+});
 test("a render script fills a template's variables and snippets", () => {
   const r = run(renders('export default ({ fill }) => ({ "note.txt": fill("{{host_full}}: {{< cost}}") });\n', { "shared/text/cost.md": "One credit.\n" }), tokenSpec, ["dist/piece/note.txt"]);
   assert.ok(r.ok, r.out);
@@ -505,5 +570,79 @@ test('"ZenRows" in a host fails; the GitHub org and the client header pass', () 
   assert.ok(r.ok, r.out);
 });
 test("a snippet written out instead of its token fails", fails({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n", "platforms/piece/src/index.ts": "export const a = {{text:cost}};\n// A request costs 5 credits.\n" }, "platforms/piece/src/index.ts writes out shared/text/cost.md"));
+test("a snippet the cost sentences in scripts/lib.mjs use isn't reported unused", () => {
+  const r = run({});
+  assert.ok(r.ok, r.out);
+  for (const name of ["billing-free", "billing-after-run"]) assert.ok(!r.out.includes(`shared/text/${name}.md isn't used`), r.out);
+});
+test("shared/text/request-timeout.md states the wait shared/vars.yaml sets", () => {
+  const ms = parseYaml(readFileSync(join(root, "shared/vars.yaml"), "utf8")).request_timeout_ms;
+  assert.ok(Number.isInteger(ms) && ms > 0, "request_timeout_ms is a whole number of milliseconds");
+  assert.match(readFileSync(join(root, "shared/text/request-timeout.md"), "utf8"), new RegExp(`\\b${ms / 1000} seconds\\b`));
+});
 test("an unused snippet only warns", warns({ ...piece, "shared/text/cost.md": "A request costs 5 credits.\n" }, "shared/text/cost.md isn't used by any skill or host yet"));
 test("a missing snippet fails", fails({ ...piece, "platforms/piece/src/index.ts": "export const cost = {{text:nope}};\n" }, "there's no shared/text/nope.md"));
+
+// A JSON file is checked against the schema it declares, whichever draft that schema is written in.
+test("a JSON file against a draft-07 schema is checked", fails({ ...piece, "platforms/piece/turbo.json": '{ "$schema": "https://v2-9-16.turborepo.dev/schema.json", "tasks": "build" }\n' }, "piece: turbo.json /tasks must be object"));
+
+// The Mastra host exposes or excludes every parameter of its tools' slices, so a new one forces a decision.
+test("a parameter the Mastra tools neither expose nor exclude fails", () => {
+  const endpoints = readFileSync(join(root, "shared/endpoints.yaml"), "utf8").replace(/^(  parameters: \[url, mode, js_render, )/m, "$1custom_headers, ");
+  assert.ok(endpoints.includes("custom_headers"), "the fetch slice gained custom_headers");
+  fails({ "shared/endpoints.yaml": endpoints }, "the scrape tool neither exposes nor excludes custom_headers from shared/endpoints.yaml's fetch")();
+});
+
+test("a response_type value the Mastra scrape tool neither offers nor excludes fails", () => {
+  const spec = structuredClone(published);
+  const parameters = [...(spec.paths["/"].parameters ?? []), ...(spec.paths["/"].get.parameters ?? [])];
+  const param = parameters.map((p) => (p.$ref ? spec.components.parameters[p.$ref.split("/").pop()] : p)).find((p) => p.name === "response_type");
+  assert.ok(param?.schema?.enum, "GET / has a response_type enum");
+  param.schema.enum.push("docx");
+  fails({ "openapi-rt.json": JSON.stringify(spec) }, "the API spec gives response_type docx, which the scrape tool neither offers nor excludes", { ZENROWS_OPENAPI: "openapi-rt.json" })();
+});
+
+// Mastra generates a tool for every endpoint shared/billing.yaml offers that has no hand-written one.
+test("an endpoint shared/billing.yaml offers becomes a Mastra tool", () => {
+  const tool = "dist/mastra/integrations/zenrows/src/generated/get-job.ts";
+  const index = "dist/mastra/integrations/zenrows/src/generated/index.ts";
+  // o11 lists the endpoint too, and needs a description for it.
+  const spec = JSON.parse(tokenSpecText);
+  spec.paths["/stub/{job_id}"].get.description = "Reads one job.\n\nMore for the API docs.";
+  const r = run({ "openapi-tokens.json": JSON.stringify(spec), "shared/billing.yaml": billingWith({ free: ["GET /stub/{job_id}"] }) }, tokenSpec, [tool, index]);
+  assert.ok(r.ok, r.out);
+  assert.match(r.dist(tool), /id: 'zenrows-get-job'/);
+  assert.match(r.dist(tool), /"server":"https:\/\/async\.example\.com\/v1","path":"\/stub\/\{job_id\}"/);
+  assert.match(r.dist(tool), /job_id: z\.string\(\)/);
+  assert.match(r.dist(tool), /description: 'Read a job\. Reads one job\. This call uses no credits\.'/);
+  assert.match(r.dist(index), /zenrowsGetJob: createZenrowsGetJobTool\(options\)/);
+});
+test("a Mastra tool input named in two places of one operation fails", () => {
+  const spec = JSON.parse(tokenSpecText);
+  spec.paths["/stub-dup/{id}"] = {
+    get: {
+      operationId: "readDup",
+      summary: "Read a dup",
+      parameters: [
+        { name: "id", in: "path", required: true, schema: { type: "string" } },
+        { name: "id", in: "query", schema: { type: "string" } },
+      ],
+    },
+  };
+  const billing = JSON.parse(billingWith({ free: ["GET /stub-dup/{id}"] }));
+  fails({ "openapi-tokens.json": JSON.stringify(spec), "shared/billing.yaml": JSON.stringify(billing) }, 'the API spec has "id" in two places of GET /stub-dup/{id}', tokenSpec)();
+});
+// A failure the spec causes in a host's render.mjs says "the API spec", which api-changed.yml looks for.
+test("a spec-caused failure in the Mastra render says the API spec, as api-changed.yml expects", () => {
+  const spec = structuredClone(published);
+  const parameters = [...(spec.paths["/"].parameters ?? []), ...(spec.paths["/"].get.parameters ?? [])];
+  const wait = parameters.find((p) => p.name === "wait");
+  assert.ok(wait, "GET / has a wait parameter");
+  delete wait.description;
+  const r = run({ "openapi-nodesc.json": JSON.stringify(spec) }, { ZENROWS_OPENAPI: "openapi-nodesc.json" });
+  assert.ok(!r.ok, "the render failed");
+  assert.match(r.out, /platforms\/mastra\/scripts\/render\.mjs: the API spec has no description for wait/);
+  const workflow = readFileSync(join(root, ".github/workflows/api-changed.yml"), "utf8");
+  const pattern = workflow.match(/grep -E '(\^❌ [^']+)'/)[1];
+  assert.match(r.out.split("\n").find((line) => line.startsWith("❌")), new RegExp(pattern));
+});

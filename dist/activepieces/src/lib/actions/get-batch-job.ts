@@ -12,7 +12,7 @@ export const getBatchJobAction = createAction({
   description: "Read a batch job and the progress of its latest run.",
   audience: 'both',
   aiMetadata: {
-    description: "Reads a batch job with its latest run: progress in latest_run.stats, spend in latest_run.stats.spend. Poll it after Create Batch Job until latest_run.status is terminal, then read Get Batch Results. Costs no credits; safe to retry.",
+    description: "Reads a batch job with its latest run: progress in latest_run.stats, spend in latest_run.stats.spend. Poll it after Create Batch Job until latest_run.status is terminal, then read Get Batch Results. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

@@ -12,7 +12,7 @@ export const getBatchResultsAction = createAction({
   description: "List the tasks of a batch job's latest run with their status, one page at a time.",
   audience: 'both',
   aiMetadata: {
-    description: "Lists the tasks of a batch job's latest run, one page at a time, with each task's URL, status and task_id. Filter by status, and pass next_cursor back as Cursor for the next page. Read a task's page with Get Batch Task Content. Costs no credits; safe to retry.",
+    description: "Lists the tasks of a batch job's latest run, one page at a time, with each task's URL, status and task_id. Filter by status, and pass next_cursor back as Cursor for the next page. Read a task's page with Get Batch Task Content. Safe to retry. This call uses no credits.",
     idempotent: true,
   },
   props: {

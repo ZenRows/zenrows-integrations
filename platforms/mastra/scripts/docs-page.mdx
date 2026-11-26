@@ -1,0 +1,279 @@
+---
+title: 'Zenrows | Tools'
+description: 'Add Zenrows tools to Mastra agents to read any public page as Markdown, plaintext, HTML or structured JSON fields, with typed Zod schemas.'
+packages:
+  - '@mastra/zenrows'
+---
+
+# Zenrows
+
+The `@mastra/zenrows` package exposes the [Zenrows](https://www.zenrows.com) API as Mastra-compatible tools: a scrape tool and an extract tool, and a tool for every other endpoint Zenrows offers. Zenrows handles proxies, JavaScript rendering and anti-bot protection. The tools can read pages that block typical scrapers. Each factory returns a tool created with [`createTool()`](/reference/tools/create-tool) and a typed Zod input schema.
+
+The scrape tool returns a page's content. The extract tool returns the structured fields Zenrows parsed out of a page, such as a product's name and price, with no selectors to write. The [other tools](#more-tools) cover the rest of the API, one tool per endpoint.
+
+## Installation
+
+```bash npm2yarn
+npm install @mastra/zenrows zod
+```
+
+Set `ZENROWS_API_KEY` in your environment. You can also pass an API key directly to any factory.
+
+## Quick start
+
+Use `createZenrowsTools()` to create the scrape and extract tools with shared configuration:
+
+```typescript title="src/mastra/tools/index.ts"
+import { createZenrowsTools } from '@mastra/zenrows'
+
+export const zenrowsTools = createZenrowsTools()
+// Or pass an explicit API key:
+// export const zenrowsTools = createZenrowsTools({ apiKey: 'your-zenrows-api-key' })
+```
+
+The returned object contains `zenrowsScrape` and `zenrowsExtract`. `createZenrowsAllTools()` returns those and the [other tools](#more-tools).
+
+Create a tool on its own when an agent doesn't need them all:
+
+```typescript title="src/mastra/tools/index.ts"
+import { createZenrowsExtractTool, createZenrowsScrapeTool } from '@mastra/zenrows'
+
+export const scrapeTool = createZenrowsScrapeTool()
+export const extractTool = createZenrowsExtractTool({ apiKey: 'your-zenrows-api-key' })
+```
+
+A tool reads the API key when it executes, not when you create it. A missing key fails at execution time with a configuration error.
+
+## Configuration
+
+All factories accept `ZenrowsClientOptions`:
+
+<PropertiesTable
+  content={[
+  {
+    name: 'apiKey',
+    type: 'string',
+    description: 'Zenrows API key. Falls back to the `ZENROWS_API_KEY` environment variable.',
+    isOptional: true,
+  },
+  {
+    name: 'baseUrl',
+    type: 'string',
+    description:
+      'Override the Zenrows API base URL. Falls back to the `ZENROWS_API_URL` environment variable, then the public API, {{api:fetch server}}. A tool whose endpoint Zenrows serves from another server keeps that server.',
+    isOptional: true,
+  },
+  {
+    name: 'timeout',
+    type: 'number',
+    description:
+      'Timeout in milliseconds for one request: {{< request-timeout }}.',
+    isOptional: true,
+    defaultValue: '{{request_timeout_ms}}',
+  },
+  {
+    name: 'fetch',
+    type: 'typeof fetch',
+    description: 'Custom `fetch` implementation.',
+    isOptional: true,
+  },
+]}
+/>
+
+A request Zenrows rejects throws a `ZenrowsError` that carries the HTTP `status`, the API error `code` (for example `REQS004` or `REQS007`), its `reason` when it has one, and the API's `detail`. Its message tells the agent what the error means.
+
+## Credits
+
+{{cost:per_credit}} Both tools return the credits a request used as `credits`, read from the `X-Request-Credits` response header, or `null` when the response doesn't carry it. `mode: 'auto'` turns on Adaptive Stealth Mode. {{< adaptive-stealth-mode }}.
+
+## `createZenrowsScrapeTool()`
+
+Creates the `zenrows-scrape` tool. Scrape fetches one URL and returns its content as Markdown by default, as plaintext, or as the page's HTML. With `css_extractor`, it returns only the fields the selectors name, as JSON text.
+
+```typescript
+import { createZenrowsScrapeTool } from '@mastra/zenrows'
+
+const scrapeTool = createZenrowsScrapeTool()
+```
+
+### Scrape input
+
+<PropertiesTable
+  content={[
+  { name: 'url', type: 'string', description: 'The page to fetch. Only `http` and `https` URLs are accepted.' },
+  {
+    name: 'response_type',
+    type: "'markdown' | 'plaintext' | 'html'",
+    description: 'What to return. `html` returns the page as Zenrows received it.',
+    isOptional: true,
+    defaultValue: "'markdown'",
+  },
+  {
+    name: 'mode',
+    type: "'auto'",
+    description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.',
+    isOptional: true,
+  },
+  { name: 'js_render', type: 'boolean', description: 'Render the page in a headless browser first.', isOptional: true },
+  {
+    name: 'premium_proxy',
+    type: 'boolean',
+    description: 'Route the request through residential IPs.',
+    isOptional: true,
+  },
+  {
+    name: 'proxy_country',
+    type: 'string',
+    description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.',
+    isOptional: true,
+  },
+  {
+    name: 'wait_for',
+    type: 'string',
+    description: 'CSS selector to wait for before returning. Needs `js_render`.',
+    isOptional: true,
+  },
+  {
+    name: 'wait',
+    type: 'number',
+    description: 'Milliseconds to wait after load. Needs `js_render`.',
+    isOptional: true,
+  },
+  {
+    name: 'js_instructions',
+    type: 'string',
+    description: 'JSON array of browser actions (click, fill, scroll, wait) to run first. Needs `js_render` or `mode`.',
+    isOptional: true,
+  },
+  {
+    name: 'css_extractor',
+    type: 'string',
+    description: 'JSON object mapping output keys to CSS selectors.',
+    isOptional: true,
+  },
+  {
+    name: 'block_resources',
+    type: 'string',
+    description: 'Comma-separated resource types to block, such as `image,media,font`.',
+    isOptional: true,
+  },
+]}
+/>
+
+### Scrape output
+
+<PropertiesTable
+  content={[
+  { name: 'url', type: 'string', description: 'The input URL.' },
+  {
+    name: 'content',
+    type: 'string',
+    description: 'The page as Markdown, plaintext or HTML, or the `css_extractor` fields as JSON text.',
+  },
+  { name: 'credits', type: 'number | null', description: 'Credits the request used.' },
+]}
+/>
+
+## `createZenrowsExtractTool()`
+
+Creates the `zenrows-extract` tool. Extract returns the fields of a page as JSON, named the way the site names them. It works on any domain Zenrows has prepared. A domain that isn't prepared yet, or a page Extract doesn't recognise, throws a `ZenrowsError` with code `REQS007`, and isn't charged, since {{< failed-not-billed }}.
+
+```typescript
+import { createZenrowsExtractTool } from '@mastra/zenrows'
+
+const extractTool = createZenrowsExtractTool()
+```
+
+### Extract input
+
+<PropertiesTable
+  content={[
+  { name: 'url', type: 'string', description: 'The page to extract. Only `http` and `https` URLs are accepted.' },
+  {
+    name: 'extract_fields',
+    type: 'string',
+    description:
+      'Comma-separated fields to return, dot-notated inside a group, such as `products.name,products.price`. Omit it to receive every field.',
+    isOptional: true,
+  },
+  {
+    name: 'mode',
+    type: "'auto'",
+    description: 'Adaptive Stealth Mode. Use it instead of `js_render` and `premium_proxy`, not with them.',
+    isOptional: true,
+  },
+  { name: 'js_render', type: 'boolean', description: 'Render the page in a headless browser first.', isOptional: true },
+  {
+    name: 'premium_proxy',
+    type: 'boolean',
+    description: 'Route the request through residential IPs.',
+    isOptional: true,
+  },
+  {
+    name: 'proxy_country',
+    type: 'string',
+    description: 'Two-letter country code for the exit IP. Needs `premium_proxy` or `mode`.',
+    isOptional: true,
+  },
+]}
+/>
+
+### Extract output
+
+<PropertiesTable
+  content={[
+  { name: 'url', type: 'string', description: 'The input URL.' },
+  { name: 'data', type: 'unknown', description: 'The extracted fields, parsed from JSON.' },
+  {
+    name: 'credits',
+    type: 'number | null',
+    description: 'Credits the request used. {{< extract-no-credits }}.',
+  },
+]}
+/>
+
+## More tools
+
+`createZenrowsAllTools()` returns the scrape and extract tools and a tool for every other endpoint Zenrows offers:
+
+```typescript title="src/mastra/tools/index.ts"
+import { createZenrowsAllTools } from '@mastra/zenrows'
+
+export const zenrowsTools = createZenrowsAllTools()
+```
+
+Each factory is also exported on its own, such as `createZenrowsStartCrawlTool()`. Each of these tools takes the endpoint's path, query and body fields as its input, and returns the API's answer: JSON parsed, text as a string, and a file such as a PDF as `{ contentType, base64 }`. Batch jobs and crawls run in the background: start one, then read it with the matching tools until it ends.
+
+GENERATED_TOOLS_TABLE
+
+The [Zenrows API reference](https://docs.zenrows.com) describes each endpoint's fields.
+
+## Use the tools with an agent
+
+```typescript title="src/mastra/agents/research-agent.ts"
+import { Agent } from '@mastra/core/agent'
+import { createZenrowsTools } from '@mastra/zenrows'
+
+export const researchAgent = new Agent({
+  id: 'research-agent',
+  name: 'Research Agent',
+  model: '__GATEWAY_ANTHROPIC_MODEL_SONNET__',
+  instructions:
+    'Read pages with the scrape tool. When you need the fields of a product, article or listing page, use the extract tool.',
+  tools: createZenrowsTools(),
+})
+```
+
+## Environment variables
+
+| Variable | Description |
+| - | - |
+| `ZENROWS_API_KEY` | Your Zenrows API key. Used when `apiKey` isn't passed to a factory function. |
+| `ZENROWS_API_URL` | Optional. Overrides the API base URL when `baseUrl` isn't passed. |
+
+## Related
+
+- [Zenrows Fetch API reference](https://docs.zenrows.com/fetch/api-reference)
+- [Zenrows Extract documentation](https://docs.zenrows.com/extract/setup)
+- [Zenrows API error codes](https://docs.zenrows.com/api-error-codes)
+- [`createTool()` reference](/reference/tools/create-tool)
